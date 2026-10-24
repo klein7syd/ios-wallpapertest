@@ -118,8 +118,9 @@ struct WallpaperEditorView: View {
 
     private var canvas: some View {
         GeometryReader { geometry in
-            let width = min(geometry.size.width, geometry.size.height * model.settings.size.aspectRatio)
-            let height = width / model.settings.size.aspectRatio
+            let ratio = CGFloat(model.settings.size.aspectRatio)
+            let width: CGFloat = min(geometry.size.width, geometry.size.height * ratio)
+            let height: CGFloat = width / ratio
             ZStack {
                 if !dataReady {
                     ContentUnavailableView("请先读取待办", systemImage: "checklist",
@@ -155,10 +156,12 @@ struct WallpaperEditorView: View {
                     canvas: canvas, settings: model.settings)
                 let factor = 390 / previewWidth
                 if rect.width > canvas.width + 0.01 {
-                    model.settings.backgroundPanX = min(1, max(-1, start.x + value.translation.width * factor / ((rect.width - canvas.width) / 2)))
+                    let pan: CGFloat = start.x + value.translation.width * factor / ((rect.width - canvas.width) / 2)
+                    model.settings.backgroundPanX = Double(min(1, max(-1, pan)))
                 }
                 if rect.height > canvas.height + 0.01 {
-                    model.settings.backgroundPanY = min(1, max(-1, start.y + value.translation.height * factor / ((rect.height - canvas.height) / 2)))
+                    let pan: CGFloat = start.y + value.translation.height * factor / ((rect.height - canvas.height) / 2)
+                    model.settings.backgroundPanY = Double(min(1, max(-1, pan)))
                 }
             }
             .onEnded { _ in dragStart = nil }

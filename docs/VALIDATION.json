@@ -66,6 +66,15 @@
     "windows_signing": "not_verified",
     "iphone_installation": "not_verified",
     "wallpaper_device_acceptance": "pending_user_device_feedback",
-    "scope": "D1_D2_only_D3_D4_not_started"
+    "scope": "D1_D2_only_D3_D4_not_started",
+    "build_attempts": [
+      {
+        "run": 40115366528,
+        "commit": "492118bc53da0ee2442bfbb18596223e258b2f55",
+        "result": "failed",
+        "reason": "Swift type inference timeout in mixed CGFloat/Double layout expression; no IPA generated",
+        "repository_and_migration_checks": "passed"
+      }
+    ]
   }
 }

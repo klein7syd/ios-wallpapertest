@@ -52,7 +52,7 @@ enum WallpaperRenderer {
     }
 
     static func font(_ settings: WallpaperSettings, size: CGFloat? = nil) -> CTFont {
-        let pointSize = size ?? settings.fontSize
+        let pointSize: CGFloat = size ?? CGFloat(settings.fontSize)
         let base: CTFont
         switch settings.font {
         case .system:
@@ -107,7 +107,7 @@ enum WallpaperRenderer {
             ascent = max(ascent, a); descent = max(descent, d); leading = max(leading, l)
         }
         let natural = ceil(ascent + descent + leading)
-        let advance = natural + settings.lineSpacing
+        let advance: CGFloat = natural + CGFloat(settings.lineSpacing)
         return WallpaperTextBlock(lines: lines, font: chosenFont, ascent: ascent,
             height: lines.isEmpty ? 0 : natural + CGFloat(lines.count - 1) * advance,
             lineAdvance: advance, truncated: truncated)
@@ -117,9 +117,10 @@ enum WallpaperRenderer {
         let settings = try raw.validated()
         let canvas = CGSize(width: logicalWidth, height: settings.size.logicalHeight)
         let margin: CGFloat = 8
-        let panelWidth = canvas.width * settings.panelWidth
-        let padding = min(settings.padding, max(8, (panelWidth - 50) / 2))
-        let textWidth = max(12, panelWidth - 2 * padding - 28)
+        let panelWidth: CGFloat = canvas.width * CGFloat(settings.panelWidth)
+        let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
+        let textWidth: CGFloat = max(12, panelWidth - 2 * padding - 28)
+        let itemSpacing = CGFloat(settings.itemSpacing)
         let filtered = settings.filtered(items)
         let candidates = Array(filtered.prefix(settings.maximumItems))
         var blocks: [(TodoItem, WallpaperTextBlock)] = []
@@ -131,14 +132,16 @@ enum WallpaperRenderer {
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
-        let allHeight = blocks.reduce(CGFloat(0)) { $0 + $1.1.height } +
-            CGFloat(max(0, blocks.count - 1)) * settings.itemSpacing
-        let naturalHeight = (empty?.height ?? allHeight) + 2 * padding +
-            (filtered.count > candidates.count ? reserveFooter.height + 12 : 0)
-        let height = min(canvas.height - 2 * margin, max(2 * padding + 28,
-            settings.automaticHeight ? naturalHeight : canvas.height * settings.panelHeight))
-        let desiredX = (settings.customPosition ? settings.panelX : 0.5) * canvas.width
-        let desiredY = (settings.customPosition ? settings.panelY : 0.5) * canvas.height
+        var allHeight: CGFloat = 0
+        for pair in blocks { allHeight += pair.1.height }
+        allHeight += CGFloat(max(0, blocks.count - 1)) * itemSpacing
+        let contentHeight: CGFloat = empty?.height ?? allHeight
+        let footerHeight: CGFloat = filtered.count > candidates.count ? reserveFooter.height + 12 : 0
+        let naturalHeight: CGFloat = contentHeight + padding * 2 + footerHeight
+        let requestedHeight: CGFloat = settings.automaticHeight ? naturalHeight : canvas.height * CGFloat(settings.panelHeight)
+        let height: CGFloat = min(canvas.height - margin * 2, max(padding * 2 + 28, requestedHeight))
+        let desiredX: CGFloat = CGFloat(settings.customPosition ? settings.panelX : 0.5) * canvas.width
+        let desiredY: CGFloat = CGFloat(settings.customPosition ? settings.panelY : 0.5) * canvas.height
         let x = min(canvas.width - panelWidth - margin, max(margin, desiredX - panelWidth / 2))
         let y = min(canvas.height - height - margin, max(margin, desiredY - height / 2))
         let panel = CGRect(x: x, y: y, width: panelWidth, height: height)
@@ -146,8 +149,8 @@ enum WallpaperRenderer {
         var rows: [WallpaperRow] = []
         var used: CGFloat = 0
         for (index, pair) in blocks.enumerated() {
-            let spacing = rows.isEmpty ? 0 : settings.itemSpacing
-            let reserve = filtered.count > index + 1 ? reserveFooter.height + 12 : 0
+            let spacing: CGFloat = rows.isEmpty ? 0 : itemSpacing
+            let reserve: CGFloat = filtered.count > index + 1 ? reserveFooter.height + 12 : 0
             guard used + spacing + pair.1.height + reserve <= usable + 0.01 else { break }
             used += spacing
             rows.append(WallpaperRow(item: pair.0, block: pair.1, top: panel.minY + padding + used))
@@ -183,10 +186,10 @@ enum WallpaperRenderer {
     }
 
     static func backgroundRect(source: CGSize, canvas: CGSize, settings: WallpaperSettings) -> CGRect {
-        let scale = max(canvas.width / source.width, canvas.height / source.height) * settings.backgroundZoom
+        let scale: CGFloat = max(canvas.width / source.width, canvas.height / source.height) * CGFloat(settings.backgroundZoom)
         let w = source.width * scale, h = source.height * scale
-        return CGRect(x: (canvas.width - w) / 2 + settings.backgroundPanX * (w - canvas.width) / 2,
-                      y: (canvas.height - h) / 2 + settings.backgroundPanY * (h - canvas.height) / 2,
+        return CGRect(x: (canvas.width - w) / 2 + CGFloat(settings.backgroundPanX) * (w - canvas.width) / 2,
+                      y: (canvas.height - h) / 2 + CGFloat(settings.backgroundPanY) * (h - canvas.height) / 2,
                       width: w, height: h)
     }
 
@@ -248,14 +251,14 @@ enum WallpaperRenderer {
         context.scaleBy(x: scale, y: scale)
         context.draw(backgroundImage, in: canvasRect)
         let panel = native(layout.panel, height: layout.canvas.height)
-        let radius = min(settings.cornerRadius, min(panel.width, panel.height) / 2)
+        let radius: CGFloat = min(CGFloat(settings.cornerRadius), min(panel.width, panel.height) / 2)
         let path = CGPath(roundedRect: panel, cornerWidth: radius, cornerHeight: radius, transform: nil)
         context.saveGState()
         context.addPath(path); context.clip()
         if settings.blurRadius > 0 {
             let input = CIImage(cgImage: backgroundImage)
             let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur",
-                parameters: [kCIInputRadiusKey: settings.blurRadius * scale]).cropped(to: input.extent)
+                parameters: [kCIInputRadiusKey: CGFloat(settings.blurRadius) * scale]).cropped(to: input.extent)
             guard let blurImage = ciContext.createCGImage(blurred, from: input.extent)
             else { throw WallpaperError.renderingFailed }
             context.draw(blurImage, in: canvasRect)
@@ -278,7 +281,7 @@ enum WallpaperRenderer {
         }
         context.saveGState()
         context.addPath(path); context.clip()
-        let padding = min(settings.padding, max(8, (panel.width - 50) / 2))
+        let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panel.width - 50) / 2))
         for row in layout.rows {
             let opacity: Double = row.item.isCompleted && settings.completionStyle != .check ? 0.5 : 1
             let firstLineHeight = CTFontGetAscent(row.block.font) + CTFontGetDescent(row.block.font)
