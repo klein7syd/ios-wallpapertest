@@ -14,6 +14,14 @@ Windows + iPhone，GitHub Actions macOS 编译，iPASide 本地签名安装。�
 
 [正式 App Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105646210) 已真实构建成功，生产存储代码的自动化检查通过。交付 **0.1.0／构建 1001**，ARM64 iOS 真机未签名 IPA 已生成并独立检查。用户于 2026-10-24 反馈“验收完成”，并认可原生底栏与简洁页面。阶段 B 按用户整体真机验收记为通过；未提供逐项设备日志，后续保持当前原生、简洁的设计方向。安装步骤与验收：[DEVICE-TEST.md](TodoWallpaper/DEVICE-TEST.md)。
 
-正式 App 的 Widget、壁纸、AI 与视觉完善留待后续阶段。`native-tools/` 保存正式工程生成/编译工具；两条工作流按路径分别触发，避免重复构建。不会自动创建公开 Release。
+正式 App 的壁纸、AI 与视觉完善留待后续阶段。`native-tools/` 保存正式工程生成/编译工具；两条工作流按路径分别触发，避免重复构建。不会自动创建公开 Release。
 
 公开源码可能被复制、缓存；后续改为 Private 无法撤回过去已公开的信息。
+
+## 阶段 C：0.2.0／构建 1002（等待真机验收）
+
+已加入小/中/大交互式 Widget、App Intents、App Groups 和阶段 B 数据一次性迁移，保留现有底部导航。App ID 仍为 org.todowallpaper.app；扩展 org.todowallpaper.app.widget；共享组 group.org.todowallpaper.app。
+
+本轮[Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40111874272) 一次构建成功，迁移及跨进程存储检查通过。IPA 已独立检查为 ARM64 iOS 真机未签名 App + Widget，Intent 元数据 openAppWhenRun=false。
+
+Windows 必须使用本包 Install-TodoWallpaper.cmd，复用 R1 两份 profile 预嵌入与资源完整性检查，直接覆盖已有 App。正式包适配脚本、设备迁移和 Widget 交互尚待本次反馈；不能视为阶段 C 完成。详见 [阶段 C 技术记录](docs/STAGE-C.md) 与 [真机清单](TodoWallpaper/DEVICE-TEST.md)。

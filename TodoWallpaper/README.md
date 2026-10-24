@@ -1,3 +1,17 @@
+# Todo Wallpaper · 阶段 C（待真机验收）
+
+当前版本 **0.2.0／构建 1002**。主 App ID 不变：org.todowallpaper.app。
+
+新增 `Core/TodoSharedStorage.swift` 一次性迁移与共享存储门禁，`Shared/SetTodoCompletionIntent.swift`、`Widget/` 小中大号 Widget 和两端 App Groups 权限。原 CRUD、UUID、排序、数据 schema 与原生底栏保持。原私有文件不删除，共享数据已有较新状态时不重复导入。读取失败有受保护的备份恢复入口。
+
+Windows 使用 `Install-TodoWallpaper.cmd` 与 `native-tools/windows/` 中的 R1 适配脚本，两份 profile 先嵌入再签名，并检查资源和代码哈希。
+
+[当前 Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40111874272) 成功；生产存储和迁移代码在 macOS 临时文件上实测通过，包括 3 进程并发写入。实际 IPA 的两目标为 ARM64 iOS device，未签名，App Intent 元数据均为不打开 App。
+
+**Windows 签名、iPhone 覆盖迁移、共享组访问、Widget 操作与本版数据保留仍待验收。** 见 [DEVICE-TEST.md](DEVICE-TEST.md)。阶段 D 未开始。
+
+下文是已验收阶段 B 的历史说明，保留作为数据格式与原导航基线：
+
 # Todo Wallpaper · 阶段 B
 
 正式 Bundle ID：`org.todowallpaper.app`。版本 `0.1.0`，CI 构建号从 1001 开始。最低 iOS 17。
