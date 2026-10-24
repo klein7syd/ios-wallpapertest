@@ -37,5 +37,17 @@
       "design_direction": "keep_native_navigation_and_simple_layout",
       "evidence_scope": "User accepted stage B overall; individual device logs were not supplied."
     }
+  },
+  "stage_c": {
+    "version": "0.2.0",
+    "bundle_id": "org.todowallpaper.app",
+    "widget_bundle_id": "org.todowallpaper.app.widget",
+    "app_group": "group.org.todowallpaper.app",
+    "compilation": "pending",
+    "migration_checks": "pending",
+    "windows_signing": "not_verified",
+    "iphone_upgrade_and_migration": "not_verified",
+    "widget_interaction": "not_verified",
+    "acceptance": "pending_user_device_feedback"
   }
 }

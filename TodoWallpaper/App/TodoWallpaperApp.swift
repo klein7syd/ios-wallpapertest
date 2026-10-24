@@ -10,7 +10,7 @@ struct TodoWallpaperApp: App {
             TabView {
                 TodoListView(store: store)
                     .tabItem { Label("待办", systemImage: "checklist") }
-                AboutView()
+                AboutView(store: store)
                     .tabItem { Label("关于", systemImage: "info.circle") }
             }
             .task { store.reload() }
@@ -35,6 +35,7 @@ struct TodoListView: View {
     @ObservedObject var store: TodoStore
     @State private var editor: EditorRequest?
     @State private var displayError: DisplayError?
+    @State private var confirmRecovery = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,9 @@ struct TodoListView: View {
                         Text(error)
                     } actions: {
                         Button("重新读取") { store.reload() }
+                        if store.canRecover {
+                            Button("从上次备份恢复") { confirmRecovery = true }
+                        }
                     }
                 } else if !store.hasLoaded {
                     ProgressView("正在读取")
@@ -96,6 +100,12 @@ struct TodoListView: View {
             }
             .alert(item: $displayError) { error in
                 Alert(title: Text("操作未保存"), message: Text(error.message), dismissButton: .default(Text("好")))
+            }
+            .confirmationDialog("从上次成功保存的备份恢复？", isPresented: $confirmRecovery, titleVisibility: .visible) {
+                Button("恢复备份") { perform { try store.recoverFromBackup() } }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("备份可能少一次修改。当前损坏文件会另存保留，不会删除原文件。")
             }
         }
     }
@@ -176,6 +186,7 @@ struct TodoEditorView: View {
 }
 
 struct AboutView: View {
+    @ObservedObject var store: TodoStore
     private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     private var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?" }
     var body: some View {
@@ -191,8 +202,13 @@ struct AboutView: View {
                 }
                 Section("本次测试") {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")
-                    Text("此正式 App 版本尚未加入小组件和壁纸编辑。")
+                    Text("支持主屏幕小组件直接完成或恢复待办。壁纸编辑尚未加入。")
                     Text("安装标识：\(Bundle.main.bundleIdentifier ?? "未知")").font(.caption).textSelection(.enabled)
+                }
+                Section("小组件") {
+                    Text(store.hasLoaded && store.loadError == nil ? "共享存储已就绪" : "请先处理待办页的读取提示")
+                    Text("长按主屏幕，添加 Todo Wallpaper 小组件。任务按钮可直接操作，空白区域仍可打开 App。")
+                    Button("请求刷新小组件") { store.reload() }
                 }
             }
             .navigationTitle("关于")

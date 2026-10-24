@@ -16,6 +16,8 @@ struct TodoDocument: Codable {
 enum TodoDataError: LocalizedError {
     case invalidTitle, missingItem, invalidOrder, invalidDocument
     case unsupportedSchema(Int), unreadableDocument, primaryMissing, lockFailed(Int32)
+    case sharedUnavailable(String), migrationRequired, migrationConflict, migrationMetadataInvalid
+    case recoveryUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +29,11 @@ enum TodoDataError: LocalizedError {
         case .unreadableDocument: return "无法读取待办文件，原文件已保留。请勿卸载 App。"
         case .primaryMissing: return "发现已有备份但主文件缺失，已停止写入以保留数据。"
         case .lockFailed(let code): return "暂时无法访问待办文件（\(code)），请稍后重试。"
+        case .sharedUnavailable(let group): return "没有获得共享存储权限（\(group)）。旧待办仍保留，请核对签名后重试。"
+        case .migrationRequired: return "请先打开 Todo Wallpaper 完成数据迁移。"
+        case .migrationConflict: return "共享存储与迁移记录不一致，已停止迁移并保留原数据。"
+        case .migrationMetadataInvalid: return "迁移记录无法验证，原数据已保留。请勿卸载 App。"
+        case .recoveryUnavailable: return "没有可安全恢复的备份，原文件已保留。"
         }
     }
 }

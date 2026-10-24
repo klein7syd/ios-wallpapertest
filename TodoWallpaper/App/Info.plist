@@ -3,6 +3,7 @@
 <plist version="1.0"><dict>
     <key>CFBundleDisplayName</key><string>Todo Wallpaper</string>
     <key>ITSAppUsesNonExemptEncryption</key><false/>
+    <key>TodoAppGroupIdentifier</key><string>group.org.todowallpaper.app</string>
     <key>UISupportedInterfaceOrientations</key><array>
         <string>UIInterfaceOrientationPortrait</string>
         <string>UIInterfaceOrientationLandscapeLeft</string>

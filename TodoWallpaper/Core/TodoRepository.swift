@@ -5,6 +5,7 @@ import Darwin
 /// an App Group without changing the document schema or item identities.
 struct TodoRepository {
     let directoryURL: URL
+    var requiresExistingFile = false
     var fileURL: URL { directoryURL.appendingPathComponent("todos-v1.json") }
     var backupURL: URL { directoryURL.appendingPathComponent("todos-v1.backup.json") }
 
@@ -76,17 +77,78 @@ struct TodoRepository {
 
     private func readDocument() throws -> TodoDocument {
         if !FileManager.default.fileExists(atPath: fileURL.path) {
-            guard !FileManager.default.fileExists(atPath: backupURL.path) else { throw TodoDataError.primaryMissing }
+            guard !requiresExistingFile, !FileManager.default.fileExists(atPath: backupURL.path) else { throw TodoDataError.primaryMissing }
             return TodoDocument()
         }
-        let data = try Data(contentsOf: fileURL)
+        return try decodeDocument(Data(contentsOf: fileURL))
+    }
+
+    private func decodeDocument(_ data: Data) throws -> TodoDocument {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        // Read schema first, even if a future version changes all item fields.
+        struct Header: Decodable { let schemaVersion: Int }
+        let header: Header
+        do { header = try decoder.decode(Header.self, from: data) }
+        catch { throw TodoDataError.unreadableDocument }
+        guard header.schemaVersion == 1 else { throw TodoDataError.unsupportedSchema(header.schemaVersion) }
         let document: TodoDocument
         do { document = try decoder.decode(TodoDocument.self, from: data) }
         catch { throw TodoDataError.unreadableDocument }
         try validate(document)
         return document
+    }
+
+    func existingSnapshot() throws -> (document: TodoDocument, data: Data)? {
+        try withLock {
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                guard !FileManager.default.fileExists(atPath: backupURL.path) else { throw TodoDataError.primaryMissing }
+                return nil
+            }
+            return (try readDocument(), try Data(contentsOf: fileURL))
+        }
+    }
+
+    /// Only used before migration publishes its ready receipt. Never replaces
+    /// an existing shared document, even if another process arrived first.
+    func installIfAbsent(_ data: Data) throws -> TodoDocument {
+        try withLock {
+            if FileManager.default.fileExists(atPath: fileURL.path) { return try readDocument() }
+            guard !FileManager.default.fileExists(atPath: backupURL.path) else { throw TodoDataError.primaryMissing }
+            let document = try decodeDocument(data)
+            try writeAtomically(data, to: fileURL)
+            guard try Data(contentsOf: fileURL) == data else { throw TodoDataError.migrationConflict }
+            _ = try readDocument()
+            return document
+        }
+    }
+
+    func canRecoverFromBackup() -> Bool {
+        (try? withLock { recoveryPermitted() }) ?? false
+    }
+
+    /// An explicit user action; the damaged file is archived before restore.
+    func recoverFromBackup() throws {
+        try withLock {
+            guard recoveryPermitted() else { throw TodoDataError.recoveryUnavailable }
+            let backup = try Data(contentsOf: backupURL)
+            _ = try decodeDocument(backup)
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                let archive = directoryURL.appendingPathComponent("recovery-preserved-\(UUID().uuidString).json")
+                try writeAtomically(Data(contentsOf: fileURL), to: archive)
+            }
+            try writeAtomically(backup, to: fileURL)
+            _ = try readDocument()
+        }
+    }
+
+    private func recoveryPermitted() -> Bool {
+        guard let backup = try? Data(contentsOf: backupURL), (try? decodeDocument(backup)) != nil else { return false }
+        if !FileManager.default.fileExists(atPath: fileURL.path) { return true }
+        do { _ = try readDocument(); return false }
+        catch TodoDataError.unreadableDocument { return true }
+        catch TodoDataError.invalidDocument { return true }
+        catch { return false } // Never roll back a future schema or an I/O error.
     }
 
     private func update(_ mutation: (inout TodoDocument) throws -> Void) throws -> TodoDocument {

@@ -24,6 +24,7 @@ __pycache__/
 .env
 .env.*
 **/widget-probe-local-output/
+**/todo-wallpaper-local-output/
 **/local-result.json
 **/signed-package-verification.json
 **/zsign.log

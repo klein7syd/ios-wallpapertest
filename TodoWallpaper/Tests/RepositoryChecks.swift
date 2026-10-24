@@ -7,6 +7,11 @@ enum RepositoryChecks {
     }
 
     static func main() throws {
+        if CommandLine.arguments.count == 4, CommandLine.arguments[1] == "--concurrent-worker" {
+            let repository = TodoRepository(directoryURL: URL(fileURLWithPath: CommandLine.arguments[2]), requiresExistingFile: true)
+            for index in 0..<10 { _ = try repository.add(title: "worker-\(CommandLine.arguments[3])-\(index)") }
+            return
+        }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TodoWallpaper-Checks-\(UUID())", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = TodoRepository(directoryURL: root)
@@ -55,6 +60,7 @@ enum RepositoryChecks {
         do { _ = try repository.load(); throw NSError(domain: "ExpectedBackupProtection", code: 1) }
         catch TodoDataError.primaryMissing { }
         print("PASS: CRUD, Unicode, completion/restore, reorder, fresh-instance persistence, backup, rejected writes, unknown schema and corruption preservation.")
+        try MigrationChecks.run()
     }
 
     private static func tryData(_ url: URL) -> Data? { try? Data(contentsOf: url) }
