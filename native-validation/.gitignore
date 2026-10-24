@@ -1,0 +1,6 @@
+out/
+*.xcodeproj/xcuserdata/
+*.p12
+*.p8
+*.mobileprovision
+*.ipa

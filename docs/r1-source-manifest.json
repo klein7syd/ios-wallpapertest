@@ -1,0 +1,233 @@
+{
+  "version": "0.0.2-build5-signing-r1",
+  "source_commit": "a5c8890f00437a3a36247421da0f9dc65e25b01c",
+  "files_compared": 28,
+  "all_blob_hashes_match": true,
+  "sensitive_pattern_findings": [],
+  "original_files": [
+    {
+      "path": ".github/workflows/native-probe.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b4b0e7d4acc4a83942d23a1400abc6e86c0467e9",
+      "size": 911,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/b4b0e7d4acc4a83942d23a1400abc6e86c0467e9"
+    },
+    {
+      "path": "native-validation/.gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "efdba87644caa4c6b045ebabf8fc429b75a28fb5",
+      "size": 29,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/efdba87644caa4c6b045ebabf8fc429b75a28fb5"
+    },
+    {
+      "path": "native-validation/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2dc497d2b75acea631c8f59a995d979b4b90e2a",
+      "size": 64,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/f2dc497d2b75acea631c8f59a995d979b4b90e2a"
+    },
+    {
+      "path": "native-validation/DEVICE-TEST.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "432fcb2d8e5ccdccd91d64adb039b8f55ae2f307",
+      "size": 3929,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/432fcb2d8e5ccdccd91d64adb039b8f55ae2f307"
+    },
+    {
+      "path": "native-validation/NativeInstallProbe.xcodeproj/project.pbxproj",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5be2f862718f17e40109ed99f473dd01544be2c",
+      "size": 16141,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/d5be2f862718f17e40109ed99f473dd01544be2c"
+    },
+    {
+      "path": "native-validation/NativeInstallProbe.xcodeproj/xcshareddata/xcschemes/NativeInstallProbe.xcscheme",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1e8f4a55e89940ce8121ebb65d0bdc7100a5555a",
+      "size": 686,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/1e8f4a55e89940ce8121ebb65d0bdc7100a5555a"
+    },
+    {
+      "path": "native-validation/NativeInstallProbe/App.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cfc3a6ab6648cbf190a4e478643830084b2f985",
+      "size": 4598,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/0cfc3a6ab6648cbf190a4e478643830084b2f985"
+    },
+    {
+      "path": "native-validation/NativeInstallProbe/Info.plist",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d5e985db1d16097ed2338740b49cf08049607d4",
+      "size": 284,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/3d5e985db1d16097ed2338740b49cf08049607d4"
+    },
+    {
+      "path": "native-validation/NativeInstallProbe/Probe.entitlements",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "709e0a78d0e40749b70a58cec0b9668288944e62",
+      "size": 318,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/709e0a78d0e40749b70a58cec0b9668288944e62"
+    },
+    {
+      "path": "native-validation/NativeProbeWidget/Info.plist",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "352a5531ac68df997b740e5d366e2e5932873ed9",
+      "size": 491,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/352a5531ac68df997b740e5d366e2e5932873ed9"
+    },
+    {
+      "path": "native-validation/NativeProbeWidget/NativeProbeWidget.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c01907688a5e68c493c6a8fc77059c650aab625",
+      "size": 3316,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/3c01907688a5e68c493c6a8fc77059c650aab625"
+    },
+    {
+      "path": "native-validation/NativeProbeWidget/Probe.entitlements",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "709e0a78d0e40749b70a58cec0b9668288944e62",
+      "size": 318,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/709e0a78d0e40749b70a58cec0b9668288944e62"
+    },
+    {
+      "path": "native-validation/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4cb9dafd7456e6b3904988436c31522ce538b851",
+      "size": 4885,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/4cb9dafd7456e6b3904988436c31522ce538b851"
+    },
+    {
+      "path": "native-validation/SIGNING-REPAIR.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9a77e66b2875abfdf6c1d342c70d4c3d3634b4e1",
+      "size": 2038,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/9a77e66b2875abfdf6c1d342c70d4c3d3634b4e1"
+    },
+    {
+      "path": "native-validation/Shared/SetProbeTaskCompletionIntent.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "470bcfcef1a723c2e961a2cf16765d5965d62598",
+      "size": 708,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/470bcfcef1a723c2e961a2cf16765d5965d62598"
+    },
+    {
+      "path": "native-validation/Shared/SharedProbeStore.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4a75cc990a45c268eacd52965f843fe74c38488d",
+      "size": 3586,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/4a75cc990a45c268eacd52965f843fe74c38488d"
+    },
+    {
+      "path": "native-validation/signing-repair-evidence/fixed_signer_without_staging.log",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b25f985b7a930e944c6016b25e24bec0ff94fe1d",
+      "size": 1128,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/b25f985b7a930e944c6016b25e24bec0ff94fe1d"
+    },
+    {
+      "path": "native-validation/signing-repair-evidence/fixture-result.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17ac631bcab0643b3f8388103752a21bb3c5029c",
+      "size": 743,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/17ac631bcab0643b3f8388103752a21bb3c5029c"
+    },
+    {
+      "path": "native-validation/signing-repair-evidence/old_signer_with_staging.log",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "abe9072c3f34c006e2c6a82b1f35d6c71e143f74",
+      "size": 1061,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/abe9072c3f34c006e2c6a82b1f35d6c71e143f74"
+    },
+    {
+      "path": "native-validation/signing-repair-evidence/old_signer_without_staging.log",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71fbba116e02c2c7321d21818eb3a7c15007cb24",
+      "size": 1126,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/71fbba116e02c2c7321d21818eb3a7c15007cb24"
+    },
+    {
+      "path": "native-validation/signing-repair-evidence/repair-verification.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7707b4dc7718e0efa849b040dc5110f0ebe946f",
+      "size": 1773,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/e7707b4dc7718e0efa849b040dc5110f0ebe946f"
+    },
+    {
+      "path": "native-validation/tools/Install-WidgetProbe.cmd",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7186e7edaf83f51936b6e7882ab2525f222cdd05",
+      "size": 112,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/7186e7edaf83f51936b6e7882ab2525f222cdd05"
+    },
+    {
+      "path": "native-validation/tools/Install-WidgetProbe.ps1",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "96c0c2687ebebbd3ce56c5c78d29e6fc00dd6984",
+      "size": 2043,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/96c0c2687ebebbd3ce56c5c78d29e6fc00dd6984"
+    },
+    {
+      "path": "native-validation/tools/build.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f1212571e4c7fb83f489372400f6e190187d4910",
+      "size": 2870,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/f1212571e4c7fb83f489372400f6e190187d4910"
+    },
+    {
+      "path": "native-validation/tools/sign_widget_probe.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71c1e258b460a1ef7bfa95f425ccd2d8ed0f293d",
+      "size": 10734,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/71c1e258b460a1ef7bfa95f425ccd2d8ed0f293d"
+    },
+    {
+      "path": "native-validation/tools/test_resource_seals.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56c7a8386883b2b1bb5a42671fe045362960607e",
+      "size": 6849,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/56c7a8386883b2b1bb5a42671fe045362960607e"
+    },
+    {
+      "path": "native-validation/tools/verify_ipa.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f0eb391d474fa355b134b0202eb90894a5b1494",
+      "size": 11155,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/0f0eb391d474fa355b134b0202eb90894a5b1494"
+    },
+    {
+      "path": "native-validation/verification.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "714902c65a2d482a5fe235b1f9615ef7af0e2b05",
+      "size": 4919,
+      "url": "https://api.github.com/repos/klein7syd/klein7syd.github.io/git/blobs/714902c65a2d482a5fe235b1f9615ef7af0e2b05"
+    }
+  ]
+}

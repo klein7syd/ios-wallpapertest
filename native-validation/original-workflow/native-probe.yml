@@ -1,0 +1,32 @@
+name: Native iPhone app and interactive Widget probe
+on:
+  push:
+    branches: [native-install-probe]
+    paths: ['native-validation/**', '.github/workflows/native-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compile-device:
+    runs-on: macos-26
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: native-validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile device app and Widget, then verify embedded extension
+        shell: bash
+        run: bash tools/build.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-iphone-probe-${{ github.run_number }}
+          path: native-validation/out/
+          retention-days: 3
+          if-no-files-found: error

@@ -1,0 +1,109 @@
+{
+  "bundle_id": "org.todowallpaper.nativeinstallprobe",
+  "version": "0.0.1",
+  "build": "1",
+  "minimum_os": "17.0",
+  "architecture": "arm64",
+  "platform": "iOS device",
+  "code_signature": false,
+  "provisioning_profile": false,
+  "executable_bytes": 98952,
+  "ipa_bytes": 13655,
+  "sha256": "b207c6c7be30c4f7f2ab0523f3986ef90d56b3e93d4bc246b6b7a888fdfbc87b",
+  "installation_verified": true,
+  "artifact_scope": "Unsigned GitHub Actions output; signature/profile fields above describe the downloaded IPA before local re-signing.",
+  "device_verification": {
+    "date": "2026-10-24",
+    "evidence": "User-provided iPhone screenshot IMG_0721[1].PNG and user statement that iPASide was used.",
+    "installation_tool_reported": "iPASide",
+    "swiftui_launch_verified": true,
+    "displayed_build": "1",
+    "displayed_counter": 1,
+    "persistence_after_relaunch": "passed_user_report_2026-10-24",
+    "persistence_after_update": "not_yet_verified",
+    "effective_signed_bundle_id": "not_yet_verified",
+    "signing_account_type": "free Apple Account, explicitly reported by user"
+  },
+  "next_probe": {
+    "version": "0.0.2",
+    "build": "5",
+    "source_commit": "9f22d99c5b6e974481f5dfe53ca6efed223f5cc4",
+    "actions_run_id": 40101379470,
+    "job_id": 120894056848,
+    "actions_url": "https://github.com/klein7syd/klein7syd.github.io/actions/runs/40101379470",
+    "compilation": "passed_real_xcode_log",
+    "extension_packaging": "passed_real_ipa_inspection",
+    "app_intent_metadata": "present_in_both_bundles_openAppWhenRun_false",
+    "ipa_sha256": "54d62cade526e589e8c9f416914e502383674b0ba9aef4af1c614eab92fee96c",
+    "artifact_sha256": "85ccd6d57351865e633cfb121eb87d46497f5956a3a9e770cc5a44705c3e083b",
+    "windows_companion": "syntax_and_parser_boundary_checks_only_not_executed_on_windows",
+    "signing": "previous_tool_returned_success_but_device_rejected_widget_resource_seal",
+    "installation": "failed_user_report_0xe8008017",
+    "widget_intent_on_device": "not_yet_verified",
+    "app_groups_on_device": "not_yet_verified",
+    "data_retention_after_update": "not_yet_verified",
+    "artifact_bundles": [
+      {
+        "bundle_id": "org.todowallpaper.nativeinstallprobe",
+        "version": "0.0.2",
+        "build": "5",
+        "app_group": "group.org.todowallpaper.nativeinstallprobe",
+        "embedded_profile": false,
+        "architecture": "arm64",
+        "platform": "iOS device",
+        "signature_present": false,
+        "entitlements": null,
+        "intent_metadata_present": true,
+        "intent_open_app_when_run": false
+      },
+      {
+        "bundle_id": "org.todowallpaper.nativeinstallprobe.widget",
+        "version": "0.0.2",
+        "build": "5",
+        "app_group": "group.org.todowallpaper.nativeinstallprobe",
+        "embedded_profile": false,
+        "architecture": "arm64",
+        "platform": "iOS device",
+        "signature_present": false,
+        "entitlements": null,
+        "intent_metadata_present": true,
+        "intent_open_app_when_run": false
+      }
+    ]
+  },
+  "signing_repair_r1": {
+    "repair_version": "0.0.2-build5-signing-r1",
+    "reported_install_failure": "ApplicationVerificationFailed / NativeProbeWidget.appex / 0xe8008017",
+    "previous_package_status": "Device rejected resource signature; prior identity/entitlement checks were insufficient.",
+    "fix": "Embed both exact provisioning profiles before multi-profile signing; verify all sealed files, unexpected files, Info.plist/resource/entitlement slots and executable page hashes before installation.",
+    "unchanged_unsigned_ipa_sha256": "54d62cade526e589e8c9f416914e502383674b0ba9aef4af1c614eab92fee96c",
+    "app_version": "0.0.2",
+    "app_build": "5",
+    "test_environment": "Linux, official zsign v1.1.1 and v1.1.2, actual build-5 unsigned device IPA, synthetic certificate chain/profiles only",
+    "fixture_results": {
+      "scope": "synthetic_identity_resource_integrity_only",
+      "iphone_installation": "not_tested",
+      "cases": {
+        "old_signer_without_staging": {
+          "integrity_passed": false,
+          "detail": "Resource added after sealing: Payload/NativeInstallProbe.app/PlugIns/NativeProbeWidget.appex/embedded.mobileprovision"
+        },
+        "old_signer_with_staging": {
+          "integrity_passed": true,
+          "detail": "resource seals and code-directory hashes passed"
+        },
+        "fixed_signer_without_staging": {
+          "integrity_passed": true,
+          "detail": "resource seals and code-directory hashes passed"
+        }
+      },
+      "tampered_profile_rejection": "passed",
+      "tampered_code_page_rejection": "passed",
+      "tampered_resource_slot_rejection": "passed"
+    },
+    "windows_r1_execution": "not_yet_verified",
+    "iphone_r1_installation": "not_yet_verified",
+    "widget_function": "not_yet_verified",
+    "apple_signature_trust": "not_established_by_fixture"
+  }
+}

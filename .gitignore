@@ -1,0 +1,33 @@
+# Build output and Xcode user state
+**/out/
+**/build/
+**/DerivedData/
+**/.build/
+**/xcuserdata/
+*.xcuserstate
+.DS_Store
+__pycache__/
+*.pyc
+# Credentials, signed artifacts and local signing state never belong in git.
+*.ipa
+*.app/
+*.appex/
+*.p12
+*.pfx
+*.p8
+*.pem
+*.key
+*.cer
+*.der
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+**/widget-probe-local-output/
+**/local-result.json
+**/signed-package-verification.json
+**/zsign.log
+**/anisette.bin
+**/pairing*.plist
+**/session/
+**/signing/

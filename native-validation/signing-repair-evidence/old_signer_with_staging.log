@@ -1,0 +1,23 @@
+>>> Unzip:	/tmp/probe-seal-wmkw92p3/staged.ipa (99.10 KB) -> /tmp/zsign_folder_1792852158927635 ... 
+[32m>>> Unzip OK! (0.002s, 2456us)
+[0m>>> Signing: 	/tmp/zsign_folder_1792852158927635/Payload/NativeInstallProbe.app ...
+>>> AppName: 	原生安装测试
+>>> BundleId: 	org.todowallpaper.nativeinstallprobe
+>>> Version: 	5
+>>> TeamId: 	PROBETEST1
+>>> SubjectCN: 	Native Probe Fixture
+>>> ReadCache: 	NO
+>>> SignFile: 	NativeInstallProbe
+[33m>>> Can't find CodeSignature segment!
+[0m[33m>>> Realloc CodeSignature space... 
+[0m[33m>>> Success!
+[0m>>> SignFile: 	PlugIns/NativeProbeWidget.appex/NativeProbeWidget
+[33m>>> Can't find CodeSignature segment!
+[0m[33m>>> Realloc CodeSignature space... 
+[0m[33m>>> Success!
+[0m>>> SignFolder: PlugIns/NativeProbeWidget.appex, (NativeProbeWidget)
+>>> SignFolder: NativeInstallProbe.app, (NativeInstallProbe)
+[32m>>> Signed OK! (0.012s, 11546us)
+[0m>>> Archiving: 	/tmp/probe-seal-wmkw92p3/old_signer_with_staging.ipa ... 
+[32m>>> Archive OK! (519.54 KB) (0.002s, 2125us)
+[0m>>> Done. (0.021s, 21003us)

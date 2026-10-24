@@ -1,0 +1,21 @@
+{
+  "scope": "synthetic_identity_resource_integrity_only",
+  "iphone_installation": "not_tested",
+  "cases": {
+    "old_signer_without_staging": {
+      "integrity_passed": false,
+      "detail": "Resource added after sealing: Payload/NativeInstallProbe.app/PlugIns/NativeProbeWidget.appex/embedded.mobileprovision"
+    },
+    "old_signer_with_staging": {
+      "integrity_passed": true,
+      "detail": "resource seals and code-directory hashes passed"
+    },
+    "fixed_signer_without_staging": {
+      "integrity_passed": true,
+      "detail": "resource seals and code-directory hashes passed"
+    }
+  },
+  "tampered_profile_rejection": "passed",
+  "tampered_code_page_rejection": "passed",
+  "tampered_resource_slot_rejection": "passed"
+}
