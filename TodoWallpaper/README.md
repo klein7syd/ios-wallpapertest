@@ -17,3 +17,5 @@
 云端仅编译未签名 ARM64 真机 IPA，不处理 Apple Account 或用户照片。Windows 签名脚本和资源/CodeDirectory 验证原样沿用阶段 C 的 R1 适配版本。
 
 [完整技术说明](../docs/STAGE-D1-D2.md) · [真实结果](../docs/VALIDATION.json) · [设备验收](DEVICE-TEST.md)
+
+实际交付 **0.3.0 / 1005**，[Actions 40115769912](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40115769912) 成功。原生渲染样图已检查，未将 macOS 输出视为 iPhone 验收。IPA 与 Widget 未签名，需用包内 R1 Windows 脚本签名覆盖安装，之后反馈。

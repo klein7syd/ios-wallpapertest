@@ -25,3 +25,16 @@ PhotosPicker grants access to the selected asset; no broad photo-read permission
 The product workflow runs unchanged production repository/migration checks, compiles and executes the actual wallpaper renderer on macOS using synthetic fixture files, then builds real ARM64 iOS App + embedded Widget unsigned. Rendering checks cover output PNG dimensions/readback, shared logical wrap/geometry, zero-material no-tint/orientation, crop bounds, presets/custom sizes, overflow and protected draft reset. Generated PNGs are artifacts for visual inspection, never app sample content.
 
 Compilation, signing, installation and iPhone behavior are recorded separately in docs/VALIDATION.json. See TodoWallpaper/DEVICE-TEST.md for the Windows/iPhone checklist. D3+D4 await actual iPhone feedback.
+
+## Actual delivery · 2026-10-25
+
+- Version **0.3.0 / 1005**, code commit `a6850546717a17dae3bcb438a0b1636d7e06e5c0`.
+- [Actions run 40115769912](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40115769912), job 120936609323: success, **BUILD SUCCEEDED**. Both ARM64 device targets, no Swift source warning in the final build.
+- Production repository/migration checks passed, including concurrent writes and recovery.
+- Production renderer executed and wrote verified PNGs at 1170×2532, 390×844 preview, 1200×1200 and 1600×900. Layout and wrapping match; zero-material RGBA channel difference = 0. Five device presets checked.
+- Inspected the generated 1170×2532 and 1200×1200 images: center/bounds, Chinese wrapping, emoji, truncation, completed styling and omission footer visible. These are synthetic macOS outputs, not phone screenshots or device acceptance.
+- Downloaded artifact digest and ZIP CRC checked, then independently inspected the actual IPA: main+one Widget extension, stable IDs/group, version/build match, true ARM64 iOS device platform, App Intents metadata in both with openAppWhenRun=false, no embedded profile/signature.
+- IPA SHA256: `a8b3b59bff7568395d46b6eecd07df32769222acbd0b13b09143ac87cde6d777`.
+- Artifact 12568511768, ZIP SHA256 `cb7dd79a1abc4aac2dbd735f49ed2b67fbab84b2818a37709e91f4f25ebab215`. Contains unsigned IPA, original Windows R1 scripts, device checklist, actual logs and synthetic rendering outputs.
+- Three macOS runs this delivery: first failed at Swift mixed-number type inference; second passed renderer checks but failed at two SwiftUI Section initializers; third passed after log-based fixes. No blind reruns. Result documentation uses [skip ci].
+- **Windows signing, 0.2.0→0.3.0 overlay installation, Photos permissions, touch gestures, Widget regression and actual iPhone export remain pending. D3+D4 not started.**

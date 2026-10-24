@@ -61,10 +61,10 @@
     "bundle_id": "org.todowallpaper.app",
     "widget_bundle_id": "org.todowallpaper.app.widget",
     "app_group": "group.org.todowallpaper.app",
-    "code": "implemented_pending_compilation",
-    "compilation": "not_run",
-    "windows_signing": "not_verified",
-    "iphone_installation": "not_verified",
+    "code": "implemented",
+    "compilation": "success_real_xcode_log",
+    "windows_signing": "not_verified_for_0.3.0",
+    "iphone_installation": "not_verified_for_0.3.0",
     "wallpaper_device_acceptance": "pending_user_device_feedback",
     "scope": "D1_D2_only_D3_D4_not_started",
     "build_attempts": [
@@ -83,7 +83,68 @@
         "repository_and_migration_checks": "passed",
         "production_wallpaper_render_checks": "passed",
         "synthetic_png_artifact": 12568586108
+      },
+      {
+        "run": 40115769912,
+        "commit": "a6850546717a17dae3bcb438a0b1636d7e06e5c0",
+        "result": "success",
+        "repository_and_migration_checks": "passed",
+        "production_wallpaper_render_checks": "passed",
+        "unsigned_app_widget_ipa": "generated_and_independently_inspected"
       }
-    ]
+    ],
+    "build": "1005",
+    "commit": "a6850546717a17dae3bcb438a0b1636d7e06e5c0",
+    "actions_run": 40115769912,
+    "job": 120936609323,
+    "builds_this_delivery": 3,
+    "repository_and_migration_checks": "passed_production_core_on_mac",
+    "production_wallpaper_render_checks": {
+      "checked_sizes": [
+        "1170 × 2532",
+        "1080 × 2340",
+        "1284 × 2778",
+        "1179 × 2556",
+        "1290 × 2796",
+        "1200 × 1200",
+        "1600 × 900"
+      ],
+      "checks": [
+        "stable real-item identities and manual order",
+        "pending/all filters",
+        "completed style input",
+        "Unicode wrapping and truncation",
+        "default center",
+        "relative centers",
+        "custom pixels",
+        "overflow footer",
+        "extreme bounds",
+        "aspect fill / pan",
+        "PNG readback",
+        "private draft preservation"
+      ],
+      "engine": "production CoreGraphics + CoreText + CoreImage on macOS",
+      "export_pixels": [
+        1170,
+        2532
+      ],
+      "iphone_device_validation": "pending",
+      "logical_layout_and_wrapping_match": true,
+      "preview_pixels": [
+        390,
+        844
+      ],
+      "result": "passed",
+      "synthetic_fixture_only": true,
+      "zero_material_max_channel_difference": 0
+    },
+    "export_visual_inspection": "passed_mac_generated_1170x2532_and_1200x1200_synthetic_pngs_not_iphone",
+    "extension_packaging": "passed_independent_unsigned_ipa_inspection",
+    "ipa_sha256": "a8b3b59bff7568395d46b6eecd07df32769222acbd0b13b09143ac87cde6d777",
+    "artifact_id": 12568511768,
+    "artifact_zip_sha256": "cb7dd79a1abc4aac2dbd735f49ed2b67fbab84b2818a37709e91f4f25ebab215",
+    "photos_permission_key": "present_add_only",
+    "intent_metadata": "present_in_both_targets_openAppWhenRun_false",
+    "protected_sources": "core_migration_widget_intents_windows_R1_native_baseline_git_blob_unchanged"
   }
 }

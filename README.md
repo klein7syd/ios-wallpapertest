@@ -10,6 +10,8 @@ Windows + iPhone，GitHub Actions macOS 编译，iPASide 本地签名安装。Pu
 
 ## 当前交付 · D1 + D2
 
+**0.3.0 / 1005**：[实际构建成功](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40115769912)。原生 PNG 渲染与存储检查通过；新版 Windows 签名和 iPhone 验收待反馈。
+
 正式源码在 `TodoWallpaper/`，版本 **0.3.0**。标识不变：`org.todowallpaper.app` / `org.todowallpaper.app.widget` / `group.org.todowallpaper.app`。
 
 新增 SwiftUI 壁纸页、PhotosPicker、缩放/拖动裁剪、真实待办排版、玻璃面板连续调节、设备尺寸/自定义尺寸、原生 PNG 高清渲染、相册保存、系统分享及单份本地草稿。预览不保存相册。保留阶段 C 全部存储/迁移/小组件代码和 R1 签名流程。
