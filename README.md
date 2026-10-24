@@ -12,7 +12,7 @@ Windows + iPhone，GitHub Actions macOS 编译，iPASide 本地签名安装。�
 
 `TodoWallpaper/`，Bundle ID **org.todowallpaper.app**，版本 **0.1.0**，构建号从 1001 开始。支持新增、编辑、删除、拖动排序、完成/恢复和本地持久化；原生 SwiftUI 底部导航。与测试 App 并存。
 
-[正式 App Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105646210) 已真实构建成功，生产存储代码的自动化检查通过。交付 **0.1.0／构建 1001**，ARM64 iOS 真机未签名 IPA 已生成并独立检查。Windows 签名、iPhone 安装和交互、覆盖保留仍待实测。安装步骤与验收：[DEVICE-TEST.md](TodoWallpaper/DEVICE-TEST.md)。
+[正式 App Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105646210) 已真实构建成功，生产存储代码的自动化检查通过。交付 **0.1.0／构建 1001**，ARM64 iOS 真机未签名 IPA 已生成并独立检查。用户于 2026-10-24 反馈“验收完成”，并认可原生底栏与简洁页面。阶段 B 按用户整体真机验收记为通过；未提供逐项设备日志，后续保持当前原生、简洁的设计方向。安装步骤与验收：[DEVICE-TEST.md](TodoWallpaper/DEVICE-TEST.md)。
 
 正式 App 的 Widget、壁纸、AI 与视觉完善留待后续阶段。`native-tools/` 保存正式工程生成/编译工具；两条工作流按路径分别触发，避免重复构建。不会自动创建公开 Release。
 

@@ -15,10 +15,10 @@
     "version": "0.1.0",
     "compilation": "success_real_xcode_log",
     "repository_checks": "passed_production_core_compiled_and_executed",
-    "signing": "not_performed",
-    "iphone_installation": "not_verified",
-    "device_crud": "not_verified",
-    "upgrade_data_retention": "not_verified",
+    "signing": "completed_for_real_device_installation_user_acceptance",
+    "iphone_installation": "passed_user_report",
+    "device_crud": "accepted_in_overall_stage_b_feedback",
+    "upgrade_data_retention": "included_in_overall_acceptance_no_separate_log",
     "build": "1001",
     "commit": "460c8945fc515d2298d0bec6892c2f136bfdab96",
     "actions_run": 40105646210,
@@ -28,6 +28,14 @@
     "artifact_id": 12564154215,
     "artifact_zip_sha256": "a553ac3d8f4bdded0de9d2b01f8f01ec80d3bf1966465349cb1c05670fcb599e",
     "builds_this_delivery": 2,
-    "app_intents_metadata_warning": "expected_in_stage_B_no_AppIntents_dependency"
+    "app_intents_metadata_warning": "expected_in_stage_B_no_AppIntents_dependency",
+    "device_acceptance": {
+      "date": "2026-10-24",
+      "result": "passed_user_report",
+      "user_feedback": "验收完成，底部栏也是可以的，页面也很好简洁",
+      "native_bottom_bar": "accepted",
+      "design_direction": "keep_native_navigation_and_simple_layout",
+      "evidence_scope": "User accepted stage B overall; individual device logs were not supplied."
+    }
   }
 }
