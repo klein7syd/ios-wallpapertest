@@ -178,9 +178,10 @@ struct WallpaperEditorView: View {
     }
 
     @ViewBuilder private var backgroundControls: some View {
+        let photoTitle = model.hasPhoto ? "更换背景照片" : "选择背景照片"
         Section {
             PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
-                Label(model.hasPhoto ? "更换背景照片" : "选择背景照片", systemImage: "photo")
+                Label(photoTitle, systemImage: "photo")
             }
             if model.hasPhoto {
                 WallpaperSlider(title: "等比例缩放", value: $model.settings.backgroundZoom, range: 1...4)
@@ -208,7 +209,7 @@ struct WallpaperEditorView: View {
     }
 
     @ViewBuilder private var panelControls: some View {
-        Section("尺寸与位置") {
+        Section {
             WallpaperSlider(title: "面板宽度（画布比例）", value: $model.settings.panelWidth, range: 0.3...0.96)
             Toggle("自动适应内容高度", isOn: $model.settings.automaticHeight)
             if !model.settings.automaticHeight {
@@ -220,7 +221,8 @@ struct WallpaperEditorView: View {
                 WallpaperSlider(title: "垂直中心（0 上 · 1 下）", value: $model.settings.panelY, range: 0...1)
                 Button("回到正中") { model.settings.panelX = 0.5; model.settings.panelY = 0.5 }
             }
-        } footer: { Text("默认水平、垂直居中。靠近画布边缘时会自动约束面板，防止超出。") }
+        } header: { Text("尺寸与位置") }
+        footer: { Text("默认水平、垂直居中。靠近画布边缘时会自动约束面板，防止超出。") }
         Section("玻璃") {
             WallpaperSlider(title: "玻璃底色不透明度", value: $model.settings.glassOpacity, range: 0...0.85)
             WallpaperSlider(title: "背景模糊", value: $model.settings.blurRadius, range: 0...45)
@@ -279,7 +281,7 @@ struct WallpaperEditorView: View {
     }
 
     @ViewBuilder private var outputControls: some View {
-        Section("目标像素尺寸") {
+        Section {
             Picker("设备预设", selection: $preset) {
                 ForEach(WallpaperPreset.allCases) { Text($0.title).tag($0) }
             }
@@ -295,7 +297,8 @@ struct WallpaperEditorView: View {
                 }
             }
             LabeledContent("将导出", value: model.settings.size.label + " px")
-        } footer: { Text("默认适配 iPhone 13 Pro：1170 × 2532。自定义宽高各 480–4096，总像素最多 1200 万。") }
+        } header: { Text("目标像素尺寸") }
+        footer: { Text("默认适配 iPhone 13 Pro：1170 × 2532。自定义宽高各 480–4096，总像素最多 1200 万。") }
         Section("PNG 成品") {
             Button { Task { await model.export(saveToPhotos: true) } } label: { Label("保存到相册", systemImage: "square.and.arrow.down") }
                 .disabled(!canExport)

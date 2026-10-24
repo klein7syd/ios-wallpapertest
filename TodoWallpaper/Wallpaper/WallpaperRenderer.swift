@@ -218,6 +218,9 @@ enum WallpaperRenderer {
         let background = try bitmap(width: pixelWidth, height: pixelHeight)
         background.scaleBy(x: scale, y: scale)
         let canvasRect = CGRect(origin: .zero, size: layout.canvas)
+        // Transparent source PNGs also receive an opaque wallpaper backdrop.
+        background.setFillColor(CGColor(gray: 0.12, alpha: 1))
+        background.fill(canvasRect)
         var sourceInfo: WallpaperPhotoInfo?
         var soft = false
         if let photoURL {

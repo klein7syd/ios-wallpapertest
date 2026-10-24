@@ -74,6 +74,15 @@
         "result": "failed",
         "reason": "Swift type inference timeout in mixed CGFloat/Double layout expression; no IPA generated",
         "repository_and_migration_checks": "passed"
+      },
+      {
+        "run": 40115539484,
+        "commit": "3a90ddf2d40aa22ab064c358c6672c32f1156989",
+        "result": "failed",
+        "reason": "iOS SwiftUI Section(title)+footer overload unavailable; fixed to explicit header closure. Captured picker label value to remove MainActor Sendable warning. No IPA generated.",
+        "repository_and_migration_checks": "passed",
+        "production_wallpaper_render_checks": "passed",
+        "synthetic_png_artifact": 12568586108
       }
     ]
   }
