@@ -1,0 +1,23 @@
+{
+  "stage_a": {
+    "source_version": "0.0.2-build5-signing-r1",
+    "source_files_hash_matched": 28,
+    "baseline_commit": "1d002b7ee6659914f5280a346973f196a1bb060f",
+    "preserved_branch": "r1-baseline-0.0.2-build5-signing-r1",
+    "actions_run": 40105083399,
+    "job": 120904990760,
+    "compilation": "success",
+    "ipa_structure": "passed",
+    "device_capabilities": "passed_user_report_in_v2_instruction"
+  },
+  "stage_b": {
+    "bundle_id": "org.todowallpaper.app",
+    "version": "0.1.0",
+    "compilation": "pending",
+    "repository_checks": "pending",
+    "signing": "not_performed",
+    "iphone_installation": "not_verified",
+    "device_crud": "not_verified",
+    "upgrade_data_retention": "not_verified"
+  }
+}

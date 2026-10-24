@@ -1,0 +1,203 @@
+// !$*UTF8*$!
+{
+    "archiveVersion" = "1";
+    "classes" = {
+    };
+    "objectVersion" = "56";
+    "objects" = {
+        "A2CDD2B51B9CC7AF9D7B2D55" = {
+            "isa" = "PBXFileReference";
+            "path" = "Info.plist";
+            "lastKnownFileType" = "text.plist.xml";
+            "sourceTree" = "<group>";
+        };
+        "32514B8369B4DC85624D17CF" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoStore.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "63805A39A8FCF03F10160012" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "32514B8369B4DC85624D17CF";
+        };
+        "74DE40EDB0CAE90A579310D0" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoWallpaperApp.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "F9DED40AA0C983B9BDD62085" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "74DE40EDB0CAE90A579310D0";
+        };
+        "1C48CE29E4E135EE62951B22" = {
+            "isa" = "PBXGroup";
+            "children" = ("A2CDD2B51B9CC7AF9D7B2D55", "32514B8369B4DC85624D17CF", "74DE40EDB0CAE90A579310D0");
+            "path" = "App";
+            "sourceTree" = "<group>";
+        };
+        "AAD07AFE15F3CE565909A001" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoItem.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "88A5B5308D20DB9D5F527856" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "AAD07AFE15F3CE565909A001";
+        };
+        "8A48B64FC787581F6DF279ED" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoRepository.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "E4511F80D122D518145EFAD8" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "8A48B64FC787581F6DF279ED";
+        };
+        "410188F9DC6E499FEC68BCF6" = {
+            "isa" = "PBXGroup";
+            "children" = ("AAD07AFE15F3CE565909A001", "8A48B64FC787581F6DF279ED");
+            "path" = "Core";
+            "sourceTree" = "<group>";
+        };
+        "38A007151ABE87CC01A5B6E9" = {
+            "isa" = "PBXFileReference";
+            "explicitFileType" = "wrapper.application";
+            "includeInIndex" = "0";
+            "path" = "TodoWallpaper.app";
+            "sourceTree" = "BUILT_PRODUCTS_DIR";
+        };
+        "FBDC4F23F93125BBEEAE800C" = {
+            "isa" = "PBXGroup";
+            "children" = ("38A007151ABE87CC01A5B6E9");
+            "name" = "Products";
+            "sourceTree" = "<group>";
+        };
+        "870B3294C0CBD48AF6BBCC1B" = {
+            "isa" = "PBXGroup";
+            "children" = ("1C48CE29E4E135EE62951B22", "410188F9DC6E499FEC68BCF6", "FBDC4F23F93125BBEEAE800C");
+            "sourceTree" = "<group>";
+        };
+        "BCE16DD0260827ECF338C787" = {
+            "isa" = "PBXSourcesBuildPhase";
+            "buildActionMask" = "2147483647";
+            "files" = ("63805A39A8FCF03F10160012", "F9DED40AA0C983B9BDD62085", "88A5B5308D20DB9D5F527856", "E4511F80D122D518145EFAD8");
+            "runOnlyForDeploymentPostprocessing" = "0";
+        };
+        "7561BFB015D8F536760CB671" = {
+            "isa" = "PBXFrameworksBuildPhase";
+            "buildActionMask" = "2147483647";
+            "files" = ();
+            "runOnlyForDeploymentPostprocessing" = "0";
+        };
+        "0189424A5A60FED329FA868E" = {
+            "isa" = "PBXResourcesBuildPhase";
+            "buildActionMask" = "2147483647";
+            "files" = ();
+            "runOnlyForDeploymentPostprocessing" = "0";
+        };
+        "AB52CB08E0FDF02BF6C67C33" = {
+            "isa" = "XCBuildConfiguration";
+            "name" = "Debug";
+            "buildSettings" = {
+                "CLANG_ENABLE_MODULES" = "YES";
+                "CLANG_ENABLE_OBJC_ARC" = "YES";
+                "SDKROOT" = "iphoneos";
+                "IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
+                "SWIFT_VERSION" = "5.0";
+                "SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+            };
+        };
+        "59E1BEE911F66DA37FEBACDC" = {
+            "isa" = "XCBuildConfiguration";
+            "name" = "Debug";
+            "buildSettings" = {
+                "CODE_SIGN_STYLE" = "Automatic";
+                "PRODUCT_NAME" = "$(TARGET_NAME)";
+                "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
+                "CURRENT_PROJECT_VERSION" = "1001";
+                "MARKETING_VERSION" = "0.1.0";
+                "GENERATE_INFOPLIST_FILE" = "YES";
+                "INFOPLIST_FILE" = "App/Info.plist";
+                "INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";
+                "TARGETED_DEVICE_FAMILY" = "1,2";
+                "SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+                "LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks");
+            };
+        };
+        "5283471FF90C511CFE244FFF" = {
+            "isa" = "XCBuildConfiguration";
+            "name" = "Release";
+            "buildSettings" = {
+                "CLANG_ENABLE_MODULES" = "YES";
+                "CLANG_ENABLE_OBJC_ARC" = "YES";
+                "SDKROOT" = "iphoneos";
+                "IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
+                "SWIFT_VERSION" = "5.0";
+                "SWIFT_OPTIMIZATION_LEVEL" = "-O";
+            };
+        };
+        "F4C425279CD5DDD18FD6DC6D" = {
+            "isa" = "XCBuildConfiguration";
+            "name" = "Release";
+            "buildSettings" = {
+                "CODE_SIGN_STYLE" = "Automatic";
+                "PRODUCT_NAME" = "$(TARGET_NAME)";
+                "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
+                "CURRENT_PROJECT_VERSION" = "1001";
+                "MARKETING_VERSION" = "0.1.0";
+                "GENERATE_INFOPLIST_FILE" = "YES";
+                "INFOPLIST_FILE" = "App/Info.plist";
+                "INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";
+                "TARGETED_DEVICE_FAMILY" = "1,2";
+                "SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+                "LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks");
+            };
+        };
+        "640DC9EFD529235A8D9E2727" = {
+            "isa" = "XCConfigurationList";
+            "buildConfigurations" = ("AB52CB08E0FDF02BF6C67C33", "5283471FF90C511CFE244FFF");
+            "defaultConfigurationIsVisible" = "0";
+            "defaultConfigurationName" = "Release";
+        };
+        "976B52545947CA66FD9EF2A4" = {
+            "isa" = "XCConfigurationList";
+            "buildConfigurations" = ("59E1BEE911F66DA37FEBACDC", "F4C425279CD5DDD18FD6DC6D");
+            "defaultConfigurationIsVisible" = "0";
+            "defaultConfigurationName" = "Release";
+        };
+        "0E8A3AD980EC179856012B7E" = {
+            "isa" = "PBXNativeTarget";
+            "buildConfigurationList" = "976B52545947CA66FD9EF2A4";
+            "buildPhases" = ("BCE16DD0260827ECF338C787", "7561BFB015D8F536760CB671", "0189424A5A60FED329FA868E");
+            "buildRules" = ();
+            "dependencies" = ();
+            "name" = "TodoWallpaper";
+            "productName" = "TodoWallpaper";
+            "productReference" = "38A007151ABE87CC01A5B6E9";
+            "productType" = "com.apple.product-type.application";
+        };
+        "98F54143AB4E86B28C3AFEE0" = {
+            "isa" = "PBXProject";
+            "attributes" = {
+                "LastUpgradeCheck" = "2600";
+            };
+            "buildConfigurationList" = "640DC9EFD529235A8D9E2727";
+            "compatibilityVersion" = "Xcode 14.0";
+            "developmentRegion" = "zh_CN";
+            "hasScannedForEncodings" = "0";
+            "knownRegions" = ("zh_CN", "en", "Base");
+            "mainGroup" = "870B3294C0CBD48AF6BBCC1B";
+            "productRefGroup" = "FBDC4F23F93125BBEEAE800C";
+            "projectDirPath" = "";
+            "projectRoot" = "";
+            "targets" = ("0E8A3AD980EC179856012B7E");
+        };
+    };
+    "rootObject" = "98F54143AB4E86B28C3AFEE0";
+}

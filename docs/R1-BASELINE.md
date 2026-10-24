@@ -15,4 +15,12 @@
 
 已排除 IPA、签名输出、profile、私钥、本机缓存、下载认证链接和设备标识。根目录 .gitignore 防止这些本地文件进入后续提交。Public 源码可能被复制、缓存，后续设为 Private 不能撤回已公开内容。
 
-本阶段构建结果将在读取真实 Actions 日志后记录。正式产品只在阶段 A 通过后建立，并使用另一 Bundle ID。
+阶段 A 已读取真实日志并通过：
+
+- 提交：1d002b7ee6659914f5280a346973f196a1bb060f。
+- Actions：https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105083399。
+- Job 120904990760：success；日志含 BUILD SUCCEEDED，IPA 结构检查 passed。
+- 本仓库复编流水号/构建号为 1，不与用户原先已验证构建 5 混淆；不要求重做真机能力验证。
+- 独立保留分支：r1-baseline-0.0.2-build5-signing-r1，指向上述基线提交。
+
+阶段 A 成功后开始阶段 B，正式 Bundle ID 选用 org.todowallpaper.app，与测试 App 并存。
