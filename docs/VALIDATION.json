@@ -43,23 +43,29 @@
     "bundle_id": "org.todowallpaper.app",
     "widget_bundle_id": "org.todowallpaper.app.widget",
     "app_group": "group.org.todowallpaper.app",
-    "compilation": "success_real_xcode_log",
-    "migration_checks": "passed_mac_synthetic_files_and_three_process_writes",
+    "compilation": "pending",
+    "migration_checks": "pending",
+    "windows_signing": "passed_user_report",
+    "iphone_upgrade_and_migration": "accepted_in_overall_stage_c_feedback",
+    "widget_interaction": "passed_user_report_small_medium_large",
+    "acceptance": "passed_user_report",
+    "app_group_sharing_on_iphone": "passed_user_report",
+    "next_stage": "D1_D2_in_development",
+    "device_acceptance": {
+      "date": "2026-10-25",
+      "evidence": "User explicitly confirmed stage C acceptance in D1+D2 instruction; todo CRUD, bottom navigation, three widget sizes, App Intents and App/Widget sync passed."
+    }
+  },
+  "stage_d1_d2": {
+    "version": "0.3.0",
+    "bundle_id": "org.todowallpaper.app",
+    "widget_bundle_id": "org.todowallpaper.app.widget",
+    "app_group": "group.org.todowallpaper.app",
+    "code": "implemented_pending_compilation",
+    "compilation": "not_run",
     "windows_signing": "not_verified",
-    "iphone_upgrade_and_migration": "not_verified",
-    "widget_interaction": "not_verified",
-    "acceptance": "pending_user_device_feedback",
-    "build": "1002",
-    "commit": "922cc61a9bc1f2dce4c38ba0227f421ea1acc211",
-    "actions_run": 40111874272,
-    "job": 120925108096,
-    "extension_packaging": "passed_independent_unsigned_ipa_inspection",
-    "intent_metadata": "present_in_both_targets_openAppWhenRun_false",
-    "ipa_sha256": "e4b7a5e4146bcec3aecc539ac22fe6641dc2c0d2bd90c0288680c97dfedc6396",
-    "artifact_id": 12567375086,
-    "artifact_zip_sha256": "bfac1d45d1c8776a30e1ff61f62c6bb838b00a0c0f9fa7075014dcdf868b8426",
-    "builds_this_stage": 1,
-    "app_group_sharing_on_iphone": "not_verified",
-    "next_stage": "D_not_started"
+    "iphone_installation": "not_verified",
+    "wallpaper_device_acceptance": "pending_user_device_feedback",
+    "scope": "D1_D2_only_D3_D4_not_started"
   }
 }

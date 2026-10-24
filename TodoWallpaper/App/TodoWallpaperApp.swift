@@ -10,6 +10,8 @@ struct TodoWallpaperApp: App {
             TabView {
                 TodoListView(store: store)
                     .tabItem { Label("待办", systemImage: "checklist") }
+                WallpaperEditorView(store: store)
+                    .tabItem { Label("壁纸", systemImage: "photo") }
                 AboutView(store: store)
                     .tabItem { Label("关于", systemImage: "info.circle") }
             }
@@ -202,7 +204,7 @@ struct AboutView: View {
                 }
                 Section("本次测试") {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")
-                    Text("支持主屏幕小组件直接完成或恢复待办。壁纸编辑尚未加入。")
+                    Text("支持主屏幕小组件直接完成或恢复待办，以及本地壁纸编辑与 PNG 导出。")
                     Text("安装标识：\(Bundle.main.bundleIdentifier ?? "未知")").font(.caption).textSelection(.enabled)
                 }
                 Section("小组件") {

@@ -6,6 +6,15 @@ PRODUCT_BUILD=$((1000 + GITHUB_RUN_NUMBER))
 # Compile and execute the production persistence code with independent files.
 swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
 "$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log
+mkdir -p TodoWallpaper/out/render-checks
+python3 native-tools/make-render-fixture.py TodoWallpaper/out/render-checks/fixture-input.png
+# Execute the exact production renderer on macOS, not HTML or a Python imitation.
+swiftc -O -parse-as-library TodoWallpaper/Core/TodoItem.swift \
+    TodoWallpaper/Wallpaper/WallpaperSettings.swift TodoWallpaper/Wallpaper/WallpaperRenderer.swift \
+    TodoWallpaper/Wallpaper/WallpaperDraftStore.swift TodoWallpaper/Tests/WallpaperRenderChecks.swift \
+    -o "$RUNNER_TEMP/todo-wallpaper-render-checks" 2>&1 | tee TodoWallpaper/out/render-compile.log
+"$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
+python3 native-tools/generate_product_project.py
 plutil -lint TodoWallpaper/TodoWallpaper.xcodeproj/project.pbxproj TodoWallpaper/App/Info.plist TodoWallpaper/Widget/Info.plist TodoWallpaper/App/TodoWallpaper.entitlements TodoWallpaper/Widget/TodoWallpaper.entitlements
 xcodebuild build -project TodoWallpaper/TodoWallpaper.xcodeproj -scheme TodoWallpaper -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/todo-wallpaper-derived" ARCHS=arm64 CURRENT_PROJECT_VERSION="$PRODUCT_BUILD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' 2>&1 | tee TodoWallpaper/out/build.log
 PRODUCT_APP="$RUNNER_TEMP/todo-wallpaper-derived/Build/Products/Release-iphoneos/TodoWallpaper.app"
@@ -25,7 +34,8 @@ import json,os,shutil
 from pathlib import Path
 out=Path('TodoWallpaper/out')
 report=json.loads((out/'package-verification.json').read_text())
-(out/'status.json').write_text(json.dumps({'stage':'C','compilation':'succeeded','repository_and_migration_checks':'passed',
+(out/'status.json').write_text(json.dumps({'stage':'D1+D2','compilation':'succeeded','repository_and_migration_checks':'passed',
+    'wallpaper_render_checks':'passed_on_macos_production_renderer','wallpaper_photos_and_touch_on_iphone':'not_verified',
     'version':report['bundles'][0]['version'],'build':report['bundles'][0]['build'],'bundle_id':report['bundles'][0]['bundle_id'],
     'signing':'not_performed','iphone_installation':'not_verified','device_crud':'not_verified',
     'widget_interaction':'not_verified','app_group_migration_on_iphone':'not_verified',
@@ -33,4 +43,4 @@ report=json.loads((out/'package-verification.json').read_text())
     'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA']},indent=2))
 shutil.rmtree(out/'package')
 PY
-echo "Todo Wallpaper 0.2.0 ($PRODUCT_BUILD): unsigned ARM64 app and Widget IPA; Windows signing, iPhone migration and Widget tests pending." >> "$GITHUB_STEP_SUMMARY"
+echo "Todo Wallpaper 0.3.0 ($PRODUCT_BUILD): native PNG checks passed, unsigned ARM64 app + Widget IPA; Windows signing and iPhone wallpaper tests pending." >> "$GITHUB_STEP_SUMMARY"

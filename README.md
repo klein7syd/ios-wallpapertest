@@ -1,27 +1,25 @@
 # Todo Wallpaper · 原生 iOS
 
-Windows + iPhone，GitHub Actions macOS 编译，iPASide 本地签名安装。仓库保持 Public，不保存账号、私钥、profile 或设备信息。
+Windows + iPhone，GitHub Actions macOS 编译，iPASide 本地签名安装。Public 仓库仅含非敏感源码与构建配置，不保存账号、私钥、profile 或设备信息，不自动创建公开 Release。
 
-## R1 基线（阶段 A 已通过）
+## 已验收基线
 
-`native-validation/` 保存原生测试工程，Bundle ID `org.todowallpaper.nativeinstallprobe`。28 个原文件逐个校验 Git blob 哈希。用户已确认 `0.0.2-build5-signing-r1` 原生安装、持久化/覆盖更新、WidgetKit、App Intents、App Groups 和 R1 签名流程通过。
+- 阶段 A：`native-validation/` 独立保留原始 `0.0.2-build5-signing-r1`，Bundle ID `org.todowallpaper.nativeinstallprobe`。原文件哈希、来源及独立分支见 [R1 记录](docs/R1-BASELINE.md)。
+- 阶段 B：正式 App 待办 CRUD、完成/恢复、排序、本地持久化及原生底部导航，用户真实 iPhone 验收通过。
+- 阶段 C：`0.2.0 / 1002`，小中大小组件、App Intents、App Groups 和同步，用户真实 iPhone 验收通过，见 [阶段 C](docs/STAGE-C.md)。
 
-迁移后的[基线 Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105083399) 实际构建成功。基线独立分支 `r1-baseline-0.0.2-build5-signing-r1` 保留，不被正式产品覆盖。详见 [基线记录](docs/R1-BASELINE.md)。
+## 当前交付 · D1 + D2
 
-## 正式 App（阶段 B）
+正式源码在 `TodoWallpaper/`，版本 **0.3.0**。标识不变：`org.todowallpaper.app` / `org.todowallpaper.app.widget` / `group.org.todowallpaper.app`。
 
-`TodoWallpaper/`，Bundle ID **org.todowallpaper.app**，版本 **0.1.0**，构建号从 1001 开始。支持新增、编辑、删除、拖动排序、完成/恢复和本地持久化；原生 SwiftUI 底部导航。与测试 App 并存。
+新增 SwiftUI 壁纸页、PhotosPicker、缩放/拖动裁剪、真实待办排版、玻璃面板连续调节、设备尺寸/自定义尺寸、原生 PNG 高清渲染、相册保存、系统分享及单份本地草稿。预览不保存相册。保留阶段 C 全部存储/迁移/小组件代码和 R1 签名流程。
 
-[正式 App Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40105646210) 已真实构建成功，生产存储代码的自动化检查通过。交付 **0.1.0／构建 1001**，ARM64 iOS 真机未签名 IPA 已生成并独立检查。用户于 2026-10-24 反馈“验收完成”，并认可原生底栏与简洁页面。阶段 B 按用户整体真机验收记为通过；未提供逐项设备日志，后续保持当前原生、简洁的设计方向。安装步骤与验收：[DEVICE-TEST.md](TodoWallpaper/DEVICE-TEST.md)。
+[正式 App Actions](https://github.com/klein7syd/ios-wallpapertest/actions/workflows/todo-wallpaper.yml) 生成包含 App + Widget 的**未签名真机 IPA**和 Windows 安装脚本。实际结果见 [验证记录](docs/VALIDATION.json)；代码、CI、Windows 签名、安装和真机功能分别记录。
 
-正式 App 的壁纸、AI 与视觉完善留待后续阶段。`native-tools/` 保存正式工程生成/编译工具；两条工作流按路径分别触发，避免重复构建。不会自动创建公开 Release。
+- [技术实现及限制](docs/STAGE-D1-D2.md)
+- [Windows 安装与 iPhone 验收](TodoWallpaper/DEVICE-TEST.md)
+- [正式工程结构](TodoWallpaper/README.md)
 
-公开源码可能被复制、缓存；后续改为 Private 无法撤回过去已公开的信息。
+壁纸为静态快照，手动通过系统设置使用；壁纸玻璃独立渲染，不宣称复制系统 Liquid Glass 或后台自动更换壁纸。D1+D2 等待真机验收，D3+D4、AI 和翻译均未开发。
 
-## 阶段 C：0.2.0／构建 1002（等待真机验收）
-
-已加入小/中/大交互式 Widget、App Intents、App Groups 和阶段 B 数据一次性迁移，保留现有底部导航。App ID 仍为 org.todowallpaper.app；扩展 org.todowallpaper.app.widget；共享组 group.org.todowallpaper.app。
-
-本轮[Actions](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40111874272) 一次构建成功，迁移及跨进程存储检查通过。IPA 已独立检查为 ARM64 iOS 真机未签名 App + Widget，Intent 元数据 openAppWhenRun=false。
-
-Windows 必须使用本包 Install-TodoWallpaper.cmd，复用 R1 两份 profile 预嵌入与资源完整性检查，直接覆盖已有 App。正式包适配脚本、设备迁移和 Widget 交互尚待本次反馈；不能视为阶段 C 完成。详见 [阶段 C 技术记录](docs/STAGE-C.md) 与 [真机清单](TodoWallpaper/DEVICE-TEST.md)。
+工作流按路径触发，只进行必要构建；文档性结果提交使用 `[skip ci]`。公开源码可能被复制或缓存，后续改 Private 无法撤回已公开的信息。

@@ -7,7 +7,10 @@ path=Path(sys.argv[1])
 report=verify(path,unsigned=True)
 with zipfile.ZipFile(path) as z:
     for prefix,bundle in zip([ROOT,EXT],report['bundles']):
-        require(bundle['version']=='0.2.0','Version mismatch')
+        require(bundle['version']=='0.3.0','Version mismatch')
+        if prefix==ROOT:
+            import plistlib
+            require(plistlib.loads(z.read(prefix+'Info.plist')).get('NSPhotoLibraryAddUsageDescription'), 'Missing add-only Photos permission explanation')
         metadata=json.loads(z.read(prefix+'Metadata.appintents/extract.actionsdata'))
         intent=metadata['actions']['SetTodoCompletionIntent']
         require(intent['openAppWhenRun'] is False,'Intent must not open the app')

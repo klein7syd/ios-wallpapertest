@@ -1,6 +1,6 @@
 # 阶段 C：正式 Widget 与共享存储
 
-状态：本版编译与自动化检查通过，尚未得到本版真机反馈，不能标记完成或开始阶段 D。
+状态：开发/构建验证中，尚未得到本版真机反馈，不能标记完成或开始阶段 D。
 
 - App：org.todowallpaper.app；原安装身份保持。
 - Widget：org.todowallpaper.app.widget。
@@ -26,15 +26,7 @@ native-tools/windows/ 是 R1 脚本的正式 App 适配副本：只调整产品/
 
 本机安装与验收见 TodoWallpaper/DEVICE-TEST.md。云端只产生未签名 IPA，无 Apple 凭据/私钥/profile/设备信息。
 
-## 实际构建记录
 
-- 日期（用户时区）：2026-10-25。
-- 代码提交：922cc61a9bc1f2dce4c38ba0227f421ea1acc211。
-- Actions：https://github.com/klein7syd/ios-wallpapertest/actions/runs/40111874272。
-- Job 120925108096：success；日志 BUILD SUCCEEDED。
-- 原 CRUD/保存检查及逐字节迁移、标记门禁、中断/重复迁移、错组/缺失文件保护、三个进程写入和备份恢复检查均实际运行 PASS。使用的是临时合成文件，未访问真实 iPhone 数据。
-- 版本 0.2.0，构建 1002；实际 IPA 包含主 App 与 PlugIns/TodoWallpaperWidget.appex，均为 ARM64 iOS device、无 profile、无代码签名。
-- 两目标均包含 SetTodoCompletionIntent 元数据且 openAppWhenRun=false；这不能代替真机“不打开 App”的操作验证。
-- IPA SHA256：e4b7a5e4146bcec3aecc539ac22fe6641dc2c0d2bd90c0288680c97dfedc6396。
-- 本阶段只运行一次 macOS 构建；记录更新跳过 CI。原 R1 基线未改动。
-- 待反馈：Windows 适配签名与安装、iPhone 原待办迁移、Widget 显示/操作/同步、重启与再次覆盖保留。
+## 真机验收更新 · 2026-10-25
+
+用户在 D1+D2 开发指令中明确确认 0.2.0 / 1002 的待办、原生导航、小中大小组件、App Intents 与共享数据同步通过真实 iPhone 验收。阶段 C 标记为通过；新版本仍需覆盖安装回归测试。
