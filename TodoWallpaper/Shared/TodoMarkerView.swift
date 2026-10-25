@@ -32,6 +32,8 @@ struct TodoMarkerView: View {
                     }
                 }.frame(width: extent, height: extent)
             }
-        }.opacity(result.opacity).accessibilityHidden(true)
+        }.opacity(result.opacity)
+            .offset(y: min(maximumSize / 4, max(-maximumSize / 4, style.verticalOffset)))
+            .accessibilityHidden(true)
     }
 }

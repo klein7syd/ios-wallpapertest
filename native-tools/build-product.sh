@@ -3,18 +3,10 @@ set -euo pipefail
 mkdir -p TodoWallpaper/out
 PRODUCT_BUILD=$((1000 + GITHUB_RUN_NUMBER))
 { sw_vers; xcodebuild -version; xcrun --sdk iphoneos --show-sdk-version; } > TodoWallpaper/out/toolchain.txt
-# Compile and execute the production persistence code with independent files.
-swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
-"$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log
-mkdir -p TodoWallpaper/out/render-checks
-python3 native-tools/make-render-fixture.py TodoWallpaper/out/render-checks/fixture-input.png
-# Execute the exact production renderer on macOS, not HTML or a Python imitation.
-swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
-    TodoWallpaper/Wallpaper/WallpaperSettings.swift TodoWallpaper/Wallpaper/WallpaperRenderer.swift \
-    TodoWallpaper/Wallpaper/WallpaperDraftStore.swift TodoWallpaper/Wallpaper/WallpaperGeometry.swift \
-    TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift \
-    -o "$RUNNER_TEMP/todo-wallpaper-render-checks" 2>&1 | tee TodoWallpaper/out/render-compile.log
-"$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
+# Collect both test and iOS compiler diagnostics in the same run, but never package
+# a deliverable if native checks fail. This avoids a second run just to discover UI errors.
+NATIVE_CHECKS_PASSED=true
+if bash native-tools/check-native.sh; then :; else NATIVE_CHECKS_PASSED=false; fi
 python3 native-tools/generate_product_project.py
 plutil -lint TodoWallpaper/TodoWallpaper.xcodeproj/project.pbxproj TodoWallpaper/App/Info.plist TodoWallpaper/Widget/Info.plist TodoWallpaper/App/TodoWallpaper.entitlements TodoWallpaper/Widget/TodoWallpaper.entitlements
 xcodebuild build -project TodoWallpaper/TodoWallpaper.xcodeproj -scheme TodoWallpaper -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/todo-wallpaper-derived" ARCHS=arm64 CURRENT_PROJECT_VERSION="$PRODUCT_BUILD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' 2>&1 | tee TodoWallpaper/out/build.log
@@ -23,6 +15,10 @@ for PRODUCT_BINARY in "$PRODUCT_APP/TodoWallpaper" "$PRODUCT_APP/PlugIns/TodoWal
     lipo -archs "$PRODUCT_BINARY" >> TodoWallpaper/out/architectures.txt
     xcrun vtool -show-build "$PRODUCT_BINARY" >> TodoWallpaper/out/platform.txt
 done
+if [ "$NATIVE_CHECKS_PASSED" != true ]; then
+    echo "Native checks failed; iOS compiler diagnostics collected, no deliverable IPA packaged." >&2
+    exit 1
+fi
 mkdir -p TodoWallpaper/out/package/Payload
 ditto "$PRODUCT_APP" TodoWallpaper/out/package/Payload/TodoWallpaper.app
 (cd TodoWallpaper/out/package && ditto -c -k --keepParent Payload ../TodoWallpaper-unsigned.ipa)

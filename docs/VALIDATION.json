@@ -154,6 +154,15 @@
     "windows_signing": "not_verified",
     "iphone_installation": "not_verified",
     "device_acceptance": "pending_user_feedback",
-    "scope": "final_revision_Emoji_ratio_first_4K_only"
+    "scope": "final_revision_Emoji_ratio_first_4K_only",
+    "build_attempts": [
+      {
+        "run": 40179574435,
+        "commit": "109732cc5dbeeb847580de78bd142875cd25c581",
+        "result": "failed_native_check",
+        "repository_migration_and_weight_raster_checks": "passed",
+        "reason": "Test incorrectly required chromatic pixels for native achromatic musical-note Emoji; heart and blossom colored PNGs already passed. Corrected glyph/ink criterion for native note, retained chromatic checks for colored Emoji."
+      }
+    ]
   }
 }

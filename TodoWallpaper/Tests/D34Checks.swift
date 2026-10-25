@@ -19,6 +19,7 @@ enum D34Checks {
         }
         return count
     }
+    static func tryInk(_ image: CGImage) -> Int { (try? ink(image)) ?? 0 }
     static func colored(_ image: CGImage) throws -> Int {
         let bytes = [UInt8](try WallpaperRenderChecks.pixels(image)); var count = 0
         for i in stride(from: 0, to: bytes.count - 3, by: 4) {
@@ -69,8 +70,24 @@ enum D34Checks {
                 textColor: WallpaperColor(red: 0, green: 0, blue: 0), rect: CGRect(x: 35, y: 35, width: 160, height: 160), context: context)
             guard let image = context.makeImage() else { throw WallpaperError.renderingFailed }
             let count = try colored(image); emojiPixels[emoji] = count
-            try require(count > 100, "Emoji must contain actual colored pixels, not tofu or monochrome")
             try WallpaperRenderer.writePNG(image, to: out.appendingPathComponent("emoji-\(index).png"), expected: WallpaperSize(width: 230, height: 230))
+            let nativeLine = MarkerDrawing.emojiLine(emoji, size: 160)
+            let runs = CTLineGetGlyphRuns(nativeLine) as NSArray
+            var glyphsFound = 0
+            for element in runs {
+                let run = element as! CTRun
+                var glyphs = Array(repeating: CGGlyph(0), count: CTRunGetGlyphCount(run))
+                CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &glyphs)
+                glyphsFound += glyphs.filter { $0 != 0 }.count
+            }
+            try require(glyphsFound > 0, "Missing native glyph for \(emoji)")
+            if emoji == "🎵" {
+                // Apple's native musical-note glyph is achromatic. Do not invent a color
+                // merely to satisfy a saturation test; preserve the original font appearance.
+                try require(tryInk(image) > 100, "Native musical-note glyph must not be blank")
+            } else {
+                try require(count > 100, "Expected native color pixels for \(emoji), got \(count)")
+            }
             items.append(TodoItem(id: UUID(), title: index == 6 ? "组合 Emoji 与长标题自动换行：家人的时间也值得好好安排" : "真实标记渲染测试 \(index + 1)",
                 marker: TodoMarker(kind: .emoji, emoji: emoji), isCompleted: false, createdAt: .now, updatedAt: .now))
         }
