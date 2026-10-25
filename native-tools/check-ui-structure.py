@@ -42,6 +42,8 @@ require('DisclosureGroup' not in marker and '精细 RGB' not in marker and 'Colo
 for forbidden in ['UITabBar.appearance', 'setValue(', 'WebView', 'WKWebView']:
     require(all(forbidden not in source for source in [app,wallpaper,widget,marker]), f'No {forbidden} workaround in edited UI')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
+require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
+    'Protected manifest contains source/config only, no generated caches')
 for path, expected in protected.items():
     # Git intentionally checks Windows text scripts out as CRLF; signing code is unchanged.
     data = (root/path).read_bytes()

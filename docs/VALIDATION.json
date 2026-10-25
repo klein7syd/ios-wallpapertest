@@ -319,6 +319,18 @@
     "iphone_installation": "not_verified",
     "floating_text_retest": "pending_real_iPhone",
     "device_acceptance": "pending_user_feedback",
-    "scope": "seven_UI_feedback_items_only; no schema or R1 changes"
+    "scope": "seven_UI_feedback_items_only; no schema or R1 changes",
+    "build_attempts": [
+      {
+        "run": 40187256239,
+        "job": 121150575356,
+        "commit": "314fb77eb4d2cb04cf5b6be7b644390b0986d8c5",
+        "build": "1011",
+        "result": "failed_source_manifest_check",
+        "iOS_App_and_Widget_compilation": "success_real_xcode_log",
+        "reason": "Protected-source manifest accidentally contained a local ignored Python cache path. Removed generated entry; UI source did not change. No IPA packaged.",
+        "native_state_storage_render_checks": "not_run_due_to_precheck_failure"
+      }
+    ]
   }
 }

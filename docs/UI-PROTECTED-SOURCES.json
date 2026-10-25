@@ -19,7 +19,6 @@
   "TodoWallpaper/Widget/TodoWallpaper.entitlements": "74d082a37edd0beb507296d3e97832c8241925891dac15352ebe7fc6cc9c535b",
   "native-tools/windows/Install-TodoWallpaper.cmd": "a38f8c8a6d40acfe1560afb01dc69253a066c077f15a1a2f6d87c7c1f0a4e7a4",
   "native-tools/windows/Install-TodoWallpaper.ps1": "b40943bda947206bff0370dc564abca03ef1a34ba68ef40c3685f0f971c7a447",
-  "native-tools/windows/__pycache__/verify_ipa.cpython-312.pyc": "aaa92d496e08572ec63643dbba6ac226cf4173703869e56e88b7414de3a86eac",
   "native-tools/windows/sign_todo_wallpaper.py": "1616e8eb894516245c6e803af4e517fd619b5f7c6c1826ac71e8ae0e815338e5",
   "native-tools/windows/verify_ipa.py": "2bb4cd566dac665426a3cb812ba373c2e825919b35daae65070fcadd69c1309c"
 }
