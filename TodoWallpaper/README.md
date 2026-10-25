@@ -1,6 +1,6 @@
 # Todo Wallpaper 0.4.2 · Widget feedback revision
 
-[Changes and validation scope](../docs/WIDGET-FEEDBACK.md). New version awaits actual CI and iPhone acceptance.
+[Changes and validation scope](../docs/WIDGET-FEEDBACK.md). **1015 passed CI**, including the device App/Widget and isolated iOS Simulator rendering. Windows signing, installation, physical font/Display Zoom and Widget interaction remain pending user acceptance.
 
 # Previous native UI revision
 

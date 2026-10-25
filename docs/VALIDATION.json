@@ -382,11 +382,93 @@
     "version": "0.4.2",
     "base": "0.4.1 / 1013",
     "code": "implemented",
-    "CI": "pending",
+    "CI": "success_real_logs_device_and_Simulator_builds",
     "native_tests": "pending_macos_and_iOS_Simulator",
     "windows_signing": "not_performed",
     "iphone_installation": "not_verified",
     "physical_iPhone_Display_Zoom": "not_verified",
-    "device_acceptance": "pending_user_feedback"
+    "device_acceptance": "pending_user_feedback",
+    "build": "1015",
+    "commit": "a9d07f7fce1070dfcdd6c4689786981dc0803097",
+    "actions_run": 40199284647,
+    "job": 121186801277,
+    "builds_this_delivery": 2,
+    "ui_architecture_checks": 51,
+    "protected_unchanged_source_files": 20,
+    "repository_migration_and_backup_checks": "passed",
+    "widget_feedback_state_and_compatibility_checks": "passed",
+    "native_raster_checks": "passed_54_small_Emoji_1x_3x_and_static_wallpaper_policies",
+    "iOS_Simulator_probe": {
+      "device_signing_installation_and_acceptance": "not_verified",
+      "environment": "iOS Simulator; not a real iPhone",
+      "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",
+      "result": "passed",
+      "small_heart_pixel_widths": {
+        "8": 20,
+        "10": 26,
+        "12": 31,
+        "16": 41,
+        "19": 50,
+        "20": 53,
+        "24": 65,
+        "32": 88,
+        "48": 132
+      },
+      "system": "26.5",
+      "text_effect_pixel_hashes": {
+        "color": "0bd6053094e75c0bfed549b087dd2397699f30f87e322ca1708ccf2cb8d498dc",
+        "fade": "c1f735a1602f6c0187170c6529f887f60cc7e1e87c103e11e665a68920e6c462",
+        "fadeStrike": "90f4f256467716a1076b48ff8bf1ae1f9220338de5231f477d16fb7db7a38615",
+        "keep": "c6558b5992948a589d317064fe53ae14ff1d1b445d61cce23e3e50c6d6d03230",
+        "strike": "df4f1c78d76dca8385a4b9ff439f410e9b03de620a3cc36cd8b8c571039fa0ee"
+      },
+      "UIFontMetrics_point_sizes": {
+        "a11y": 32.666666666666664,
+        "a11y-max": 42.333333333333336,
+        "large": 19.666666666666668,
+        "small": 13,
+        "standard": 15
+      },
+      "widget_type_size_matrix_images": 30
+    },
+    "iOS_Simulator_system_content_size": "command_accepted_maximum_accessibility_screenshot_captured",
+    "UI_screenshot_review": "editor_circle_plus_single_tool_capsule_no_system_TabBar; small_hearts_complete; final_maximum_text_menu_fits_single_line",
+    "marker_selector_offscreen_snapshot": "ScrollView_snapshot_blank; not_counted_as_visual_pass; source_allocation_and_manual_phone_check_only",
+    "Swift_source_warnings": 0,
+    "artifact_id": 12601806039,
+    "artifact_zip_sha256": "d8b754cfaf98dd81ba1d8405ff2a20d68c121c74708d984c3e7952daf84eebb5",
+    "ipa_sha256": "13bfc1afc66f981022a398ae0561f4bd632d48ca47884fec1d510577dece95d5",
+    "IPA": "unsigned_arm64_iOS_device_App_and_Widget_independently_verified; no_Simulator_probe",
+    "R1_installer": "unchanged_source_content; Windows_CRLF_normalized_for_comparison",
+    "actual_export_pixels": [
+      [
+        1890,
+        4096
+      ],
+      [
+        2304,
+        4096
+      ]
+    ],
+    "real_iPhone_Font_DisplayZoom_touch_and_Widget_acceptance": "pending_user_feedback",
+    "build_attempts": [
+      {
+        "run": 40197988638,
+        "job": 121182894435,
+        "commit": "f585d9c789bca51a3833a4e2d8a57bb830dd73bd",
+        "build": "1014",
+        "result": "success",
+        "followup": "Actual maximum-system-font screenshot showed a wrapping settings menu label. Updated compact menus, marker-card allocation and numeric input; no data/signing changes."
+      },
+      {
+        "run": 40199284647,
+        "job": 121186801277,
+        "commit": "a9d07f7fce1070dfcdd6c4689786981dc0803097",
+        "build": "1015",
+        "result": "success",
+        "checks": "all_declared_native_and_Simulator_checks_passed",
+        "delivery": "final_unsigned_IPA_verified; actual_system_font_screenshot_reviewed"
+      }
+    ]
   }
 }

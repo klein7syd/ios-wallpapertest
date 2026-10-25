@@ -27,3 +27,19 @@ The CI Simulator Debug app alone includes NativeUIProbe. Its five Dynamic Type e
 The probe source/flags are absent from the device Release build; IPA verification checks that the probe launch marker is not embedded. Simulator rendering and screenshots do not prove physical iPhone scrolling, touch behavior, signing, installation or Widget timeline/Intent execution. Those need the packaged device checklist and user feedback.
 
 Actual build evidence will be recorded after CI. No PWA, AI, translation, cloud sync, custom image assets or new signing flow is added.
+
+## Actual final evidence
+
+Final **0.4.2 / 1015**, commit `a9d07f7fce1070dfcdd6c4689786981dc0803097`, [Actions 40199284647](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40199284647), job 121186801277: **success**. Both device bundles are ARM64 iOS device, original identifiers/group, no signature/profile, App Intent metadata `openAppWhenRun=false`. The CI probe launch marker is absent from the delivered device executable.
+
+51 architecture/protected-file guards, production CRUD/migration/concurrency/backup, new compatibility/preview/range/row-budget checks, existing 4K/fonts/Emoji and 54 small native Emoji images at 1x/3x passed. There are zero Swift-source warnings. Actual PNG dimensions independently checked: 1890×4096 and 2304×4096.
+
+iOS **26.5 Simulator**: nine actual heart outputs at 8/10/12/16/19/20/24/32/48pt fit their cell. Rendered ink widths at 3x were 20/26/31/41/50/53/65/88/132px, so growth continues beyond 24pt. Five completed-text effects have distinct actual pixel hashes. Thirty Widget images cover five Dynamic Type environments and normal/85% logical dimensions. UIKit body baseline15pt measured13/15/19.67/32.67/42.33 across the tested categories. The Simulator accepted the maximum system content-size command; actual app screenshots show the separate circle+current-tool Dock and the final single-line large-text settings menu. These are Simulator observations, not physical phone results.
+
+The extra offscreen marker-card ScrollView snapshot was blank and **is excluded from visual passes**. Its larger card/number-field layout still needs the real control-page/manual accessibility check. No automated native tap sequence is claimed: preview routing is source/state tested, and real Widget App Intent taps remain on the phone checklist.
+
+Two real CI runs, both successful: 1014 compiled and tested the first revision; reviewing its maximum-font screenshot found a crowded settings menu. Final1015 includes the corresponding compact-menu/card/numeric-field correction and repeats the declared checks. No further full builds for evidence-only documentation.
+
+Artifact `todo-wallpaper-0.4.2-15`, id12601806039, 14,146,673 bytes, SHA256 `d8b754cfaf98dd81ba1d8405ff2a20d68c121c74708d984c3e7952daf84eebb5`. Unsigned IPA SHA256 `13bfc1afc66f981022a398ae0561f4bd632d48ca47884fec1d510577dece95d5`. The official ZIP was retained unchanged, downloaded and checked by SHA256/CRC; bundle metadata/platform/probe exclusion and original R1 scripts were independently verified (Windows line endings normalized).
+
+**Windows signing/install, real iPhone system-font/Display Zoom, touches, scroll stability and Widget actions remain pending.** Use the unchanged R1 installer to cover the existing App, never uninstall it, then follow `TodoWallpaper/DEVICE-TEST.md`. Stop for user feedback.

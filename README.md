@@ -1,6 +1,6 @@
 # Todo Wallpaper · Native iOS
 
-**Current work: 0.4.2 · Widget and compact Dock feedback revision.** Native device compilation, Simulator checks and iPhone acceptance are recorded separately.
+**Current delivery: 0.4.2 / 1015** — [real CI success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40199284647). App+Widget device compilation, native regression and iOS Simulator rendering passed. New Windows signing and real iPhone acceptance remain pending.
 
 Public source-only personal project. Windows+iPhone, free Apple Account, macOS GitHub Actions compilation, Windows iPASide/R1 local signing. No credentials, signed packages, profiles or device identities are committed; no automatic public Releases.
 
