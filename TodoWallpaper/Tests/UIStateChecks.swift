@@ -77,9 +77,14 @@ enum UIStateChecks {
                 "Hidden marker stays hidden without deleting a dormant replacement policy")
         }
         for height in [150.0, 260, 420, 650, 900] {
-            let preview = EditorSizing.widgetPreviewHeight(available: height)
+            for family in WidgetPreviewFamily.allCases {
+            let preview = EditorSizing.widgetPreviewHeight(available: height, family: family)
             let controlsHeader = height < 320 ? 44.0 : 96.0
             try require(height - preview - controlsHeader - 6 > 20, "Pinned preview leaves independent settings space even in compact keyboard layout")
+            if height >= 320 && family != .large {
+                try require(preview <= 214, "Small/medium preview must not reserve the large Widget's empty vertical space")
+            }
+            }
         }
         try require(WidgetPreviewFamily.small.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 2, "Small Widget retains proven row capacity")
         try require(WidgetPreviewFamily.medium.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 3, "Medium Widget retains proven row capacity")

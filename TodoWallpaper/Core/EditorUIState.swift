@@ -65,10 +65,10 @@ enum EditorSizing {
         if !expanded { return min(64, available) }
         return min(310, max(160, available * 0.46), max(64, available - 110))
     }
-    static func widgetPreviewHeight(available: Double) -> Double {
+    static func widgetPreviewHeight(available: Double, family: WidgetPreviewFamily = .large) -> Double {
         guard available.isFinite, available > 0 else { return 0 }
         if available < 320 { return min(100, max(52, available * 0.30)) }
-        return min(310, available * 0.43, available - 160)
+        return min(310, available * 0.43, available - 160, family.height + 44)
     }
 }
 

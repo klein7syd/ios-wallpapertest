@@ -28,7 +28,7 @@ struct WidgetAppearanceEditor: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height))
+                fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
                 if geometry.size.height < 320 {
                     HStack {
                         Picker("类别", selection: $tool) { ForEach(WidgetEditorTool.allCases) { Text($0.rawValue).tag($0) } }
