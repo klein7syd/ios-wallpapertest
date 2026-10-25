@@ -312,9 +312,9 @@
     "version": "0.4.1",
     "base_version": "0.4.0 / 1010",
     "code": "implemented",
-    "compilation": "pending",
-    "ui_state_checks": "pending_macos_execution",
-    "ui_architecture_checks": "passed_local_source_checks",
+    "compilation": "success_real_xcode_log_App_and_Widget",
+    "ui_state_checks": "passed_compiled_production_navigation_capabilities_and_sizing",
+    "ui_architecture_checks": "passed_47_source_and_protected_file_guards_on_CI",
     "windows_signing": "not_performed",
     "iphone_installation": "not_verified",
     "floating_text_retest": "pending_real_iPhone",
@@ -330,7 +330,51 @@
         "iOS_App_and_Widget_compilation": "success_real_xcode_log",
         "reason": "Protected-source manifest accidentally contained a local ignored Python cache path. Removed generated entry; UI source did not change. No IPA packaged.",
         "native_state_storage_render_checks": "not_run_due_to_precheck_failure"
+      },
+      {
+        "run": 40187452118,
+        "job": 121151152536,
+        "commit": "6bfc9575416c4ce0c0be47f57944fa18f014e673",
+        "build": "1012",
+        "result": "success",
+        "checks": "all_passed",
+        "followup": "Review found small/medium previews reserved large-family height. Final follow-up only caps fixed preview space by selected family and adds a sizing guard."
+      },
+      {
+        "run": 40187675187,
+        "job": 121151823203,
+        "commit": "6433f5ac367a34344424d1db87781ba012bbfac9",
+        "build": "1013",
+        "result": "success",
+        "checks": "all_passed_including_family_space_guard",
+        "delivery": "final_unsigned_IPA_downloaded_SHA256_CRC_verified_and_independently_inspected"
       }
-    ]
+    ],
+    "build": "1013",
+    "commit": "6433f5ac367a34344424d1db87781ba012bbfac9",
+    "actions_run": 40187675187,
+    "job": 121151823203,
+    "repository_migration_and_native_render_regression": "all_passed_on_macos",
+    "ipa_structure": "passed_independent_0.4.1_1013_App_and_Widget_arm64_iOS_device_inspection",
+    "intent_metadata": "present_both_targets_openAppWhenRun_false",
+    "artifact_id": 12597135589,
+    "artifact_zip_sha256": "313f488ac1a93915f58242ad0c0dc385ea961a81db81d8a462319b5f12530f2b",
+    "ipa_sha256": "7d978dd8e32879a09ff2eaf6667bdba8fd929c69b50a784944201aa7306c007f",
+    "r1_install_scripts": "identical_source_content; intentional_CRLF_checkout_normalized",
+    "protected_sources": 22,
+    "swift_source_warnings": 0,
+    "builds_this_delivery": 3,
+    "simulator_UI_automation": "not_run",
+    "device_visual_bug_root_cause": "source_layout_and_clipping_risks_addressed; exact_iPhone_failure_not_reproduced_here",
+    "native_png_dimensions_verified": {
+      "modern": [
+        1890,
+        4096
+      ],
+      "classic": [
+        2304,
+        4096
+      ]
+    }
   }
 }

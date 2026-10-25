@@ -6,7 +6,7 @@ Base: `7b29bae4ebfdb42fa34a898bb76e0a9094df27a1`, previous delivered App 0.4.0 /
 
 - Four native TabView roots: Todo, Wallpaper, Widget, About. Widget is the full editor; duplicate pushed entrances removed.
 - `AppNavigationState` explicitly tracks selected root, active wallpaper tool and inspector visibility. In ordinary mode the system Tab Bar is visible. Selecting a tool hides it with public SwiftUI `toolbar(_:for:)`; the editor Dock supplies a 44pt circular page menu and the five tools. Restoring the full tabs or selecting any page clears editing state. No private API or overlay over the system Tab Bar.
-- Wallpaper canvas and controls are sibling layout regions. Expanded panel height adapts to available safe-area/keyboard height, retaining canvas space. The Dock remains present when settings collapse. Only entering/exiting/collapsing the Dock animates; tool contents replace directly.
+- Wallpaper canvas and controls are sibling layout regions. Expanded panel height adapts to available safe-area/keyboard height, retaining canvas space. The Dock remains present when settings collapse. Dock entry/collapse uses explicit animation; tool contents replace directly without animating the entire scrolling content.
 - Reusable `InspectorViewport` has one bounded vertical ScrollView and explicit scroll/outer clipping. Common and advanced controls are separate pages, not nested DisclosureGroups. Tool/detail changes reset the page's top anchor; changing a value does not change view identity or scroll position.
 - 28pt continuous outer panel, 16pt tool/choice surfaces, 44pt navigation/touch targets. No extra decorative shadow or thick panel outline. Sliders remain continuous; display precision is tailored to point/ratio/coordinate values.
 
@@ -41,3 +41,14 @@ No installation IDs, App Group configuration, task/document/appearance/draft sch
 Existing production repository/migration/native PNG checks continue. New executable Swift state checks cover root/Dock transitions, repeat switching/collapse, marker-control capabilities, dormant-value compatibility, reduced-height allocation and family ratios/capacities. A separate source-architecture guard checks containment, clipping, shared preview/extension rows, public navigation, no duplicate entrances and protected sources. These checks do not prove iPhone scrolling, frame rate, signing, Photos permission, safe areas or Widget interaction.
 
 Build and device evidence is recorded after the real workflow in `VALIDATION.json`. The output is an **unsigned** ARM64 device IPA including the Widget, plus unchanged R1 Windows scripts. Do not uninstall the previous App; use the same iPASide account and installation identity. No Release is created. Stop after this delivery for iPhone feedback.
+
+## Actual delivery evidence
+
+Final **0.4.1 / 1013**, code `6433f5ac367a34344424d1db87781ba012bbfac9`: [Actions run 40187675187](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40187675187), job 121151823203, **success**.
+
+- 47 architecture/protected-source guards, executable production navigation/control/sizing state checks, CRUD/migration/3-process/recovery checks and actual native 4K/font/Emoji rendering all passed. There are zero Swift-source warnings. No simulator UI or real iPhone scroll automation ran.
+- Both main and extension: 0.4.1 / 1013, ARM64 iOS device; original Bundle IDs and source App Group. App Intent metadata is present with `openAppWhenRun=false`. No signatures or provisioning profiles are included.
+- Artifact `todo-wallpaper-0.4.1-13` (12597135589), 11,332,140 bytes, SHA256 `313f488ac1a93915f58242ad0c0dc385ea961a81db81d8a462319b5f12530f2b`. Official artifact ZIP bytes were retained unchanged.
+- Unsigned IPA SHA256 `7d978dd8e32879a09ff2eaf6667bdba8fd929c69b50a784944201aa7306c007f`. Independently downloaded and checked: ZIP CRC, bundle/platform/version/group/intent metadata, actual 1890×4096 and 2304×4096 PNG sizes, unchanged R1 scripts (LF/CRLF conversion accounted for).
+- Three real CI attempts: 1011 compiled App/Widget but failed a source-manifest precheck because a local ignored Python cache had been listed; removed cache and guarded against recurrence. 1012 passed. Final 1013 also passed after limiting small/medium preview height instead of reserving large-family blank space. No further full builds for evidence-only docs.
+- **New Windows signing, installation and iPhone visual/Widget regression remain unverified.** Do not uninstall; use the packaged R1 installer and [device checklist](../TodoWallpaper/DEVICE-TEST.md). Stop for actual device feedback.

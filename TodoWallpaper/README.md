@@ -1,9 +1,11 @@
 # Todo Wallpaper 0.4.1 · native UI revision
 
+Final UI-revision build **1013**: [actual Actions success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40187675187). Both ARM64 device bundles and unsigned IPA inspected. Native regression/state and 47 architecture guards passed. Windows signing, installation and iPhone visual acceptance remain pending.
+
 Minimum iOS17. Stable IDs and native navigation preserved. CI build number = 1000 + product workflow run number.
 
 - Core: backward-compatible optional task marker, original repository lock/backup/migration; shared appearance lock+backup and weighted native typography.
-- Shared: unchanged completion App Intent and common native marker view used by App and Widget.
+- Shared: unchanged completion App Intent, native marker view and the same Widget content used by both extension and fixed preview.
 - Widget: interactive small/medium/large widgets with task Emoji and independent App Groups appearance.
 - App: existing CRUD; four native root tabs, task marker override cards, full independent Widget page with pinned preview. Wallpaper editing uses an explicit navigation Dock and conditional common/advanced controls.
 - Wallpaper: large live canvas, cached photo textures, GPU transformations/backdrop, small shared Core Text vector layer; stable native bitmap preview and full target-pixel PNG export. Ratio is independent of resolution; 19.5:9 modern, 16:9 classic and custom. Old draft/photo stays compatible.
