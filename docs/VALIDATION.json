@@ -162,6 +162,14 @@
         "result": "failed_native_check",
         "repository_migration_and_weight_raster_checks": "passed",
         "reason": "Test incorrectly required chromatic pixels for native achromatic musical-note Emoji; heart and blossom colored PNGs already passed. Corrected glyph/ink criterion for native note, retained chromatic checks for colored Emoji."
+      },
+      {
+        "run": 40179901839,
+        "commit": "f4de7f1c25b53f4a2edb325a102d634c8cf59f08",
+        "result": "failed_iOS_compilation",
+        "native_checks": "all_passed_including_4K_color_Emoji_weight_legacy_data_style",
+        "reason": "Two SwiftUI State declarations incorrectly declared multiple variables; split into individual declarations",
+        "artifact": 12594241607
       }
     ]
   }

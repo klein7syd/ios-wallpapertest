@@ -20,8 +20,10 @@ struct WallpaperEditorView: View {
     @State private var resetConfirmation = false
     @State private var aspect = WallpaperAspect.modern
     @State private var quality = WallpaperQuality.high
-    @State private var ratioWidth = "9", ratioHeight = "19.5"
-    @State private var pixelWidth = "1890", pixelHeight = "4096"
+    @State private var ratioWidth = "9"
+    @State private var ratioHeight = "19.5"
+    @State private var pixelWidth = "1890"
+    @State private var pixelHeight = "4096"
     private var dataReady: Bool { store.hasLoaded && store.loadError == nil }
     private var canExport: Bool { dataReady && model.ready && !model.busy && !model.draftBlocked && store.appearanceError == nil && model.previewError == nil }
     private var appearance: Binding<TodoAppearance> {
