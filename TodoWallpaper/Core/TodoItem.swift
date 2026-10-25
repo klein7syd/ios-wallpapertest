@@ -3,6 +3,7 @@ import Foundation
 struct TodoItem: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
+    var marker: TodoMarker? = nil
     var isCompleted: Bool
     let createdAt: Date
     var updatedAt: Date

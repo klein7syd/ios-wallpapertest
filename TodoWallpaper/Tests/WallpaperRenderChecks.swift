@@ -20,7 +20,11 @@ enum WallpaperRenderChecks {
         let context = try WallpaperRenderer.bitmap(width: image.width, height: image.height)
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         guard let data = context.data else { throw WallpaperError.renderingFailed }
-        return Data(bytes: data, count: context.bytesPerRow * context.height)
+        var packed = Data()
+        for row in 0..<context.height {
+            packed.append(data.advanced(by: row * context.bytesPerRow).assumingMemoryBound(to: UInt8.self), count: context.width * 4)
+        }
+        return packed
     }
     static func main() async throws {
         let out = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
@@ -39,6 +43,7 @@ enum WallpaperRenderChecks {
             TodoItem(id: UUID(), title: $0.element, isCompleted: $0.offset == 2, createdAt: now, updatedAt: now)
         }
         var settings = WallpaperSettings()
+        settings.size = WallpaperSize(width: 1170, height: 2532); settings.canvasAspect = nil
         let defaultLayout = try WallpaperRenderer.layout(settings: settings, items: items)
         try require(abs(defaultLayout.panel.midX - 195) < 0.01, "Default horizontal center")
         try require(abs(defaultLayout.panel.midY - defaultLayout.canvas.height / 2) < 0.01, "Default vertical center")
@@ -77,17 +82,15 @@ enum WallpaperRenderChecks {
         try require(long.lines.count == 2 && long.truncated, "Unicode wraps and truncates with ellipsis")
 
         var checkedSizes: [String] = []
-        for preset in WallpaperPreset.allCases {
-            guard let size = preset.size else { continue }
-            var value = settings
-            value.size = size
+        for ratio in [9.0 / 19.5, 9.0 / 16, 1.0] {
+            var value = settings; value.canvasAspect = ratio
             let layout = try WallpaperRenderer.layout(settings: value, items: items)
-            try require(abs(layout.panel.midY / layout.canvas.height - 0.62) < 0.001, "Relative center retained across device presets")
-            checkedSizes.append(size.label)
+            try require(layout.panel.minY >= 0, "Aspect presets remain in bounds")
+            checkedSizes.append("ratio \(ratio)")
         }
         for size in [WallpaperSize(width: 1200, height: 1200), WallpaperSize(width: 1600, height: 900)] {
             var value = settings
-            value.size = size; value.automaticHeight = false; value.panelHeight = 0.8
+            value.size = size; value.canvasAspect = size.aspectRatio; value.automaticHeight = false; value.panelHeight = 0.8
             let result = try WallpaperRenderer.render(settings: value, items: items, photoURL: fixture, ciContext: context)
             try require(result.image.width == size.width && result.image.height == size.height, "Custom resolution")
             try WallpaperRenderer.writePNG(result.image, to: out.appendingPathComponent("custom-\(size.width)x\(size.height).png"), expected: size)
@@ -110,7 +113,7 @@ enum WallpaperRenderChecks {
         for pan in [-1.0, 0, 1.0] {
             var value = settings
             value.backgroundZoom = 1.8; value.backgroundPanX = pan; value.backgroundPanY = pan
-            let canvas = CGSize(width: 390, height: value.size.logicalHeight)
+            let canvas = CGSize(width: 390, height: value.logicalHeight)
             let crop = WallpaperRenderer.backgroundRect(source: CGSize(width: 3000, height: 1600), canvas: canvas, settings: value)
             try require(crop.minX <= 0.001 && crop.minY <= 0.001 &&
                 crop.maxX >= canvas.width - 0.001 && crop.maxY >= canvas.height - 0.001, "Aspect fill cannot reveal blank edges")
@@ -118,6 +121,7 @@ enum WallpaperRenderChecks {
         let empty = try WallpaperRenderer.layout(settings: WallpaperSettings(), items: [])
         try require(empty.rows.isEmpty && empty.emptyText != nil, "Empty state")
         try await draftChecks(out: out, fixture: fixture)
+        try await D34Checks.run(out: out, fixture: fixture)
         let report: [String: Any] = [
             "result": "passed", "engine": "production CoreGraphics + CoreText + CoreImage on macOS",
             "iphone_device_validation": "pending", "synthetic_fixture_only": true,

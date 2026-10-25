@@ -1,0 +1,132 @@
+import Foundation
+
+enum MarkerKind: String, Codable, CaseIterable, Identifiable {
+    case hollow, filled, thin, bordered, square, emoji, none
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .hollow: return "空心圆"; case .filled: return "实心圆"; case .thin: return "细线圆"
+        case .bordered: return "带边框圆"; case .square: return "方框"; case .emoji: return "自定义 Emoji"; case .none: return "不显示"
+        }
+    }
+}
+struct TodoMarker: Codable, Equatable, Sendable {
+    var kind = MarkerKind.hollow
+    var emoji = "⭐"
+    func validate() throws {
+        if kind == .emoji, !EmojiInput.isValid(emoji) { throw AppearanceError.invalidEmoji }
+    }
+}
+enum EmojiInput {
+    static func isValid(_ string: String) -> Bool {
+        guard string.count == 1, string.utf16.count <= 64, string.utf8.count <= 128,
+              string == string.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+        let scalars = string.unicodeScalars
+        let emoji = scalars.contains { $0.properties.isEmoji && !(0x1F3FB...0x1F3FF).contains($0.value) }
+        let presentation = scalars.contains { $0.properties.isEmojiPresentation || $0.value == 0xFE0F || $0.value == 0x20E3 }
+        return emoji && (presentation || scalars.contains { $0.value >= 0x2300 && $0.properties.isEmoji })
+    }
+}
+enum MarkerCompletion: String, Codable, CaseIterable, Identifiable {
+    case keep, dim, replace, checkShapes
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .keep: return "保留原标记"; case .dim: return "降低透明度"; case .replace: return "替换为完成 Emoji"; case .checkShapes: return "图形加勾 · Emoji 保留" }
+    }
+}
+struct MarkerStyle: Codable, Equatable, Sendable {
+    var size: Double = 18
+    var emojiSize: Double = 22
+    var gap: Double = 10
+    var verticalOffset: Double = 0
+    var lineWidth: Double = 1.5
+    var followsTextColor = true
+    var fill = WallpaperColor()
+    var stroke = WallpaperColor()
+    var completedColor = WallpaperColor(red: 0.2, green: 0.75, blue: 0.4)
+    var completion = MarkerCompletion.checkShapes
+    var completionEmoji = "✅"
+    func validate() throws {
+        guard (8...48).contains(size), (8...48).contains(emojiSize), (0...32).contains(gap),
+              (-16...16).contains(verticalOffset), (0.3...6).contains(lineWidth),
+              fill.isValid, stroke.isValid, completedColor.isValid,
+              EmojiInput.isValid(completionEmoji) else { throw AppearanceError.invalidStyle }
+    }
+    func resolved(_ marker: TodoMarker, completed: Bool) -> (marker: TodoMarker, opacity: Double, checked: Bool) {
+        if completed && completion == .replace { return (TodoMarker(kind: .emoji, emoji: completionEmoji), 1, false) }
+        return (marker, completed && completion == .dim ? 0.4 : 1,
+                completed && completion == .checkShapes && marker.kind != .emoji && marker.kind != .none)
+    }
+}
+extension WallpaperColor {
+    var isValid: Bool { [red, green, blue, alpha].allSatisfy { $0.isFinite && (0...1).contains($0) } }
+}
+enum WidgetTheme: String, Codable, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String { self == .system ? "跟随系统" : self == .light ? "亮色" : "深色" }
+}
+enum WidgetBackdrop: String, Codable, CaseIterable, Identifiable {
+    case system, solid
+    var id: String { rawValue }
+    var title: String { self == .system ? "系统背景" : "自定义底色" }
+}
+enum WidgetCompleted: String, Codable, CaseIterable, Identifiable {
+    case recent, hidden, all
+    var id: String { rawValue }
+    var title: String { self == .recent ? "最近完成一项" : self == .hidden ? "仅未完成" : "全部事项" }
+}
+struct WidgetAppearance: Codable, Equatable, Sendable {
+    var theme = WidgetTheme.system
+    var backdrop = WidgetBackdrop.system
+    var panelColor = WallpaperColor(red: 0.12, green: 0.12, blue: 0.12)
+    var followsSystemText = true
+    var textColor = WallpaperColor()
+    var font = WallpaperFont.system
+    var weight = WallpaperWeight.regular
+    var fontSize: Double = 15
+    var markerOverride: TodoMarker?
+    var markerStyle = MarkerStyle()
+    var spacing: Double = 5
+    var compact = false
+    var maximumItems = 6
+    var completed = WidgetCompleted.recent
+    func validate() throws {
+        try markerOverride?.validate(); try markerStyle.validate()
+        guard (12...20).contains(fontSize), (0...12).contains(spacing), (1...10).contains(maximumItems),
+              textColor.isValid, panelColor.isValid else { throw AppearanceError.invalidStyle }
+    }
+    func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
+        let limit = max(1, min(capacity, maximumItems))
+        let pending = items.filter { !$0.isCompleted }
+        if completed == .all { return Array(items.prefix(limit)) }
+        if completed == .hidden { return Array(pending.prefix(limit)) }
+        let recent = items.filter(\.isCompleted).max { $0.updatedAt < $1.updatedAt }
+        guard let recent, limit > 1 || pending.isEmpty else { return Array(pending.prefix(limit)) }
+        return Array(pending.prefix(limit - 1)) + [recent]
+    }
+}
+struct TodoAppearance: Codable, Equatable, Sendable {
+    var schemaVersion = 1
+    var defaultMarker = TodoMarker()
+    var markerStyle = MarkerStyle()
+    var widget = WidgetAppearance()
+    func marker(for item: TodoItem, widgetContext: Bool = false) -> TodoMarker {
+        item.marker ?? (widgetContext ? widget.markerOverride : nil) ?? defaultMarker
+    }
+    func validate() throws {
+        guard schemaVersion == 1 else { throw AppearanceError.unsupportedVersion }
+        try defaultMarker.validate(); try markerStyle.validate(); try widget.validate()
+    }
+}
+enum AppearanceError: LocalizedError {
+    case invalidEmoji, invalidStyle, unsupportedVersion, unreadable
+    var errorDescription: String? {
+        switch self {
+        case .invalidEmoji: return "请输入一个完整 Emoji，可包含肤色或组合；不支持普通文本或多个标记。"
+        case .invalidStyle: return "标记或小组件样式参数不完整，原文件已保留。"
+        case .unsupportedVersion: return "样式来自较新版本，原文件已保留。"
+        case .unreadable: return "无法读取共享样式，原文件已保留。请重试或恢复有效备份。"
+        }
+    }
+}

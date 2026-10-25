@@ -11,6 +11,16 @@
             "lastKnownFileType" = "text.plist.xml";
             "sourceTree" = "<group>";
         };
+        "41A60D84153504698DA87662" = {
+            "isa" = "PBXFileReference";
+            "path" = "MarkerEditors.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "2ECF32F1F09C28047D02A3A8" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "41A60D84153504698DA87662";
+        };
         "32514B8369B4DC85624D17CF" = {
             "isa" = "PBXFileReference";
             "path" = "TodoStore.swift";
@@ -37,11 +47,77 @@
             "isa" = "PBXBuildFile";
             "fileRef" = "74DE40EDB0CAE90A579310D0";
         };
+        "E2ED1117940ECAEA55A44C42" = {
+            "isa" = "PBXFileReference";
+            "path" = "WidgetAppearanceEditor.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "783EFC0F53785DECE833C8D6" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "E2ED1117940ECAEA55A44C42";
+        };
         "1C48CE29E4E135EE62951B22" = {
             "isa" = "PBXGroup";
-            "children" = ("A2CDD2B51B9CC7AF9D7B2D55", "32514B8369B4DC85624D17CF", "658783EC00F519BAAF131F9D", "74DE40EDB0CAE90A579310D0");
+            "children" = ("A2CDD2B51B9CC7AF9D7B2D55", "41A60D84153504698DA87662", "32514B8369B4DC85624D17CF", "658783EC00F519BAAF131F9D", "74DE40EDB0CAE90A579310D0", "E2ED1117940ECAEA55A44C42");
             "path" = "App";
             "sourceTree" = "<group>";
+        };
+        "4F1964AD799B8F2A3EBF02AB" = {
+            "isa" = "PBXFileReference";
+            "path" = "AppearanceRepository.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "B99146576F44D0D7AC6508F1" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "4F1964AD799B8F2A3EBF02AB";
+        };
+        "1244BFB6C9B667DBEB7A08BB" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "4F1964AD799B8F2A3EBF02AB";
+        };
+        "BDD654A93B43716770D1004B" = {
+            "isa" = "PBXFileReference";
+            "path" = "MarkerDrawing.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "4BD791C8E2E1F5EDF994DFDD" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "BDD654A93B43716770D1004B";
+        };
+        "FEE0440F182366E8A390BC3B" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "BDD654A93B43716770D1004B";
+        };
+        "2A5FEFA7CB36521540BC207E" = {
+            "isa" = "PBXFileReference";
+            "path" = "NativeTypography.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "F0A5E83B75D07B3CAC0CC87E" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "2A5FEFA7CB36521540BC207E";
+        };
+        "CEB9A383E807E043956DDADA" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "2A5FEFA7CB36521540BC207E";
+        };
+        "F067D8E9F2E6AFD20930D9EB" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoAppearance.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "02D0B107D0AE4451F50DDBE5" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "F067D8E9F2E6AFD20930D9EB";
+        };
+        "6F58F7A29DEDCD530DD6D54F" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "F067D8E9F2E6AFD20930D9EB";
         };
         "AAD07AFE15F3CE565909A001" = {
             "isa" = "PBXFileReference";
@@ -85,9 +161,23 @@
             "isa" = "PBXBuildFile";
             "fileRef" = "9E85E86B19157A56CA4E0394";
         };
+        "1930A8B0EA63BE3EDCB59272" = {
+            "isa" = "PBXFileReference";
+            "path" = "VisualTypes.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "842795D68F8F6B631D97F724" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "1930A8B0EA63BE3EDCB59272";
+        };
+        "E160D4E583D815A7355A8B39" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "1930A8B0EA63BE3EDCB59272";
+        };
         "410188F9DC6E499FEC68BCF6" = {
             "isa" = "PBXGroup";
-            "children" = ("AAD07AFE15F3CE565909A001", "8A48B64FC787581F6DF279ED", "9E85E86B19157A56CA4E0394");
+            "children" = ("4F1964AD799B8F2A3EBF02AB", "BDD654A93B43716770D1004B", "2A5FEFA7CB36521540BC207E", "F067D8E9F2E6AFD20930D9EB", "AAD07AFE15F3CE565909A001", "8A48B64FC787581F6DF279ED", "9E85E86B19157A56CA4E0394", "1930A8B0EA63BE3EDCB59272");
             "path" = "Core";
             "sourceTree" = "<group>";
         };
@@ -105,9 +195,23 @@
             "isa" = "PBXBuildFile";
             "fileRef" = "6F9C925652A0EFD53160BF87";
         };
+        "8D78AFACBA477FB5C1DB6A36" = {
+            "isa" = "PBXFileReference";
+            "path" = "TodoMarkerView.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "29220D387F7251601DE511C1" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "8D78AFACBA477FB5C1DB6A36";
+        };
+        "667554CE7525CE24EAEE3FF5" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "8D78AFACBA477FB5C1DB6A36";
+        };
         "44C7E229889FE9D1BB841A79" = {
             "isa" = "PBXGroup";
-            "children" = ("6F9C925652A0EFD53160BF87");
+            "children" = ("6F9C925652A0EFD53160BF87", "8D78AFACBA477FB5C1DB6A36");
             "path" = "Shared";
             "sourceTree" = "<group>";
         };
@@ -169,6 +273,26 @@
             "isa" = "PBXBuildFile";
             "fileRef" = "4BAD697CA6E2D35285338D1C";
         };
+        "C7E6164B7C00DB441A84CCF8" = {
+            "isa" = "PBXFileReference";
+            "path" = "WallpaperGeometry.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "4E685E2C42C52D66AC55F307" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "C7E6164B7C00DB441A84CCF8";
+        };
+        "7CC70068CC120575936E9962" = {
+            "isa" = "PBXFileReference";
+            "path" = "WallpaperLiveCanvas.swift";
+            "lastKnownFileType" = "sourcecode.swift";
+            "sourceTree" = "<group>";
+        };
+        "2E279BE8078D8098ADBACCEE" = {
+            "isa" = "PBXBuildFile";
+            "fileRef" = "7CC70068CC120575936E9962";
+        };
         "84A9A9D9BA58B073AD5FD8F7" = {
             "isa" = "PBXFileReference";
             "path" = "WallpaperRenderer.swift";
@@ -191,7 +315,7 @@
         };
         "549FC76BBE5E6B5D7B90F25B" = {
             "isa" = "PBXGroup";
-            "children" = ("6039E22F485CCB5C17AE13EF", "EF2CD09A23C11D025BFF9375", "4BAD697CA6E2D35285338D1C", "84A9A9D9BA58B073AD5FD8F7", "68C872B15D141B705A7F9D93");
+            "children" = ("6039E22F485CCB5C17AE13EF", "EF2CD09A23C11D025BFF9375", "4BAD697CA6E2D35285338D1C", "C7E6164B7C00DB441A84CCF8", "7CC70068CC120575936E9962", "84A9A9D9BA58B073AD5FD8F7", "68C872B15D141B705A7F9D93");
             "path" = "Wallpaper";
             "sourceTree" = "<group>";
         };
@@ -223,7 +347,7 @@
         "BCE16DD0260827ECF338C787" = {
             "isa" = "PBXSourcesBuildPhase";
             "buildActionMask" = "2147483647";
-            "files" = ("63805A39A8FCF03F10160012", "F9DED40AA0C983B9BDD62085", "88A5B5308D20DB9D5F527856", "E4511F80D122D518145EFAD8", "F7964994619805EC19735978", "C3F41028B4D745F07DA764A9", "E614D7EEF0C49C88B41C9CBB", "1AA5442357C3C9C9BD09C538", "84F89E681EE42C1260C248A6", "43B94C9C2EFE22519BC5E3AD", "65BD1C46D679AEA1FEFF0D99");
+            "files" = ("2ECF32F1F09C28047D02A3A8", "63805A39A8FCF03F10160012", "F9DED40AA0C983B9BDD62085", "783EFC0F53785DECE833C8D6", "B99146576F44D0D7AC6508F1", "4BD791C8E2E1F5EDF994DFDD", "F0A5E83B75D07B3CAC0CC87E", "02D0B107D0AE4451F50DDBE5", "88A5B5308D20DB9D5F527856", "E4511F80D122D518145EFAD8", "F7964994619805EC19735978", "842795D68F8F6B631D97F724", "C3F41028B4D745F07DA764A9", "29220D387F7251601DE511C1", "E614D7EEF0C49C88B41C9CBB", "1AA5442357C3C9C9BD09C538", "84F89E681EE42C1260C248A6", "4E685E2C42C52D66AC55F307", "2E279BE8078D8098ADBACCEE", "43B94C9C2EFE22519BC5E3AD", "65BD1C46D679AEA1FEFF0D99");
             "runOnlyForDeploymentPostprocessing" = "0";
         };
         "7561BFB015D8F536760CB671" = {
@@ -257,8 +381,8 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
-                "CURRENT_PROJECT_VERSION" = "1003";
-                "MARKETING_VERSION" = "0.3.0";
+                "CURRENT_PROJECT_VERSION" = "1006";
+                "MARKETING_VERSION" = "0.4.0";
                 "CODE_SIGN_ENTITLEMENTS" = "App/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
                 "INFOPLIST_FILE" = "App/Info.plist";
@@ -276,8 +400,8 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app.widget";
-                "CURRENT_PROJECT_VERSION" = "1003";
-                "MARKETING_VERSION" = "0.3.0";
+                "CURRENT_PROJECT_VERSION" = "1006";
+                "MARKETING_VERSION" = "0.4.0";
                 "CODE_SIGN_ENTITLEMENTS" = "Widget/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
                 "INFOPLIST_FILE" = "Widget/Info.plist";
@@ -307,8 +431,8 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
-                "CURRENT_PROJECT_VERSION" = "1003";
-                "MARKETING_VERSION" = "0.3.0";
+                "CURRENT_PROJECT_VERSION" = "1006";
+                "MARKETING_VERSION" = "0.4.0";
                 "CODE_SIGN_ENTITLEMENTS" = "App/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
                 "INFOPLIST_FILE" = "App/Info.plist";
@@ -326,8 +450,8 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app.widget";
-                "CURRENT_PROJECT_VERSION" = "1003";
-                "MARKETING_VERSION" = "0.3.0";
+                "CURRENT_PROJECT_VERSION" = "1006";
+                "MARKETING_VERSION" = "0.4.0";
                 "CODE_SIGN_ENTITLEMENTS" = "Widget/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
                 "INFOPLIST_FILE" = "Widget/Info.plist";
@@ -359,7 +483,7 @@
         "82CE34952E166218838BE670" = {
             "isa" = "PBXSourcesBuildPhase";
             "buildActionMask" = "2147483647";
-            "files" = ("6E05301C00888DC5E7E2911A", "08CA51B84B67ECF633E67651", "5DE4C30C10C947F798D448AB", "0AAC29C0C95B9B6DC696B294", "2DF59E7750037EC8C55D9CA3");
+            "files" = ("1244BFB6C9B667DBEB7A08BB", "FEE0440F182366E8A390BC3B", "CEB9A383E807E043956DDADA", "6F58F7A29DEDCD530DD6D54F", "6E05301C00888DC5E7E2911A", "08CA51B84B67ECF633E67651", "5DE4C30C10C947F798D448AB", "E160D4E583D815A7355A8B39", "0AAC29C0C95B9B6DC696B294", "667554CE7525CE24EAEE3FF5", "2DF59E7750037EC8C55D9CA3");
             "runOnlyForDeploymentPostprocessing" = "0";
         };
         "112482586DC9325ECD958FF1" = {

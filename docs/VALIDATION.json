@@ -64,9 +64,9 @@
     "code": "implemented",
     "compilation": "success_real_xcode_log",
     "windows_signing": "not_verified_for_0.3.0",
-    "iphone_installation": "not_verified_for_0.3.0",
-    "wallpaper_device_acceptance": "pending_user_device_feedback",
-    "scope": "D1_D2_only_D3_D4_not_started",
+    "iphone_installation": "passed_first_device_test_user_report_2026_10_25",
+    "wallpaper_device_acceptance": "first_test_positive_feedback_with_UI_performance_and_weight_issues",
+    "scope": "D1_D2_delivered_D3_D4_authorized",
     "build_attempts": [
       {
         "run": 40115366528,
@@ -146,5 +146,14 @@
     "photos_permission_key": "present_add_only",
     "intent_metadata": "present_in_both_targets_openAppWhenRun_false",
     "protected_sources": "core_migration_widget_intents_windows_R1_native_baseline_git_blob_unchanged"
+  },
+  "stage_d3_d4": {
+    "version": "0.4.0",
+    "code": "implemented_pending_CI",
+    "compilation": "not_run",
+    "windows_signing": "not_verified",
+    "iphone_installation": "not_verified",
+    "device_acceptance": "pending_user_feedback",
+    "scope": "final_revision_Emoji_ratio_first_4K_only"
   }
 }

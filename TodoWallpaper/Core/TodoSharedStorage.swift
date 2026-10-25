@@ -13,7 +13,7 @@ enum TodoSharedStorage {
             ?? TodoWidgetConstants.originalGroupID
     }
 
-    private static func sharedDirectory() throws -> URL {
+    static func sharedDirectory() throws -> URL {
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
         else { throw TodoDataError.sharedUnavailable(groupID) }
         return container.appendingPathComponent("TodoWallpaper", isDirectory: true)

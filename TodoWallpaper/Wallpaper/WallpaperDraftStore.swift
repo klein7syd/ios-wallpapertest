@@ -71,6 +71,13 @@ actor WallpaperDraftStore {
         var validated = draft
         validated.settings = try draft.settings.validated()
         _ = try photoURL(for: draft.photoFileName)
+        // Archive a readable 0.3.0 draft before first writing the optional ratio field.
+        let original = directory.appendingPathComponent("draft-before-d34.json")
+        if files.fileExists(atPath: url.path), !files.fileExists(atPath: original.path),
+           let object = try? JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
+           let settings = object["settings"] as? [String: Any], settings["canvasAspect"] == nil {
+            try files.copyItem(at: url, to: original); protect(original)
+        }
         try JSONEncoder().encode(validated).write(to: url, options: .atomic)
         protect(url)
     }

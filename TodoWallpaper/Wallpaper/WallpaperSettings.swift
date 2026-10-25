@@ -13,80 +13,11 @@ struct WallpaperSize: Codable, Equatable, Sendable {
     }
 }
 
-enum WallpaperPreset: String, CaseIterable, Identifiable {
-    case iPhone13Pro, mini, proMax13, pro14, proMax14, custom
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .iPhone13Pro: return "iPhone 13 / 13 Pro"
-        case .mini: return "iPhone 12 / 13 mini"
-        case .proMax13: return "iPhone 12 / 13 Pro Max"
-        case .pro14: return "iPhone 14 Pro / 15 / 15 Pro"
-        case .proMax14: return "iPhone 14 Pro Max / 15 Plus / 15 Pro Max"
-        case .custom: return "自定义像素尺寸"
-        }
-    }
-    var size: WallpaperSize? {
-        switch self {
-        case .iPhone13Pro: return WallpaperSize(width: 1170, height: 2532)
-        case .mini: return WallpaperSize(width: 1080, height: 2340)
-        case .proMax13: return WallpaperSize(width: 1284, height: 2778)
-        case .pro14: return WallpaperSize(width: 1179, height: 2556)
-        case .proMax14: return WallpaperSize(width: 1290, height: 2796)
-        case .custom: return nil
-        }
-    }
-}
-
-struct WallpaperColor: Codable, Equatable, Sendable {
-    var red: Double = 1
-    var green: Double = 1
-    var blue: Double = 1
-    var alpha: Double = 1
-}
-enum WallpaperFont: String, Codable, CaseIterable, Identifiable {
-    case system, serif, monospaced
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .system: return "系统"; case .serif: return "衬线"; case .monospaced: return "等宽" }
-    }
-}
-enum WallpaperWeight: String, Codable, CaseIterable, Identifiable {
-    case light, regular, medium, semibold, bold
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .light: return "细"; case .regular: return "标准"; case .medium: return "中等"
-        case .semibold: return "半粗"; case .bold: return "粗"
-        }
-    }
-    var trait: Double {
-        switch self {
-        case .light: return -0.4; case .regular: return 0; case .medium: return 0.23
-        case .semibold: return 0.3; case .bold: return 0.4
-        }
-    }
-}
-enum WallpaperAlignment: String, Codable, CaseIterable, Identifiable {
-    case leading, center, trailing
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .leading: return "左对齐"; case .center: return "居中"; case .trailing: return "右对齐" }
-    }
-    var flush: Double {
-        switch self { case .leading: return 0; case .center: return 0.5; case .trailing: return 1 }
-    }
-}
-enum WallpaperCompletionStyle: String, Codable, CaseIterable, Identifiable {
-    case strikeAndDim, dim, check
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .strikeAndDim: return "变淡并划线"; case .dim: return "变淡"; case .check: return "仅勾选" }
-    }
-}
-
 struct WallpaperSettings: Codable, Equatable, Sendable {
-    var size = WallpaperSize()
+    var size = WallpaperSize(width: 1890, height: 4096)
+    var canvasAspect: Double? = 9.0 / 19.5
+    var aspectRatio: Double { canvasAspect ?? size.aspectRatio }
+    var logicalHeight: Double { 390 / aspectRatio }
     var backgroundZoom: Double = 1
     var backgroundPanX: Double = 0
     var backgroundPanY: Double = 0
@@ -116,7 +47,7 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     var maximumLines: Int = 4
 
     func validated() throws -> WallpaperSettings {
-        guard size.isValid else { throw WallpaperError.invalidSize }
+        guard size.isValid, aspectRatio.isFinite, (0.25...2).contains(aspectRatio) else { throw WallpaperError.invalidSize }
         var v = self
         func c(_ n: Double, _ range: ClosedRange<Double>, _ fallback: Double) -> Double {
             n.isFinite ? min(range.upperBound, max(range.lowerBound, n)) : fallback
@@ -145,10 +76,11 @@ struct WallpaperDraft: Codable, Sendable {
     var photoFileName: String?
 }
 enum WallpaperError: LocalizedError {
-    case invalidSize, unreadablePhoto, photoTooLarge, renderingFailed
+    case ratioMismatch, invalidSize, unreadablePhoto, photoTooLarge, renderingFailed
     case encodingFailed, dimensionsMismatch, photoPermission, unsupportedDraft, invalidDraft
     var errorDescription: String? {
         switch self {
+        case .ratioMismatch: return "像素尺寸与画布比例不一致。请保持比例，或先设置自定义画布比例。"
         case .invalidSize: return "宽高各需为 480–4096 像素，总像素不能超过 1200 万。"
         case .unreadablePhoto: return "无法读取这张照片。请重新选择一张静态图片。"
         case .photoTooLarge: return "照片文件超过 80 MB，请选择较小的静态图片。"

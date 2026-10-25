@@ -8,7 +8,10 @@ final class TodoStore: ObservableObject {
     @Published private(set) var hasLoaded = false
     @Published private(set) var loadError: String?
     @Published private(set) var canRecover = false
+    @Published private(set) var appearance = TodoAppearance()
+    @Published private(set) var appearanceError: String?
     private var repository: TodoRepository?
+    private var appearanceTask: Task<Void, Never>?
     private let usesSharedStorage: Bool
 
     init(repository: TodoRepository? = nil) {
@@ -20,13 +23,48 @@ final class TodoStore: ObservableObject {
         do {
             if usesSharedStorage { repository = try TodoSharedStorage.appRepository() }
             accept(try activeRepository().load())
+            reloadAppearance()
         } catch {
             loadError = error.localizedDescription
             canRecover = usesSharedStorage && TodoSharedStorage.canRecover()
         }
     }
 
-    func add(title: String) throws { accept(try activeRepository().add(title: title)) }
+    func add(title: String, marker: TodoMarker? = nil) throws { accept(try activeRepository().add(title: title, marker: marker)) }
+    func edit(id: UUID, title: String, marker: TodoMarker?) throws { accept(try activeRepository().edit(id: id, title: title, marker: marker)) }
+    func setAppearance(_ value: TodoAppearance) {
+        do { try value.validate() } catch { appearanceError = error.localizedDescription; return }
+        appearance = value
+        appearanceTask?.cancel()
+        appearanceTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+                try Task.checkCancellation()
+                try saveAppearance(value)
+            } catch is CancellationError { }
+            catch { appearanceError = error.localizedDescription }
+        }
+    }
+    func flushAppearance() {
+        guard appearanceTask != nil else { return }
+        appearanceTask?.cancel(); appearanceTask = nil
+        do { try saveAppearance(appearance) } catch { appearanceError = error.localizedDescription }
+    }
+    func saveAppearance(_ value: TodoAppearance) throws {
+        try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).save(value)
+        appearance = value; appearanceError = nil
+        WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+    }
+    func reloadAppearance() {
+        guard usesSharedStorage else { return }
+        do { appearance = try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).load(); appearanceError = nil }
+        catch { appearanceError = error.localizedDescription }
+    }
+    func recoverAppearance() throws {
+        try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).recover()
+        reloadAppearance()
+        WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+    }
     func rename(id: UUID, title: String) throws { accept(try activeRepository().rename(id: id, title: title)) }
     func setCompleted(id: UUID, completed: Bool) throws { accept(try activeRepository().setCompleted(id: id, completed: completed)) }
     func delete(ids: Set<UUID>) throws { accept(try activeRepository().delete(ids: ids)) }

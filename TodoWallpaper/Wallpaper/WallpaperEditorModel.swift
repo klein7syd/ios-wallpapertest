@@ -15,6 +15,12 @@ final class WallpaperEditorModel: ObservableObject {
         didSet { if ready { schedulePreview(); scheduleSave() } }
     }
     @Published private(set) var preview: WallpaperRendered?
+    @Published private(set) var livePhoto: WallpaperLivePhoto?
+    @Published private(set) var layout: WallpaperLayout?
+    @Published private(set) var appearance = TodoAppearance()
+    private var layoutKey: WallpaperSettings?
+    private var layoutItems: [TodoItem] = []
+    private var layoutAppearance = TodoAppearance()
     @Published private(set) var isRendering = false
     @Published private(set) var isImporting = false
     @Published private(set) var isExporting = false
@@ -27,7 +33,7 @@ final class WallpaperEditorModel: ObservableObject {
     @Published private(set) var photoName: String?
     @Published private(set) var draftBlocked = false
     private var photoURL: URL?
-    private var items: [TodoItem] = []
+    private(set) var items: [TodoItem] = []
     private let files = WallpaperDraftStore()
     private let renderer = WallpaperRenderService()
     private var previewTask: Task<Void, Never>?
@@ -37,8 +43,9 @@ final class WallpaperEditorModel: ObservableObject {
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
 
-    func start(items: [TodoItem]) async {
+    func start(items: [TodoItem], appearance: TodoAppearance) async {
         self.items = items
+        self.appearance = appearance
         guard !hasBootstrapped else { schedulePreview(); return }
         hasBootstrapped = true
         do {
@@ -46,12 +53,22 @@ final class WallpaperEditorModel: ObservableObject {
             settings = loaded.draft.settings
             photoURL = loaded.photoURL
             photoName = loaded.draft.photoFileName
+            if let photoURL { livePhoto = try await renderer.loadPhoto(at: photoURL) }
         } catch { draftBlocked = true; message = error.localizedDescription }
         ready = true
         if !draftBlocked { await files.cleanExpired(keeping: photoName) }
         schedulePreview()
     }
 
+    func updateAppearance(_ value: TodoAppearance) {
+        appearance = value
+        if ready { schedulePreview() }
+    }
+    var sourceIsSoft: Bool {
+        guard let info = livePhoto?.info else { return false }
+        let needed = max(Double(settings.size.width) / Double(info.width), Double(settings.size.height) / Double(info.height)) * settings.backgroundZoom
+        return needed > 1.01 || Double(max(info.width, info.height)) * needed > 6144
+    }
     func updateItems(_ items: [TodoItem]) {
         self.items = items
         if ready { schedulePreview() }
@@ -67,15 +84,16 @@ final class WallpaperEditorModel: ObservableObject {
             let url = try await files.importPhoto(data)
             var next = settings
             next.backgroundZoom = 1; next.backgroundPanX = 0; next.backgroundPanY = 0
+            let live = try await renderer.loadPhoto(at: url)
             try await files.save(WallpaperDraft(settings: next, photoFileName: url.lastPathComponent))
-            photoURL = url; photoName = url.lastPathComponent
+            photoURL = url; photoName = url.lastPathComponent; livePhoto = live
             settings = next
         } catch { message = error.localizedDescription }
     }
 
     func removePhoto() {
         guard !busy, !draftBlocked else { return }
-        photoURL = nil; photoName = nil
+        photoURL = nil; photoName = nil; livePhoto = nil
         settings.backgroundZoom = 1; settings.backgroundPanX = 0; settings.backgroundPanY = 0
         schedulePreview(); scheduleSave()
     }
@@ -85,10 +103,11 @@ final class WallpaperEditorModel: ObservableObject {
         saveTask?.cancel()
         var defaults = WallpaperSettings()
         defaults.size = settings.size
+        defaults.canvasAspect = settings.aspectRatio
         let name = draftBlocked ? nil : photoName
         do {
             try await files.save(WallpaperDraft(settings: defaults, photoFileName: name), replaceUnreadable: true)
-            if draftBlocked { photoURL = nil; photoName = nil }
+            if draftBlocked { photoURL = nil; photoName = nil; livePhoto = nil }
             draftBlocked = false
             settings = defaults
         } catch { message = error.localizedDescription }
@@ -116,13 +135,20 @@ final class WallpaperEditorModel: ObservableObject {
     }
 
     private func schedulePreview() {
+        // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
+        if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle {
+            do {
+                layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance)
+                layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance
+            } catch { previewError = error.localizedDescription }
+        }
         previewTask?.cancel()
         isRendering = true
-        let snapshot = settings, tasks = items, photo = photoURL
+        let snapshot = settings, tasks = items, photo = photoURL, look = appearance
         previewTask = Task {
             do {
-                try await Task.sleep(for: .milliseconds(45))
-                let rendered = try await renderer.preview(settings: snapshot, items: tasks, photoURL: photo)
+                try await Task.sleep(for: .milliseconds(240))
+                let rendered = try await renderer.preview(settings: snapshot, items: tasks, photoURL: photo, appearance: look)
                 try Task.checkCancellation()
                 preview = rendered; previewError = nil; isRendering = false
             } catch is CancellationError { }
@@ -139,11 +165,11 @@ final class WallpaperEditorModel: ObservableObject {
         let snapshot: WallpaperSettings
         do { snapshot = try settings.validated() }
         catch { message = error.localizedDescription; isExporting = false; return }
-        let tasks = items, photo = photoURL
+        let tasks = items, photo = photoURL, look = appearance
         defer { isExporting = false }
         do {
             let url = try await renderer.export(settings: snapshot, items: tasks, photoURL: photo,
-                                                 directory: files.exportDirectory)
+                                                 directory: files.exportDirectory, appearance: look)
             lastExportSize = snapshot.size.label
             if saveToPhotos {
                 let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)

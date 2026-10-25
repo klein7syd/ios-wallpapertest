@@ -17,7 +17,7 @@ struct TodoWallpaperApp: App {
             }
             .task { store.reload() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { store.reload() }
+                if phase == .active { store.reload() } else { store.flushAppearance() }
             }
         }
     }
@@ -95,9 +95,9 @@ struct TodoListView: View {
                 }
             }
             .sheet(item: $editor) { request in
-                TodoEditorView(item: request.item) { title in
-                    if let item = request.item { try store.rename(id: item.id, title: title) }
-                    else { try store.add(title: title) }
+                TodoEditorView(item: request.item) { title, marker in
+                    if let item = request.item { try store.edit(id: item.id, title: title, marker: marker) }
+                    else { try store.add(title: title, marker: marker) }
                 }
             }
             .alert(item: $displayError) { error in
@@ -117,9 +117,9 @@ struct TodoListView: View {
             Button {
                 perform { try store.setCompleted(id: item.id, completed: !item.isCompleted) }
             } label: {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(item.isCompleted ? Color.green : Color.secondary)
+                TodoMarkerView(marker: store.appearance.marker(for: item), completed: item.isCompleted,
+                               style: store.appearance.markerStyle)
+                    .frame(minWidth: 24, minHeight: 32)
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
@@ -144,16 +144,20 @@ struct TodoListView: View {
 
 struct TodoEditorView: View {
     let item: TodoItem?
-    let onSave: (String) throws -> Void
+    let onSave: (String, TodoMarker?) throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
+    @State private var markerOverride: TodoMarker
+    @State private var inheritsMarker: Bool
     @State private var saveError: DisplayError?
     @FocusState private var focused: Bool
 
-    init(item: TodoItem?, onSave: @escaping (String) throws -> Void) {
+    init(item: TodoItem?, onSave: @escaping (String, TodoMarker?) throws -> Void) {
         self.item = item
         self.onSave = onSave
         _title = State(initialValue: item?.title ?? "")
+        _markerOverride = State(initialValue: item?.marker ?? TodoMarker(kind: .emoji, emoji: "⭐"))
+        _inheritsMarker = State(initialValue: item?.marker == nil)
     }
 
     var body: some View {
@@ -165,6 +169,12 @@ struct TodoEditorView: View {
                 } footer: {
                     Text("\(title.trimmingCharacters(in: .whitespacesAndNewlines).count) / 200 字符")
                 }
+                Section("单项标记") {
+                    Toggle("继承全局默认标记", isOn: $inheritsMarker)
+                    if !inheritsMarker { MarkerChoiceEditor(choice: $markerOverride) }
+                    Text("单项设置优先；关闭单项覆盖后恢复全局默认。新待办默认继承。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             .navigationTitle(item == nil ? "新增待办" : "编辑待办")
             .navigationBarTitleDisplayMode(.inline)
@@ -172,7 +182,7 @@ struct TodoEditorView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        do { try onSave(title); dismiss() }
+                        do { try onSave(title, inheritsMarker ? nil : markerOverride); dismiss() }
                         catch { saveError = DisplayError(message: error.localizedDescription) }
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.trimmingCharacters(in: .whitespacesAndNewlines).count > 200)
@@ -208,6 +218,7 @@ struct AboutView: View {
                     Text("安装标识：\(Bundle.main.bundleIdentifier ?? "未知")").font(.caption).textSelection(.enabled)
                 }
                 Section("小组件") {
+                    NavigationLink("小组件外观与全局标记") { WidgetAppearanceEditor(store: store) }
                     Text(store.hasLoaded && store.loadError == nil ? "共享存储已就绪" : "请先处理待办页的读取提示")
                     Text("长按主屏幕，添加 Todo Wallpaper 小组件。任务按钮可直接操作，空白区域仍可打开 App。")
                     Button("请求刷新小组件") { store.reload() }

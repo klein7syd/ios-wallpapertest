@@ -17,11 +17,12 @@ struct TodoRepository {
         try withLock { try readDocument() }
     }
 
-    func add(title: String) throws -> TodoDocument {
+    func add(title: String, marker: TodoMarker? = nil) throws -> TodoDocument {
         let title = try validatedTitle(title)
+        try marker?.validate()
         return try update { document in
             let now = Date()
-            document.items.append(TodoItem(id: UUID(), title: title, isCompleted: false, createdAt: now, updatedAt: now))
+            document.items.append(TodoItem(id: UUID(), title: title, marker: marker, isCompleted: false, createdAt: now, updatedAt: now))
         }
     }
 
@@ -30,6 +31,17 @@ struct TodoRepository {
         return try update { document in
             guard let index = document.items.firstIndex(where: { $0.id == id }) else { throw TodoDataError.missingItem }
             document.items[index].title = title
+            document.items[index].updatedAt = Date()
+        }
+    }
+
+    func edit(id: UUID, title: String, marker: TodoMarker?) throws -> TodoDocument {
+        let title = try validatedTitle(title)
+        try marker?.validate()
+        return try update { document in
+            guard let index = document.items.firstIndex(where: { $0.id == id }) else { throw TodoDataError.missingItem }
+            document.items[index].title = title
+            document.items[index].marker = marker
             document.items[index].updatedAt = Date()
         }
     }
@@ -71,6 +83,7 @@ struct TodoRepository {
         guard document.schemaVersion == 1 else { throw TodoDataError.unsupportedSchema(document.schemaVersion) }
         guard Set(document.items.map(\.id)).count == document.items.count else { throw TodoDataError.invalidDocument }
         for item in document.items {
+            do { try item.marker?.validate() } catch { throw TodoDataError.invalidDocument }
             guard (try? validatedTitle(item.title)) == item.title else { throw TodoDataError.invalidDocument }
         }
     }

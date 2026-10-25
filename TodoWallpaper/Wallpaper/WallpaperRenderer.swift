@@ -22,10 +22,14 @@ struct WallpaperRow {
     let item: TodoItem
     let block: WallpaperTextBlock
     let top: CGFloat
+    let marker: TodoMarker
+    let markerTop: CGFloat
+    let markerSize: CGFloat
 }
 struct WallpaperLayout {
     let canvas: CGSize
     let panel: CGRect
+    let markerColumn: CGFloat
     let textWidth: CGFloat
     let rows: [WallpaperRow]
     let hiddenCount: Int
@@ -52,18 +56,7 @@ enum WallpaperRenderer {
     }
 
     static func font(_ settings: WallpaperSettings, size: CGFloat? = nil) -> CTFont {
-        let pointSize: CGFloat = size ?? CGFloat(settings.fontSize)
-        let base: CTFont
-        switch settings.font {
-        case .system:
-            base = CTFontCreateUIFontForLanguage(.system, pointSize, nil) ??
-                CTFontCreateWithName("Helvetica" as CFString, pointSize, nil)
-        case .serif: base = CTFontCreateWithName("Georgia" as CFString, pointSize, nil)
-        case .monospaced: base = CTFontCreateWithName("Menlo" as CFString, pointSize, nil)
-        }
-        let descriptor = CTFontDescriptorCreateCopyWithAttributes(CTFontCopyFontDescriptor(base),
-            [kCTFontTraitsAttribute: [kCTFontWeightTrait: settings.weight.trait]] as CFDictionary)
-        return CTFontCreateWithFontDescriptor(descriptor, pointSize, nil)
+        NativeTypography.font(family: settings.font, weight: settings.weight, size: size ?? CGFloat(settings.fontSize))
     }
 
     static func text(_ title: String, width: CGFloat, settings: WallpaperSettings,
@@ -113,13 +106,17 @@ enum WallpaperRenderer {
             lineAdvance: advance, truncated: truncated)
     }
 
-    static func layout(settings raw: WallpaperSettings, items: [TodoItem]) throws -> WallpaperLayout {
+    static func layout(settings raw: WallpaperSettings, items: [TodoItem], appearance: TodoAppearance = TodoAppearance()) throws -> WallpaperLayout {
         let settings = try raw.validated()
-        let canvas = CGSize(width: logicalWidth, height: settings.size.logicalHeight)
+        let canvas = CGSize(width: logicalWidth, height: settings.logicalHeight)
         let margin: CGFloat = 8
         let panelWidth: CGFloat = canvas.width * CGFloat(settings.panelWidth)
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
-        let textWidth: CGFloat = max(12, panelWidth - 2 * padding - 28)
+        let visibleItems = Array(settings.filtered(items).prefix(settings.maximumItems))
+        let markerStyle = appearance.markerStyle
+        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: appearance.marker(for: $0), style: markerStyle, completed: $0.isCompleted) }.max() ?? 0
+        let markerColumn: CGFloat = markerWidth > 0 ? CGFloat(markerWidth + markerStyle.gap) : 0
+        let textWidth: CGFloat = max(12, panelWidth - 2 * padding - markerColumn)
         let itemSpacing = CGFloat(settings.itemSpacing)
         let filtered = settings.filtered(items)
         let candidates = Array(filtered.prefix(settings.maximumItems))
@@ -132,8 +129,15 @@ enum WallpaperRenderer {
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
+        func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
+            let extent = CGFloat(MarkerDrawing.extent(marker: appearance.marker(for: pair.0), style: markerStyle, completed: pair.0.isCompleted))
+            let lineHeight = pair.1.ascent + CTFontGetDescent(pair.1.font)
+            let textOffset = max(0, (extent - lineHeight) / 2) + max(0, -CGFloat(markerStyle.verticalOffset))
+            let markerOffset = max(0, (lineHeight - extent) / 2) + max(0, CGFloat(markerStyle.verticalOffset))
+            return (max(pair.1.height + textOffset, extent + markerOffset), textOffset, markerOffset, extent)
+        }
         var allHeight: CGFloat = 0
-        for pair in blocks { allHeight += pair.1.height }
+        for pair in blocks { allHeight += rowMetrics(pair).height }
         allHeight += CGFloat(max(0, blocks.count - 1)) * itemSpacing
         let contentHeight: CGFloat = empty?.height ?? allHeight
         let footerHeight: CGFloat = filtered.count > candidates.count ? reserveFooter.height + 12 : 0
@@ -151,10 +155,13 @@ enum WallpaperRenderer {
         for (index, pair) in blocks.enumerated() {
             let spacing: CGFloat = rows.isEmpty ? 0 : itemSpacing
             let reserve: CGFloat = filtered.count > index + 1 ? reserveFooter.height + 12 : 0
-            guard used + spacing + pair.1.height + reserve <= usable + 0.01 else { break }
+            let metrics = rowMetrics(pair)
+            guard used + spacing + metrics.height + reserve <= usable + 0.01 else { break }
             used += spacing
-            rows.append(WallpaperRow(item: pair.0, block: pair.1, top: panel.minY + padding + used))
-            used += pair.1.height
+            let top = panel.minY + padding + used
+            rows.append(WallpaperRow(item: pair.0, block: pair.1, top: top + metrics.textOffset,
+                marker: appearance.marker(for: pair.0), markerTop: top + metrics.markerOffset, markerSize: metrics.extent))
+            used += metrics.height
         }
         let hidden = max(0, filtered.count - rows.count)
         var footer = hidden > 0 && reserveFooter.height <= usable ?
@@ -169,7 +176,7 @@ enum WallpaperRenderer {
             block.height <= usable ? block : text("暂无可显示事项", width: panelWidth - 2 * padding,
                 settings: settings, size: 11, maxLines: 1)
         }
-        return WallpaperLayout(canvas: canvas, panel: panel, textWidth: textWidth, rows: rows,
+        return WallpaperLayout(canvas: canvas, panel: panel, markerColumn: markerColumn, textWidth: textWidth, rows: rows,
             hiddenCount: hidden, footer: footer, footerTop: panel.maxY - padding - (footer?.height ?? 0),
             emptyText: fittedEmpty, emptyTop: panel.minY + padding)
     }
@@ -208,14 +215,17 @@ enum WallpaperRenderer {
     }
 
     static func render(settings raw: WallpaperSettings, items: [TodoItem], photoURL: URL?,
-                       previewWidth: Int? = nil, ciContext: CIContext) throws -> WallpaperRendered {
+                       previewWidth: Int? = nil, ciContext: CIContext, appearance: TodoAppearance = TodoAppearance()) throws -> WallpaperRendered {
         let settings = try raw.validated()
-        let layout = try layout(settings: settings, items: items)
+        let layout = try layout(settings: settings, items: items, appearance: appearance)
         let pixelWidth = min(settings.size.width, previewWidth ?? settings.size.width)
         let pixelHeight = previewWidth == nil ? settings.size.height :
-            Int((Double(pixelWidth) / settings.size.aspectRatio).rounded())
-        let scale = CGFloat(pixelWidth) / logicalWidth
+            Int((Double(pixelWidth) / settings.aspectRatio).rounded())
+        let scale = max(CGFloat(pixelWidth) / logicalWidth, CGFloat(pixelHeight) / layout.canvas.height)
+        let canvasOffset = CGPoint(x: (CGFloat(pixelWidth) - layout.canvas.width * scale) / 2,
+                                   y: (CGFloat(pixelHeight) - layout.canvas.height * scale) / 2)
         let background = try bitmap(width: pixelWidth, height: pixelHeight)
+        background.translateBy(x: canvasOffset.x, y: canvasOffset.y)
         background.scaleBy(x: scale, y: scale)
         let canvasRect = CGRect(origin: .zero, size: layout.canvas)
         // Transparent source PNGs also receive an opaque wallpaper backdrop.
@@ -251,8 +261,9 @@ enum WallpaperRenderer {
         }
         guard let backgroundImage = background.makeImage() else { throw WallpaperError.renderingFailed }
         let context = try bitmap(width: pixelWidth, height: pixelHeight)
+        context.draw(backgroundImage, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+        context.translateBy(x: canvasOffset.x, y: canvasOffset.y)
         context.scaleBy(x: scale, y: scale)
-        context.draw(backgroundImage, in: canvasRect)
         let panel = native(layout.panel, height: layout.canvas.height)
         let radius: CGFloat = min(CGFloat(settings.cornerRadius), min(panel.width, panel.height) / 2)
         let path = CGPath(roundedRect: panel, cornerWidth: radius, cornerHeight: radius, transform: nil)
@@ -264,7 +275,11 @@ enum WallpaperRenderer {
                 parameters: [kCIInputRadiusKey: CGFloat(settings.blurRadius) * scale]).cropped(to: input.extent)
             guard let blurImage = ciContext.createCGImage(blurred, from: input.extent)
             else { throw WallpaperError.renderingFailed }
-            context.draw(blurImage, in: canvasRect)
+            context.saveGState()
+            context.scaleBy(x: 1 / scale, y: 1 / scale)
+            context.translateBy(x: -canvasOffset.x, y: -canvasOffset.y)
+            context.draw(blurImage, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+            context.restoreGState()
         }
         context.setFillColor(CGColor(gray: settings.darkGlass ? 0 : 1, alpha: settings.glassOpacity))
         context.fill(panel)
@@ -282,23 +297,26 @@ enum WallpaperRenderer {
                 cornerWidth: max(0, radius - 0.4), cornerHeight: max(0, radius - 0.4), transform: nil))
             context.strokePath()
         }
+        context.saveGState(); context.addPath(path); context.clip()
+        drawContent(layout: layout, settings: settings, appearance: appearance, context: context)
+        context.restoreGState()
+        guard let image = context.makeImage() else { throw WallpaperError.renderingFailed }
+        return WallpaperRendered(image: image, layout: layout, sourceInfo: sourceInfo, sourceIsSoft: soft)
+    }
+
+    static func drawContent(layout: WallpaperLayout, settings: WallpaperSettings,
+                            appearance: TodoAppearance, context: CGContext) {
         context.saveGState()
-        context.addPath(path); context.clip()
+        let panel = native(layout.panel, height: layout.canvas.height)
+        context.clip(to: panel)
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panel.width - 50) / 2))
         for row in layout.rows {
             let opacity: Double = row.item.isCompleted && settings.completionStyle != .check ? 0.5 : 1
-            let firstLineHeight = CTFontGetAscent(row.block.font) + CTFontGetDescent(row.block.font)
-            let ringTop = row.top + max(0, (firstLineHeight - 17) / 2)
-            let ring = CGRect(x: panel.minX + padding, y: layout.canvas.height - ringTop - 17,
-                              width: 17, height: 17)
-            context.setStrokeColor(color(settings.textColor, opacity: opacity)); context.setLineWidth(1.4)
-            context.strokeEllipse(in: ring)
-            if row.item.isCompleted {
-                context.move(to: CGPoint(x: ring.minX + 4, y: ring.midY))
-                context.addLine(to: CGPoint(x: ring.minX + 7, y: ring.midY - 3))
-                context.addLine(to: CGPoint(x: ring.maxX - 3, y: ring.midY + 4)); context.strokePath()
-            }
-            drawText(row.block, in: context, x: panel.minX + padding + 28, top: row.top,
+            let rect = CGRect(x: panel.minX + padding, y: layout.canvas.height - row.markerTop - row.markerSize,
+                              width: row.markerSize, height: row.markerSize)
+            MarkerDrawing.draw(marker: row.marker, completed: row.item.isCompleted, style: appearance.markerStyle,
+                               textColor: settings.textColor, rect: rect, context: context)
+            drawText(row.block, in: context, x: panel.minX + padding + layout.markerColumn, top: row.top,
                 width: layout.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment,
                 strike: row.item.isCompleted && settings.completionStyle == .strikeAndDim,
                 strikeColor: color(settings.textColor, opacity: opacity))
@@ -312,8 +330,6 @@ enum WallpaperRenderer {
                 width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         context.restoreGState()
-        guard let image = context.makeImage() else { throw WallpaperError.renderingFailed }
-        return WallpaperRendered(image: image, layout: layout, sourceInfo: sourceInfo, sourceIsSoft: soft)
     }
 
     private static func drawText(_ block: WallpaperTextBlock, in context: CGContext, x: CGFloat,
@@ -352,20 +368,35 @@ enum WallpaperRenderer {
     }
 }
 
+struct WallpaperLivePhoto: @unchecked Sendable {
+    let image: CGImage
+    let info: WallpaperPhotoInfo
+}
 actor WallpaperRenderService {
     private let context = CIContext(options: [.cacheIntermediates: false])
-    func preview(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?) throws -> WallpaperRendered {
+    func loadPhoto(at url: URL) throws -> WallpaperLivePhoto {
+        let info = try WallpaperRenderer.photoInfo(at: url)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 2048,
+                kCGImageSourceShouldCacheImmediately: true
+              ] as CFDictionary) else { throw WallpaperError.unreadablePhoto }
+        return WallpaperLivePhoto(image: image, info: info)
+    }
+    func preview(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, appearance: TodoAppearance = TodoAppearance()) throws -> WallpaperRendered {
         try Task.checkCancellation()
         return try autoreleasepool {
             try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL,
-                                         previewWidth: 780, ciContext: context)
+                                         previewWidth: 1000, ciContext: context, appearance: appearance)
         }
     }
-    func export(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, directory: URL) throws -> URL {
+    func export(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, directory: URL, appearance: TodoAppearance = TodoAppearance()) throws -> URL {
         try Task.checkCancellation()
         defer { context.clearCaches() }
         return try autoreleasepool {
-            let rendered = try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL, ciContext: context)
+            let rendered = try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL, ciContext: context, appearance: appearance)
             try Task.checkCancellation()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let url = directory.appendingPathComponent("TodoWallpaper-\(settings.size.width)x\(settings.size.height)-\(UUID()).png")
