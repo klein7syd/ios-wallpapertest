@@ -305,6 +305,20 @@
     "windows_script_packaging": "matches_source_with_declared_cmd_ps1_CRLF_normalization",
     "widget_device_emoji_and_interaction": "pending_real_iPhone_regression",
     "live_gesture_fps": "not_measured_on_iPhone",
-    "next_stage": "not_started"
+    "next_stage": "not_started",
+    "device_feedback": "User reports new iPhone testing and UI issues in the native UI revision request; exact installed Build not reconfirmed; no blanket device acceptance inferred."
+  },
+  "ui_feedback_revision": {
+    "version": "0.4.1",
+    "base_version": "0.4.0 / 1010",
+    "code": "implemented",
+    "compilation": "pending",
+    "ui_state_checks": "pending_macos_execution",
+    "ui_architecture_checks": "passed_local_source_checks",
+    "windows_signing": "not_performed",
+    "iphone_installation": "not_verified",
+    "floating_text_retest": "pending_real_iPhone",
+    "device_acceptance": "pending_user_feedback",
+    "scope": "seven_UI_feedback_items_only; no schema or R1 changes"
   }
 }

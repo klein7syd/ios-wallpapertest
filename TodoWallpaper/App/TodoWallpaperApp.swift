@@ -4,16 +4,27 @@ import SwiftUI
 struct TodoWallpaperApp: App {
     @StateObject private var store = TodoStore()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var navigation = AppNavigationState()
 
     var body: some Scene {
         WindowGroup {
-            TabView {
+            TabView(selection: Binding(get: { navigation.page }, set: { navigation.selectPage($0) })) {
                 TodoListView(store: store)
                     .tabItem { Label("待办", systemImage: "checklist") }
-                WallpaperEditorView(store: store)
+                    .tag(AppPage.todos)
+                    .toolbar(.visible, for: .tabBar)
+                WallpaperEditorView(store: store, navigation: $navigation)
                     .tabItem { Label("壁纸", systemImage: "photo") }
+                    .tag(AppPage.wallpaper)
+                    .toolbar(navigation.isEditing ? .hidden : .visible, for: .tabBar)
+                NavigationStack { WidgetAppearanceEditor(store: store) }
+                    .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
+                    .tag(AppPage.widget)
+                    .toolbar(.visible, for: .tabBar)
                 AboutView(store: store)
                     .tabItem { Label("关于", systemImage: "info.circle") }
+                    .tag(AppPage.about)
+                    .toolbar(.visible, for: .tabBar)
             }
             .task { store.reload() }
             .onChange(of: scenePhase) { _, phase in
@@ -222,12 +233,6 @@ struct AboutView: View {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")
                     Text("支持主屏幕小组件直接完成或恢复待办，以及本地壁纸编辑与 PNG 导出。")
                     Text("安装标识：\(Bundle.main.bundleIdentifier ?? "未知")").font(.caption).textSelection(.enabled)
-                }
-                Section("小组件") {
-                    NavigationLink("小组件外观与全局标记") { WidgetAppearanceEditor(store: store) }
-                    Text(store.hasLoaded && store.loadError == nil ? "共享存储已就绪" : "请先处理待办页的读取提示")
-                    Text("长按主屏幕，添加 Todo Wallpaper 小组件。任务按钮可直接操作，空白区域仍可打开 App。")
-                    Button("请求刷新小组件") { store.reload() }
                 }
             }
             .navigationTitle("关于")

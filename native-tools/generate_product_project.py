@@ -51,7 +51,7 @@ for name in ['Debug','Release']:
         'IPHONEOS_DEPLOYMENT_TARGET':'17.0','SWIFT_VERSION':'5.0','SWIFT_OPTIMIZATION_LEVEL':'-Onone' if name=='Debug' else '-O'}))
     target_configs.append(obj('target:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)','PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app',
-        'CURRENT_PROJECT_VERSION':'1006','MARKETING_VERSION':'0.4.0',
+        'CURRENT_PROJECT_VERSION':'1011','MARKETING_VERSION':'0.4.1',
         'CODE_SIGN_ENTITLEMENTS':'App/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'App/Info.plist',
         'INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES',
@@ -60,7 +60,7 @@ for name in ['Debug','Release']:
     widget_configs.append(obj('widget:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)',
         'PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app.widget',
-        'CURRENT_PROJECT_VERSION':'1006','MARKETING_VERSION':'0.4.0',
+        'CURRENT_PROJECT_VERSION':'1011','MARKETING_VERSION':'0.4.1',
         'CODE_SIGN_ENTITLEMENTS':'Widget/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'Widget/Info.plist',
         'APPLICATION_EXTENSION_API_ONLY':'YES','SKIP_INSTALL':'YES',

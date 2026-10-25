@@ -53,6 +53,9 @@ struct MarkerStyle: Codable, Equatable, Sendable {
               EmojiInput.isValid(completionEmoji) else { throw AppearanceError.invalidStyle }
     }
     func resolved(_ marker: TodoMarker, completed: Bool) -> (marker: TodoMarker, opacity: Double, checked: Bool) {
+        // Hiding a marker must not resurrect it through a dormant completion policy.
+        // Keep that policy saved so choosing a visible marker restores its behavior.
+        if marker.kind == .none { return (marker, 1, false) }
         if completed && completion == .replace { return (TodoMarker(kind: .emoji, emoji: completionEmoji), 1, false) }
         return (marker, completed && completion == .dim ? 0.4 : 1,
                 completed && completion == .checkShapes && marker.kind != .emoji && marker.kind != .none)

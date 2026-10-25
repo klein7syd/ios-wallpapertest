@@ -112,6 +112,7 @@ private struct WallpaperGlyphView: UIViewRepresentable {
     let scale: CGFloat
     func makeUIView(context: Context) -> GlyphUIView {
         let view = GlyphUIView(); view.isOpaque = false; view.backgroundColor = .clear
+        view.clipsToBounds = true
         view.contentMode = .redraw; view.isUserInteractionEnabled = false; return view
     }
     func updateUIView(_ view: GlyphUIView, context: Context) {

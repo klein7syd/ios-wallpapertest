@@ -31,8 +31,8 @@ import json,os,shutil
 from pathlib import Path
 out=Path('TodoWallpaper/out')
 report=json.loads((out/'package-verification.json').read_text())
-(out/'status.json').write_text(json.dumps({'stage':'D3+D4','compilation':'succeeded','repository_and_migration_checks':'passed',
-    'wallpaper_render_checks':'passed_on_macos_production_renderer','wallpaper_photos_and_touch_on_iphone':'not_verified',
+(out/'status.json').write_text(json.dumps({'stage':'native_UI_feedback_revision','compilation':'succeeded','repository_and_migration_checks':'passed',
+    'wallpaper_render_checks':'passed_on_macos_production_renderer','ui_state_checks':'passed_compiled_production_state','ui_structure_checks':'passed','iphone_scroll_visual_bug':'pending_device_retest','wallpaper_photos_and_touch_on_iphone':'not_verified',
     'version':report['bundles'][0]['version'],'build':report['bundles'][0]['build'],'bundle_id':report['bundles'][0]['bundle_id'],
     'signing':'not_performed','iphone_installation':'not_verified','device_crud':'not_verified',
     'widget_interaction':'not_verified','app_group_migration_on_iphone':'not_verified',
@@ -40,4 +40,4 @@ report=json.loads((out/'package-verification.json').read_text())
     'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA']},indent=2))
 shutil.rmtree(out/'package')
 PY
-echo "Todo Wallpaper 0.4.0 ($PRODUCT_BUILD): native PNG checks passed, unsigned ARM64 app + Widget IPA; Windows signing and iPhone wallpaper tests pending." >> "$GITHUB_STEP_SUMMARY"
+echo "Todo Wallpaper 0.4.1 ($PRODUCT_BUILD): native PNG checks passed, unsigned ARM64 app + Widget IPA; Windows signing and iPhone wallpaper tests pending." >> "$GITHUB_STEP_SUMMARY"
