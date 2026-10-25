@@ -33,3 +33,16 @@ Separate settings page is reached from About or the wallpaper inspector, with no
 ## Evidence and acceptance
 
 CI must run production repository/migration checks, actual weighted-font/colored-Emoji raster comparisons, shape output, modern/classic 4K PNG readback, continuous transform and layout equivalence, legacy task/backup/draft/photo checks and shared Widget-style roundtrip. It then compiles unsigned ARM64 App + embedded Widget and inspects actual IPA/intent metadata. Result JSON, PNGs and logs are build artifacts. Windows signing/install, performance, Emoji appearance on iPhone and interactive Widget regression remain separate, pending device checks. No AI/translation/cloud sync/automatic wallpaper changes are included.
+
+## Actual final delivery · 2026-10-25
+
+- **0.4.0 / 1010**, code commit `a59718b3d8b951782bbab0efccce6838ebc47d01`.
+- [Actions run 40180955157](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40180955157), job 121131707564: **success / BUILD SUCCEEDED**. Both ARM64 device bundles are unsigned, IDs/group unchanged, matching version/build; metadata in both targets contains SetTodoCompletionIntent with openAppWhenRun=false. No Swift source warnings in the final build.
+- Actual IPA SHA256: `ada475a4d13f38c7a821a68099baf92dda318233799884176525bf6e66ea82c6`. Artifact 12594448166; ZIP SHA256 `f3b5898aef06dea5191cbb130690c39a44e0379306c5196246c136e94875a43a`. Download digest and ZIP CRC independently checked.
+- Real production native checks passed: CRUD/backups/migration/three-process writes, actual weighted font raster hashes, composed/skin-tone Emoji PNGs, marker geometry/variable thin-circle width, continuous coordinates, ratio/resolution composition, modern 1890×4096 and classic 2304×4096 PNG readback, legacy item/draft/photo preservation and shared Widget style precedence/roundtrip.
+- System mixed-script weights yielded five distinct pixel hashes; ink counts light3679 / regular4333 / medium5044 / semibold5523 / bold5967. Chinese samples yielded four native faces, with bold/semibold mapped to the same supported PingFang face.
+- Color pixel checks passed for heart, blossom, books, toned thumb, toned technologist, family, flag and keycap. Native musical note is achromatic and is verified by actual nonzero native glyph/ink rather than requiring invented color. The source Emoji is retained; no fixed picture assets replace user input.
+- Inspected actual modern/classic 4K output, wrapping/alignment and separate composed/tone/note/font PNGs. These are synthetic macOS images. iPhone UI/FPS, system ColorPicker, Photos, signing, overlay installation, Widget rendering/taps/tint remain pending real-device feedback.
+- Five CI triggers: two failed (overstrict chromatic-note test; SwiftUI multi-variable State declarations) and were fixed from actual logs; three succeeded, including final review fixes for adjustable thin-line style and marker-hidden completion accessibility. No blind reruns. Docs-only result update uses [skip ci].
+- R1 installer, original probe and completion Intent source hashes are unchanged. Packaged Python scripts byte-match; CMD/PS1 use the CRLF conversion declared by .gitattributes. This is not a signature/seal mutation inside the unsigned IPA.
+- No next phase started.

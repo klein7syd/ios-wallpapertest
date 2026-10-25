@@ -1,5 +1,7 @@
 # Todo Wallpaper · Native iOS
 
+**Current delivery: 0.4.0 / 1010** — [real build success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40180955157). Native image/storage checks passed; new Windows signing and iPhone acceptance pending.
+
 Public source-only personal project. Windows+iPhone, free Apple Account, macOS GitHub Actions compilation, Windows iPASide/R1 local signing. No credentials, signed packages, profiles or device identities are committed; no automatic public Releases.
 
 - Proven R1 validation baseline: `native-validation/`, original ID `org.todowallpaper.nativeinstallprobe`, frozen baseline branch. [Provenance](docs/R1-BASELINE.md).

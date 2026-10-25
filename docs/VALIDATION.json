@@ -50,7 +50,7 @@
     "widget_interaction": "passed_user_report_small_medium_large",
     "acceptance": "passed_user_report",
     "app_group_sharing_on_iphone": "passed_user_report",
-    "next_stage": "D1_D2_in_development",
+    "next_stage": "D1_D2_delivered_D3_D4_device_feedback_pending",
     "device_acceptance": {
       "date": "2026-10-25",
       "evidence": "User explicitly confirmed stage C acceptance in D1+D2 instruction; todo CRUD, bottom navigation, three widget sizes, App Intents and App/Widget sync passed."
@@ -149,10 +149,10 @@
   },
   "stage_d3_d4": {
     "version": "0.4.0",
-    "code": "implemented_pending_CI",
-    "compilation": "not_run",
-    "windows_signing": "not_verified",
-    "iphone_installation": "not_verified",
+    "code": "implemented",
+    "compilation": "success_real_xcode_log",
+    "windows_signing": "not_performed_for_1010",
+    "iphone_installation": "not_verified_for_1010",
     "device_acceptance": "pending_user_feedback",
     "scope": "final_revision_Emoji_ratio_first_4K_only",
     "build_attempts": [
@@ -179,7 +179,132 @@
         "all_native_checks": "passed",
         "unsigned_ipa": "generated_and_independently_inspected",
         "followup": "Final functional review found thin-circle preset ignored line-width control; adjusted before final delivery with raster regression check."
+      },
+      {
+        "run": 40180788222,
+        "commit": "a3538a70fb37984c381df420a295b97bad79179a",
+        "result": "success",
+        "build": "1009",
+        "checks": "passed_including_adjustable_thin_circle",
+        "followup": "Added explicit invisible-marker hit rectangle and native leading swipe completion before final delivery"
+      },
+      {
+        "run": 40180955157,
+        "commit": "a59718b3d8b951782bbab0efccce6838ebc47d01",
+        "result": "success",
+        "build": "1010",
+        "checks": "all_passed",
+        "delivery": "final_unsigned_IPA_independently_inspected"
       }
-    ]
+    ],
+    "build": "1010",
+    "commit": "a59718b3d8b951782bbab0efccce6838ebc47d01",
+    "actions_run": 40180955157,
+    "job": 121131707564,
+    "builds_this_delivery": 5,
+    "build_outcomes": {
+      "success": 3,
+      "failed": 2
+    },
+    "native_render_and_compatibility_checks": {
+      "chinese_weight_pixel_hashes": {
+        "bold": "131f8e034756b31db73def943e38004cc06b939caff555f9805ee4ae5d4d59f5",
+        "light": "59e28d54d688f44405ca43ced14a1b94665c4f5c68cc31ff90c0f67828d7eb65",
+        "medium": "8e138a5a49c6255786479567396ba0fd2041251ce4846c3d73e9b0e51b9948db",
+        "regular": "3bfb694ea321e02248640e88f1206cecec4442a0a7b1d5c140ebdf79f1de2e48",
+        "semibold": "131f8e034756b31db73def943e38004cc06b939caff555f9805ee4ae5d4d59f5"
+      },
+      "circle_ink_pixels": {
+        "bordered": 2000,
+        "filled": 2000,
+        "hollow": 532,
+        "none": 0,
+        "square": 556,
+        "thin": 304
+      },
+      "classic_4k": [
+        2304,
+        4096
+      ],
+      "colored_emoji_pixels": {
+        "🇨🇳": 12765,
+        "❤️": 14647,
+        "🌸": 17776,
+        "🎵": 0,
+        "👍🏽": 13598,
+        "👨‍👩‍👧‍👦": 10538,
+        "📚": 9798,
+        "🧑🏽‍💻": 6998,
+        "1️⃣": 20566
+      },
+      "continuous_transform_matches_export": true,
+      "iphone_gestures_widget_and_signing": "pending_user_device_test",
+      "legacy_todo_backup_and_draft": "passed",
+      "modern_4k": [
+        1890,
+        4096
+      ],
+      "resolution_preserves_layout_and_crop": true,
+      "result": "passed",
+      "system_weight_pixel_hashes": {
+        "bold": "921273b86115abf007c4a9c53fca03c69831e9f64c869451a168290fbdff4e0d",
+        "light": "50d20d241004bf8ecd40dd1394f7aa55c30739549e14e4440b9316b8239627c5",
+        "medium": "7d459d63d5ab9ca0ef483393220223109b21bc47a906aeb023edeaa8e5885a31",
+        "regular": "6f88839b710262ecaafccb245aa279aaec1883efed90166e080ae1dd50674991",
+        "semibold": "dfbe886357d42aaea0932ac4fc3474dc8b1a5b702bf6f993b381e5620ecf1a79"
+      },
+      "weight_ink_pixels": {
+        "bold": 5967,
+        "light": 3679,
+        "medium": 5044,
+        "regular": 4333,
+        "semibold": 5523
+      },
+      "widget_style_shared_roundtrip_and_precedence": "passed"
+    },
+    "visual_inspection": "actual modern/classic 4K PNGs, composed and skin-tone Emoji, note and weighted-font outputs inspected; synthetic macOS renders, not iPhone screenshots",
+    "unsigned_ipa_verification": {
+      "sha256": "ada475a4d13f38c7a821a68099baf92dda318233799884176525bf6e66ea82c6",
+      "bundles": [
+        {
+          "bundle_id": "org.todowallpaper.app",
+          "version": "0.4.0",
+          "build": "1010",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        },
+        {
+          "bundle_id": "org.todowallpaper.app.widget",
+          "version": "0.4.0",
+          "build": "1010",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        }
+      ],
+      "structural_verification": "passed",
+      "cryptographic_signature_verification": "not_performed",
+      "iphone_installation": "not_verified",
+      "device_capabilities": "not_verified"
+    },
+    "artifact_id": 12594448166,
+    "artifact_zip_sha256": "f3b5898aef06dea5191cbb130690c39a44e0379306c5196246c136e94875a43a",
+    "source_privacy_check": "passed_no_credentials_or_user_photos_added",
+    "R1_source_and_original_probe": "unchanged_hashes_verified",
+    "windows_script_packaging": "matches_source_with_declared_cmd_ps1_CRLF_normalization",
+    "widget_device_emoji_and_interaction": "pending_real_iPhone_regression",
+    "live_gesture_fps": "not_measured_on_iPhone",
+    "next_stage": "not_started"
   }
 }

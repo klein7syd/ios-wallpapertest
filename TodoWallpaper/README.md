@@ -11,3 +11,5 @@ Minimum iOS17. Stable IDs and native navigation preserved. CI build number = 100
 - native-tools: deterministic Xcode generator, one product workflow, unsigned packaging/IPA checks and unchanged R1 Windows installer.
 
 [Implementation/limits](../docs/STAGE-D3-D4.md) · [Validation evidence](../docs/VALIDATION.json) · [Windows and iPhone checklist](DEVICE-TEST.md). No iPhone success is inferred from CI.
+
+Final build **1010**: [actual Actions success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40180955157). Both unsigned ARM64 bundles independently inspected. Native PNG/compatibility checks passed; actual iPhone live interaction and Widget regression await feedback. See full evidence and limitations above.
