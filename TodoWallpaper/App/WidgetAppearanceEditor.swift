@@ -30,10 +30,19 @@ struct WidgetAppearanceEditor: View {
                 fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
                 if geometry.size.height < 320 || typeSize.isAccessibilitySize {
                     HStack {
-                        Picker("类别", selection: $tool) { ForEach(WidgetEditorTool.allCases) { Text($0.rawValue).tag($0) } }
-                            .pickerStyle(.menu)
+                        Menu {
+                            ForEach(WidgetEditorTool.allCases) { value in Button(value.rawValue) { tool = value } }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(tool.rawValue).font(.subheadline).lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold))
+                            }.fixedSize(horizontal: true, vertical: false).frame(minHeight: 44)
+                        }.accessibilityLabel("设置类别：\(tool.rawValue)")
                         Spacer()
-                        Button(advanced ? "返回常用" : "更多") { advanced.toggle() }.frame(minHeight: 44)
+                        Button { advanced.toggle() } label: {
+                            Image(systemName: advanced ? "arrow.uturn.backward" : "slider.horizontal.3")
+                                .font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44)
+                        }.accessibilityLabel(advanced ? "返回常用" : "更多参数")
                     }.padding(.horizontal, 18)
                 } else {
                 Picker("设置类别", selection: $tool) {
@@ -86,10 +95,17 @@ struct WidgetAppearanceEditor: View {
             HStack(spacing: 8) {
                 Menu {
                     ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
-                } label: { Label(family.title, systemImage: "rectangle.3.group").font(.subheadline) }
+                } label: {
+                    Group {
+                        if typeSize.isAccessibilitySize { Text(family.title).lineLimit(1).fixedSize(horizontal: true, vertical: false) }
+                        else { Label(family.title, systemImage: "rectangle.3.group") }
+                    }.font(.subheadline)
+                }.accessibilityLabel("预览尺寸：\(family.title)")
                 Spacer(minLength: 0)
-                Text("点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").frame(width: 44, height: 44) }
+                if !typeSize.isAccessibilitySize {
+                    Text("点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
                     .accessibilityLabel("重置预览完成状态，不修改真实待办")
             }
             GeometryReader { proxy in

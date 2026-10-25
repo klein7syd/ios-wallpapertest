@@ -62,6 +62,8 @@ enum NativeUIProbe {
                 heartWidths[String(size)] = right - left
             }
             try require((heartWidths["48"] ?? 0) > (heartWidths["24"] ?? 0) * 3 / 2, "Marker keeps growing above 24pt")
+            _ = try render(MarkerChoiceEditor(choice: .constant(TodoMarker())).padding(8).frame(width: 340, height: 130)
+                .background(.white).environment(\.dynamicTypeSize, .accessibility5), name: "marker-choices-accessibility", directory: output, scale: 2)
             let now = Date(timeIntervalSince1970: 1_700_000_000)
             var items = [
                 TodoItem(id: UUID(), title: "听音乐，给每项任务自己的 Emoji", marker: TodoMarker(kind: .emoji, emoji: "❤️"), isCompleted: true, createdAt: now, updatedAt: now),

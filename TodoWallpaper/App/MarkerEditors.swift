@@ -3,6 +3,7 @@ import UIKit
 
 struct MarkerChoiceEditor: View {
     @Binding var choice: TodoMarker
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -17,10 +18,10 @@ struct MarkerChoiceEditor: View {
                                         TodoMarkerView(marker: TodoMarker(kind: kind, emoji: choice.emoji), completed: false,
                                             style: MarkerStyle(size: 23, emojiSize: 27), textColor: .primary, maximumSize: 28)
                                     }
-                                }.frame(height: 30)
-                                Text(kind == .emoji ? "Emoji" : kind.title).font(.caption2).lineLimit(1)
+                                }.frame(height: typeSize.isAccessibilitySize ? 36 : 30)
+                                Text(kind == .emoji ? "Emoji" : kind.title).font(.caption2).lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                             }
-                            .frame(width: 64, height: 66)
+                            .frame(width: typeSize.isAccessibilitySize ? 100 : 64, height: typeSize.isAccessibilitySize ? 110 : 66)
                             .background(choice.kind == kind ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06),
                                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay {
@@ -82,6 +83,7 @@ struct PreciseSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var precision = 1
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var bounded: Binding<Double> {
         Binding(get: { min(range.upperBound, max(range.lowerBound, value)) },
                 set: { value = $0.isFinite ? min(range.upperBound, max(range.lowerBound, $0)) : range.lowerBound })
@@ -93,7 +95,7 @@ struct PreciseSlider: View {
                 Spacer(minLength: 6)
                 TextField(title, value: bounded, format: .number.precision(.fractionLength(0...precision)))
                     .keyboardType(.numbersAndPunctuation).multilineTextAlignment(.trailing)
-                    .font(.subheadline.monospacedDigit()).frame(width: 72, height: 44)
+                    .font(.subheadline.monospacedDigit()).frame(width: typeSize.isAccessibilitySize ? 116 : 72).frame(minHeight: 44)
                     .accessibilityLabel("\(title)，精确输入")
             }
             Slider(value: bounded, in: range).accessibilityLabel(title)
