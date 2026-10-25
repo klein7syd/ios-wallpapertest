@@ -34,7 +34,7 @@ enum MarkerDrawing {
         let stroke = result.checked ? style.completedColor : style.followsTextColor ? textColor : style.stroke
         var fill = result.checked ? style.completedColor : style.followsTextColor ? textColor : style.fill
         if kind == .bordered && style.followsTextColor && !result.checked { fill.alpha *= 0.15 }
-        let width: CGFloat = kind == .thin ? 0.7 : CGFloat(style.lineWidth)
+        let width: CGFloat = kind == .thin ? CGFloat(style.lineWidth * 0.45) : CGFloat(style.lineWidth)
         let inner = rect.insetBy(dx: width / 2, dy: width / 2)
         let radius: CGFloat = kind == .square ? 3 : inner.width / 2
         let path = CGPath(roundedRect: inner, cornerWidth: radius, cornerHeight: radius, transform: nil)

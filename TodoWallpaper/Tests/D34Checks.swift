@@ -104,6 +104,13 @@ enum D34Checks {
         try require(geometryInk["none"] == 0, "No-marker draws nothing")
         try require((geometryInk["filled"] ?? 0) > (geometryInk["hollow"] ?? Int.max), "Filled and hollow circles differ")
         try require((geometryInk["thin"] ?? Int.max) < (geometryInk["hollow"] ?? 0), "Thin outline differs")
+        let thinContext = try blank(100, 100)
+        var thicker = MarkerStyle(); thicker.lineWidth = 6
+        MarkerDrawing.draw(marker: TodoMarker(kind: .thin), completed: false, style: thicker,
+            textColor: WallpaperColor(red: 0, green: 0, blue: 0), rect: CGRect(x: 25, y: 25, width: 50, height: 50), context: thinContext)
+        guard let thickerImage = thinContext.makeImage() else { throw WallpaperError.renderingFailed }
+        let thickerInk = try ink(thickerImage)
+        try require(thickerInk > (geometryInk["thin"] ?? Int.max), "Thin-circle line width must really respond to its control")
         let context = CIContext(options: [.cacheIntermediates: false])
         var modern = WallpaperSettings(); modern.maximumItems = 12
         let full = try WallpaperRenderer.render(settings: modern, items: items, photoURL: fixture, ciContext: context, appearance: appearance)

@@ -25,7 +25,7 @@ struct TodoMarkerView: View {
                     RoundedRectangle(cornerRadius: result.marker.kind == .square ? 3 : extent / 2)
                         .fill(filled ? fill.opacity(result.marker.kind == .bordered && style.followsTextColor && !result.checked ? 0.15 : 1) : Color.clear)
                     RoundedRectangle(cornerRadius: result.marker.kind == .square ? 3 : extent / 2)
-                        .strokeBorder(stroke, lineWidth: result.marker.kind == .thin ? 0.7 : min(style.lineWidth, 3))
+                        .strokeBorder(stroke, lineWidth: result.marker.kind == .thin ? style.lineWidth * 0.45 : min(style.lineWidth, 3))
                     if result.checked {
                         Image(systemName: "checkmark").font(.system(size: extent * 0.6, weight: .semibold))
                             .foregroundStyle(result.marker.kind == .filled ? Color.white : stroke)
