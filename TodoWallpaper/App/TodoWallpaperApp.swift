@@ -59,6 +59,11 @@ struct TodoListView: View {
                     List {
                         ForEach(store.items) { item in
                             row(item)
+                                .swipeActions(edge: .leading) {
+                                    Button { perform { try store.setCompleted(id: item.id, completed: !item.isCompleted) } } label: {
+                                        Label(item.isCompleted ? "恢复待办" : "完成待办", systemImage: item.isCompleted ? "arrow.uturn.backward" : "checkmark")
+                                    }.tint(.green)
+                                }
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) { perform { try store.delete(ids: [item.id]) } } label: {
                                         Label("删除", systemImage: "trash")
@@ -120,6 +125,7 @@ struct TodoListView: View {
                 TodoMarkerView(marker: store.appearance.marker(for: item), completed: item.isCompleted,
                                style: store.appearance.markerStyle)
                     .frame(minWidth: 24, minHeight: 32)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
