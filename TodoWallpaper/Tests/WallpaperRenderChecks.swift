@@ -122,6 +122,7 @@ enum WallpaperRenderChecks {
         try require(empty.rows.isEmpty && empty.emptyText != nil, "Empty state")
         try await draftChecks(out: out, fixture: fixture)
         try await D34Checks.run(out: out, fixture: fixture)
+        try WidgetFeedbackRenderChecks.run(out: out)
         let report: [String: Any] = [
             "result": "passed", "engine": "production CoreGraphics + CoreText + CoreImage on macOS",
             "iphone_device_validation": "pending", "synthetic_fixture_only": true,

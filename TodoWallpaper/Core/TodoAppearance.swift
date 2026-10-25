@@ -28,10 +28,10 @@ enum EmojiInput {
     }
 }
 enum MarkerCompletion: String, Codable, CaseIterable, Identifiable {
-    case keep, dim, replace, checkShapes
+    case keep, dim, replace, checkShapes, thinCircle
     var id: String { rawValue }
     var title: String {
-        switch self { case .keep: return "保留原标记"; case .dim: return "降低透明度"; case .replace: return "替换为完成 Emoji"; case .checkShapes: return "图形加勾 · Emoji 保留" }
+        switch self { case .keep: return "保留原标记"; case .dim: return "降低透明度"; case .replace: return "替换为自定义 Emoji"; case .checkShapes: return "原图形加勾"; case .thinCircle: return "替换为细线完成圆" }
     }
 }
 struct MarkerStyle: Codable, Equatable, Sendable {
@@ -57,6 +57,7 @@ struct MarkerStyle: Codable, Equatable, Sendable {
         // Keep that policy saved so choosing a visible marker restores its behavior.
         if marker.kind == .none { return (marker, 1, false) }
         if completed && completion == .replace { return (TodoMarker(kind: .emoji, emoji: completionEmoji), 1, false) }
+        if completed && completion == .thinCircle { return (TodoMarker(kind: .thin), 1, true) }
         return (marker, completed && completion == .dim ? 0.4 : 1,
                 completed && completion == .checkShapes && marker.kind != .emoji && marker.kind != .none)
     }
@@ -79,6 +80,16 @@ enum WidgetCompleted: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String { self == .recent ? "最近完成一项" : self == .hidden ? "仅未完成" : "全部事项" }
 }
+enum WidgetTextCompletion: String, Codable, CaseIterable, Identifiable {
+    case fadeStrike, strike, fade, keep, color
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .fadeStrike: return "变淡并划线"; case .strike: return "仅划线"
+        case .fade: return "仅变淡"; case .keep: return "保持原样"; case .color: return "自定义颜色" }
+    }
+    var strikes: Bool { self == .fadeStrike || self == .strike }
+    var fades: Bool { self == .fadeStrike || self == .fade }
+}
 struct WidgetAppearance: Codable, Equatable, Sendable {
     var theme = WidgetTheme.system
     var backdrop = WidgetBackdrop.system
@@ -94,10 +105,17 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var compact = false
     var maximumItems = 6
     var completed = WidgetCompleted.recent
+    // Optional additive fields keep the complete 0.4.1 appearance JSON decodable.
+    var completedTextStyle: WidgetTextCompletion?
+    var completedTextColor: WallpaperColor?
+    var showsSeparators: Bool?
+    var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
+    var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
+    var separatesRows: Bool { showsSeparators ?? false }
     func validate() throws {
         try markerOverride?.validate(); try markerStyle.validate()
         guard (12...20).contains(fontSize), (0...12).contains(spacing), (1...10).contains(maximumItems),
-              textColor.isValid, panelColor.isValid else { throw AppearanceError.invalidStyle }
+              textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }
     }
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
         let limit = max(1, min(capacity, maximumItems))

@@ -3,34 +3,64 @@ import SwiftUI
 @main
 struct TodoWallpaperApp: App {
     @StateObject private var store = TodoStore()
+    @StateObject private var wallpaperModel = WallpaperEditorModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var navigation = AppNavigationState()
+    #if TODO_UI_CHECKS
+    @State private var didRunUIProbe = false
+    @MainActor init() {
+        if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") { _store = StateObject(wrappedValue: NativeUIProbe.makeStore()) }
+    }
+    #endif
 
     var body: some Scene {
         WindowGroup {
-            TabView(selection: Binding(get: { navigation.page }, set: { navigation.selectPage($0) })) {
-                TodoListView(store: store)
-                    .tabItem { Label("待办", systemImage: "checklist") }
-                    .tag(AppPage.todos)
-                    .toolbar(.visible, for: .tabBar)
-                WallpaperEditorView(store: store, navigation: $navigation)
-                    .tabItem { Label("壁纸", systemImage: "photo") }
-                    .tag(AppPage.wallpaper)
-                    .toolbar(navigation.isEditing ? .hidden : .visible, for: .tabBar)
-                NavigationStack { WidgetAppearanceEditor(store: store) }
-                    .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
-                    .tag(AppPage.widget)
-                    .toolbar(.visible, for: .tabBar)
-                AboutView(store: store)
-                    .tabItem { Label("关于", systemImage: "info.circle") }
-                    .tag(AppPage.about)
-                    .toolbar(.visible, for: .tabBar)
+            Group {
+                if navigation.isEditing {
+                    // The system TabView is not mounted in editing mode. A custom
+                    // compact Dock owns navigation here; hiding a bar is not relied on.
+                    WallpaperEditorView(store: store, navigation: $navigation, model: wallpaperModel)
+                } else {
+                    primaryTabs
+                }
             }
-            .task { store.reload() }
+            .task {
+                #if TODO_UI_CHECKS
+                if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
+                    guard !didRunUIProbe else { return }
+                    didRunUIProbe = true
+                    store.reload()
+                    if ProcessInfo.processInfo.arguments.contains("--native-widget-screen") {
+                        navigation.selectPage(.widget)
+                        return
+                    }
+                    await NativeUIProbe.run()
+                    navigation.selectTool(.marker)
+                    return
+                }
+                #endif
+                store.reload()
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { store.reload() } else { store.flushAppearance() }
             }
         }
+    }
+    private var primaryTabs: some View {
+            TabView(selection: Binding(get: { navigation.page }, set: { navigation.selectPage($0) })) {
+                TodoListView(store: store)
+                    .tabItem { Label("待办", systemImage: "checklist") }
+                    .tag(AppPage.todos)
+                WallpaperEditorView(store: store, navigation: $navigation, model: wallpaperModel)
+                    .tabItem { Label("壁纸", systemImage: "photo") }
+                    .tag(AppPage.wallpaper)
+                NavigationStack { WidgetAppearanceEditor(store: store) }
+                    .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
+                    .tag(AppPage.widget)
+                AboutView(store: store)
+                    .tabItem { Label("关于", systemImage: "info.circle") }
+                    .tag(AppPage.about)
+            }
     }
 }
 
@@ -187,9 +217,9 @@ struct TodoEditorView: View {
                     Text("\(title.trimmingCharacters(in: .whitespacesAndNewlines).count) / 200 字符")
                 }
                 Section("单项标记") {
-                    Toggle("继承全局默认标记", isOn: $inheritsMarker)
+                    Toggle("继承壁纸标记", isOn: $inheritsMarker)
                     if !inheritsMarker { MarkerChoiceEditor(choice: $markerOverride) }
-                    Text("单项设置优先；关闭单项覆盖后恢复全局默认。新待办默认继承。")
+                    Text("单项设置优先；恢复继承后使用壁纸默认标记。新待办默认继承。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

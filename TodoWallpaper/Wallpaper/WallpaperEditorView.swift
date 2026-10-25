@@ -5,8 +5,9 @@ import UIKit
 struct WallpaperEditorView: View {
     @ObservedObject var store: TodoStore
     @Binding var navigation: AppNavigationState
-    @StateObject private var model = WallpaperEditorModel()
+    @ObservedObject var model: WallpaperEditorModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var advanced = false
     @State private var fullScreen = false
     @State private var selectedPhoto: PhotosPickerItem?
@@ -64,8 +65,8 @@ struct WallpaperEditorView: View {
                     Button("完成") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                 }
             }
-            .toolbar(navigation.isEditing ? .hidden : .visible, for: .tabBar)
             .task { await model.start(items: store.items, appearance: store.appearance); syncOutputFields() }
+            .onChange(of: model.ready) { _, ready in if ready { syncOutputFields() } }
             .onChange(of: store.items) { _, items in model.updateItems(items) }
             .onChange(of: store.appearance) { _, value in model.updateAppearance(value) }
             .onChange(of: selectedPhoto) { _, selection in
@@ -89,15 +90,8 @@ struct WallpaperEditorView: View {
         }
     }
     private func inspector(height: Double) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 8) {
             if navigation.inspectorExpanded {
-                HStack(spacing: 8) {
-                    InspectorHeading(title: tool.title, advanced: $advanced)
-                    Button { withAnimation(.snappy(duration: 0.2)) { navigation.toggleInspector() } } label: {
-                        Image(systemName: "chevron.down").frame(width: 44, height: 44)
-                    }.buttonStyle(.plain).accessibilityLabel("收起参数")
-                }
-                .padding(.leading, 18).padding(.trailing, 6)
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic")) {
                     if model.draftBlocked { Text("草稿已保留，请用右上角菜单确认恢复默认。").font(.caption).foregroundStyle(.red) }
                     if let error = store.appearanceError { Text(error).font(.caption).foregroundStyle(.red) }
@@ -110,17 +104,18 @@ struct WallpaperEditorView: View {
                     }
                 }
                 .frame(maxHeight: .infinity)
+                .padding(.top, 8)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .disabled(!model.ready || model.busy || model.draftBlocked)
             }
-            toolDock(editing: true).padding(.horizontal, 8).frame(height: 60)
+            toolDock(editing: true).frame(height: 56)
         }
         .frame(height: height)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .accessibilityIdentifier("wallpaper.inspector")
     }
     private func toolDock(editing: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             if editing {
                 Menu {
                     ForEach(AppPage.allCases) { page in
@@ -133,11 +128,37 @@ struct WallpaperEditorView: View {
                     Button("显示完整导航", systemImage: "rectangle.bottomthird.inset.filled") { navigation.exitEditing() }
                 } label: {
                     Image(systemName: AppPage.wallpaper.icon).font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: Circle()).contentShape(Circle())
+                        .frame(width: 48, height: 48)
+                        .modifier(CircularDockMaterial()).contentShape(Circle())
                 }
                 .accessibilityLabel("切换页面或恢复主导航").accessibilityIdentifier("editor.navigation")
-            }
+                HStack(spacing: 4) {
+                    Menu {
+                        ForEach(WallpaperTool.allCases) { item in
+                            Button { advanced = false; navigation.selectTool(item) } label: { Label(item.title, systemImage: item.icon) }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: tool.icon)
+                            if !typeSize.isAccessibilitySize {
+                                Text(tool.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                            }
+                        }.frame(minHeight: 48).padding(.horizontal, 12)
+                    }.accessibilityLabel("切换当前工具：\(tool.title)")
+                    Spacer(minLength: 0)
+                    if navigation.inspectorExpanded {
+                        Button { advanced.toggle() } label: {
+                            if typeSize.isAccessibilitySize { Image(systemName: advanced ? "arrow.uturn.backward" : "ellipsis").frame(width: 44, height: 48) }
+                            else { Text(advanced ? "常用" : "更多").font(.subheadline).frame(minHeight: 48) }
+                        }.accessibilityLabel(advanced ? "返回常用" : "更多参数")
+                    }
+                    Button { withAnimation(.snappy(duration: 0.2)) { navigation.toggleInspector() } } label: {
+                        Image(systemName: navigation.inspectorExpanded ? "chevron.down" : "slider.horizontal.3").frame(width: 44, height: 48)
+                    }.accessibilityLabel(navigation.inspectorExpanded ? "收起参数" : "展开参数")
+                }
+                .padding(.horizontal, 4).modifier(CapsuleDockMaterial())
+            } else {
             ForEach(WallpaperTool.allCases) { item in
                 Button {
                     if navigation.wallpaperTool != item { advanced = false }
@@ -146,7 +167,7 @@ struct WallpaperEditorView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: item.icon).font(.body)
-                        Text(item.title).font(.caption2).lineLimit(1).minimumScaleFactor(0.85)
+                        if !typeSize.isAccessibilitySize { Text(item.title).font(.caption2).lineLimit(1).minimumScaleFactor(0.85) }
                     }
                     .frame(maxWidth: .infinity, minHeight: 46)
                     .foregroundStyle(editing && tool == item ? Color.accentColor : Color.secondary)
@@ -157,6 +178,7 @@ struct WallpaperEditorView: View {
                 .buttonStyle(.plain).accessibilityLabel(item.title)
                 .accessibilityAddTraits(editing && tool == item ? .isSelected : [])
                 .accessibilityIdentifier("editor.tool.\(item.id)")
+            }
             }
         }
     }
@@ -226,6 +248,9 @@ struct WallpaperEditorView: View {
         if !advanced {
             StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
             PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38)
+            if store.appearance.defaultMarker.kind != .none || store.items.contains(where: { store.appearance.marker(for: $0).kind != .none }) {
+                PreciseSlider(title: "与标记间距", value: appearance.markerStyle.gap, range: 0...32)
+            }
             Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
             Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         } else {
@@ -242,7 +267,7 @@ struct WallpaperEditorView: View {
     }
     @ViewBuilder private var markerControls: some View {
         if !advanced { MarkerChoiceEditor(choice: appearance.defaultMarker) }
-        MarkerStyleEditor(style: appearance.markerStyle, kind: store.appearance.defaultMarker.kind, advanced: advanced)
+        MarkerStyleEditor(style: appearance.markerStyle, kind: store.appearance.defaultMarker.kind, advanced: advanced, showsCompletion: false)
         if !advanced && store.appearance.defaultMarker.kind == .none {
             Text("默认不显示标记；任务单项覆盖仍保留。").font(.caption).foregroundStyle(.secondary)
         }
@@ -319,7 +344,13 @@ struct WallpaperEditorView: View {
         next.widget.theme = model.settings.darkGlass ? .dark : .light; next.widget.backdrop = .solid
         let gray = model.settings.darkGlass ? 0.12 : 0.93
         next.widget.panelColor = WallpaperColor(red: gray, green: gray, blue: gray)
+        let completion = next.widget.markerStyle.completion
+        let completionEmoji = next.widget.markerStyle.completionEmoji
+        let completionColor = next.widget.markerStyle.completedColor
         next.widget.markerStyle = next.markerStyle; next.widget.markerOverride = next.defaultMarker
+        next.widget.markerStyle.completion = completion
+        next.widget.markerStyle.completionEmoji = completionEmoji
+        next.widget.markerStyle.completedColor = completionColor
         store.setAppearance(next); store.flushAppearance()
         model.message = store.appearanceError ?? "已将文字、字体、标记与主题应用到小组件，并请求系统刷新。单项 Emoji 保持优先。"
     }

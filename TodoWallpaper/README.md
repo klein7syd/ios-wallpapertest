@@ -1,4 +1,8 @@
-# Todo Wallpaper 0.4.1 · native UI revision
+# Todo Wallpaper 0.4.2 · Widget feedback revision
+
+[Changes and validation scope](../docs/WIDGET-FEEDBACK.md). New version awaits actual CI and iPhone acceptance.
+
+# Previous native UI revision
 
 Final UI-revision build **1013**: [actual Actions success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40187675187). Both ARM64 device bundles and unsigned IPA inspected. Native regression/state and 47 architecture guards passed. Windows signing, installation and iPhone visual acceptance remain pending.
 

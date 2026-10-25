@@ -1,5 +1,18 @@
 import SwiftUI
 
+struct CircularDockMaterial: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26, *) { content.glassEffect(.regular.interactive(), in: Circle()) }
+        else { content.background(.regularMaterial, in: Circle()) }
+    }
+}
+struct CapsuleDockMaterial: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26, *) { content.glassEffect(.regular.interactive(), in: Capsule()) }
+        else { content.background(.regularMaterial, in: Capsule()) }
+    }
+}
+
 /// A single, bounded scroll surface. The material background does not clip drawing;
 /// clipping belongs here and at the panel edge, including during content replacement.
 struct InspectorViewport<Content: View>: View {

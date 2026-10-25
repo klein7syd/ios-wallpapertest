@@ -25,8 +25,20 @@ enum MarkerDrawing {
             let line = emojiLine(result.marker.emoji, size: rect.height)
             var ascent: CGFloat = 0, descent: CGFloat = 0
             let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, nil))
+            // Color Emoji's ink may extend outside its typographic advance (notably
+            // small hearts). Fit the real ink, without breaking composed graphemes.
             context.textMatrix = .identity
-            context.textPosition = CGPoint(x: rect.midX - width / 2, y: rect.midY - (ascent - descent) / 2)
+            context.textPosition = .zero
+            var ink = CTLineGetImageBounds(line, context)
+            if ink.isNull || ink.isInfinite || ink.width <= 0 || ink.height <= 0 {
+                ink = CGRect(x: 0, y: -descent, width: max(1, width), height: max(1, ascent + descent))
+            }
+            let inset = min(0.5, rect.width * 0.04)
+            let target = rect.insetBy(dx: inset, dy: inset)
+            let fit = min(target.width / ink.width, target.height / ink.height)
+            context.translateBy(x: target.midX - ink.midX * fit, y: target.midY - ink.midY * fit)
+            context.scaleBy(x: fit, y: fit)
+            context.textPosition = .zero
             CTLineDraw(line, context)
             return
         }

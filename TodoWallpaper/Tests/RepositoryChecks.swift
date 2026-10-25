@@ -62,6 +62,7 @@ enum RepositoryChecks {
         print("PASS: CRUD, Unicode, completion/restore, reorder, fresh-instance persistence, backup, rejected writes, unknown schema and corruption preservation.")
         try MigrationChecks.run()
         try UIStateChecks.run()
+        try WidgetFeedbackChecks.run()
     }
 
     private static func tryData(_ url: URL) -> Data? { try? Data(contentsOf: url) }

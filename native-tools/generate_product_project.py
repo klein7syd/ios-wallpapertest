@@ -1,6 +1,7 @@
 """Deterministic Xcode project; no external generator/dependency is required."""
 from pathlib import Path
 import hashlib
+import os
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1] / 'TodoWallpaper'
@@ -25,6 +26,7 @@ def dump(value, depth=0):
     return quote(value)
 
 groups, builds, widget_builds = [], [], []
+ui_probe = os.environ.get('TODO_UI_CHECKS') == '1'
 for folder in ['App','Core','Shared','Widget','Wallpaper']:
     refs = []
     for path in sorted((ROOT/folder).glob('*')):
@@ -37,6 +39,10 @@ for folder in ['App','Core','Shared','Widget','Wallpaper']:
             if folder != 'Widget': builds.append(obj('build:'+path.name,'PBXBuildFile',fileRef=ref))
             if folder in ['Core','Shared','Widget']: widget_builds.append(obj('widget-build:'+path.name,'PBXBuildFile',fileRef=ref))
     groups.append(obj('group:'+folder,'PBXGroup',children=refs,path=folder,sourceTree='<group>'))
+if ui_probe:
+    ref = obj('ui-probe-ref', 'PBXFileReference', path='NativeUIProbe.swift', lastKnownFileType='sourcecode.swift', sourceTree='<group>')
+    builds.append(obj('ui-probe-build','PBXBuildFile',fileRef=ref))
+    groups.append(obj('ui-probe-group','PBXGroup',children=[ref],path='Tests',sourceTree='<group>'))
 product = obj('product','PBXFileReference',explicitFileType='wrapper.application',includeInIndex=0,path='TodoWallpaper.app',sourceTree='BUILT_PRODUCTS_DIR')
 widget_product = obj('widget-product','PBXFileReference',explicitFileType='wrapper.app-extension',includeInIndex=0,path='TodoWallpaperWidget.appex',sourceTree='BUILT_PRODUCTS_DIR')
 products = obj('products','PBXGroup',children=[product,widget_product],name='Products',sourceTree='<group>')
@@ -51,7 +57,8 @@ for name in ['Debug','Release']:
         'IPHONEOS_DEPLOYMENT_TARGET':'17.0','SWIFT_VERSION':'5.0','SWIFT_OPTIMIZATION_LEVEL':'-Onone' if name=='Debug' else '-O'}))
     target_configs.append(obj('target:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)','PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app',
-        'CURRENT_PROJECT_VERSION':'1011','MARKETING_VERSION':'0.4.1',
+        'SWIFT_ACTIVE_COMPILATION_CONDITIONS':['DEBUG','TODO_UI_CHECKS'] if ui_probe and name=='Debug' else ['DEBUG'] if name=='Debug' else [],
+        'CURRENT_PROJECT_VERSION':'1014','MARKETING_VERSION':'0.4.2',
         'CODE_SIGN_ENTITLEMENTS':'App/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'App/Info.plist',
         'INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES',
@@ -60,7 +67,7 @@ for name in ['Debug','Release']:
     widget_configs.append(obj('widget:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)',
         'PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app.widget',
-        'CURRENT_PROJECT_VERSION':'1011','MARKETING_VERSION':'0.4.1',
+        'CURRENT_PROJECT_VERSION':'1014','MARKETING_VERSION':'0.4.2',
         'CODE_SIGN_ENTITLEMENTS':'Widget/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'Widget/Info.plist',
         'APPLICATION_EXTENSION_API_ONLY':'YES','SKIP_INSTALL':'YES',

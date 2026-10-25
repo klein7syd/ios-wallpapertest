@@ -114,7 +114,7 @@ enum WallpaperRenderer {
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
         let visibleItems = Array(settings.filtered(items).prefix(settings.maximumItems))
         let markerStyle = appearance.markerStyle
-        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: appearance.marker(for: $0), style: markerStyle, completed: $0.isCompleted) }.max() ?? 0
+        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: appearance.marker(for: $0), style: markerStyle, completed: false) }.max() ?? 0
         let markerColumn: CGFloat = markerWidth > 0 ? CGFloat(markerWidth + markerStyle.gap) : 0
         let textWidth: CGFloat = max(12, panelWidth - 2 * padding - markerColumn)
         let itemSpacing = CGFloat(settings.itemSpacing)
@@ -130,7 +130,7 @@ enum WallpaperRenderer {
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
         func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
-            let extent = CGFloat(MarkerDrawing.extent(marker: appearance.marker(for: pair.0), style: markerStyle, completed: pair.0.isCompleted))
+            let extent = CGFloat(MarkerDrawing.extent(marker: appearance.marker(for: pair.0), style: markerStyle, completed: false))
             let lineHeight = pair.1.ascent + CTFontGetDescent(pair.1.font)
             let textOffset = max(0, (extent - lineHeight) / 2) + max(0, -CGFloat(markerStyle.verticalOffset))
             let markerOffset = max(0, (lineHeight - extent) / 2) + max(0, CGFloat(markerStyle.verticalOffset))
@@ -314,7 +314,7 @@ enum WallpaperRenderer {
             let opacity: Double = row.item.isCompleted && settings.completionStyle != .check ? 0.5 : 1
             let rect = CGRect(x: panel.minX + padding, y: layout.canvas.height - row.markerTop - row.markerSize,
                               width: row.markerSize, height: row.markerSize)
-            MarkerDrawing.draw(marker: row.marker, completed: row.item.isCompleted, style: appearance.markerStyle,
+            MarkerDrawing.draw(marker: row.marker, completed: false, style: appearance.markerStyle,
                                textColor: settings.textColor, rect: rect, context: context)
             drawText(row.block, in: context, x: panel.minX + padding + layout.markerColumn, top: row.top,
                 width: layout.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment,

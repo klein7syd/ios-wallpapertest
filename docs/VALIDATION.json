@@ -375,6 +375,18 @@
         2304,
         4096
       ]
-    }
+    },
+    "subsequent_user_feedback": "Eleven real-device UI/Widget feedback items received; exact installed build not reconfirmed; earlier UI acceptance not assumed."
+  },
+  "widget_dock_feedback": {
+    "version": "0.4.2",
+    "base": "0.4.1 / 1013",
+    "code": "implemented",
+    "CI": "pending",
+    "native_tests": "pending_macos_and_iOS_Simulator",
+    "windows_signing": "not_performed",
+    "iphone_installation": "not_verified",
+    "physical_iPhone_Display_Zoom": "not_verified",
+    "device_acceptance": "pending_user_feedback"
   }
 }

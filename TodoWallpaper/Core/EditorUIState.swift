@@ -54,7 +54,7 @@ struct MarkerControlVisibility: Equatable {
     var shape: Bool { visible && !emoji }
     var stroke: Bool { [.hollow, .thin, .bordered, .square].contains(kind) }
     var fill: Bool { [.filled, .bordered].contains(kind) }
-    func completionColor(_ completion: MarkerCompletion) -> Bool { shape && completion == .checkShapes }
+    func completionColor(_ completion: MarkerCompletion) -> Bool { shape && completion == .checkShapes || visible && completion == .thinCircle }
     func completionEmoji(_ completion: MarkerCompletion) -> Bool { visible && completion == .replace }
 }
 

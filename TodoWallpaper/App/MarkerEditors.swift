@@ -143,6 +143,7 @@ struct MarkerStyleEditor: View {
     @Binding var style: MarkerStyle
     let kind: MarkerKind
     var advanced = false
+    var showsCompletion = true
     private var controls: MarkerControlVisibility { MarkerControlVisibility(kind: kind) }
     private var completion: Binding<MarkerCompletion> {
         Binding(get: { kind == .emoji && style.completion == .checkShapes ? .keep : style.completion },
@@ -169,6 +170,7 @@ struct MarkerStyleEditor: View {
                         if !style.followsTextColor { StyleColorControl(title: "边框色", value: $style.stroke) }
                     }
                     PreciseSlider(title: "垂直对齐", value: $style.verticalOffset, range: -16...16)
+                    if showsCompletion {
                     Picker("完成时", selection: completion) {
                         ForEach(MarkerCompletion.allCases.filter { kind != .emoji || $0 != .checkShapes }) {
                             Text($0.title).tag($0)
@@ -176,10 +178,15 @@ struct MarkerStyleEditor: View {
                     }.pickerStyle(.menu)
                     if controls.completionEmoji(style.completion) {
                         EmojiEntry(value: $style.completionEmoji)
-                        if !controls.emoji { PreciseSlider(title: "完成 Emoji 大小", value: $style.emojiSize, range: 8...48) }
+                        if !controls.emoji { PreciseSlider(title: "替换 Emoji 大小", value: $style.emojiSize, range: 8...48) }
+                    }
+                    if style.completion == .thinCircle {
+                        if controls.emoji { PreciseSlider(title: "完成圆圈大小", value: $style.size, range: 8...48) }
+                        PreciseSlider(title: "完成圆圈线宽", value: $style.lineWidth, range: 0.3...6)
                     }
                     if controls.completionColor(style.completion) {
                         StyleColorControl(title: "完成状态色", value: $style.completedColor)
+                    }
                     }
                 }
             }
