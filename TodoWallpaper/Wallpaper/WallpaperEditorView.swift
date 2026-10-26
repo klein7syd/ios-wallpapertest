@@ -184,8 +184,9 @@ struct WallpaperEditorView: View {
         }
     }
     @ViewBuilder private var backgroundControls: some View {
+        let photoTitle = model.hasPhoto ? "更换背景照片" : "选择背景照片"
         PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
-            Label(model.hasPhoto ? "更换背景照片" : "选择背景照片", systemImage: "photo")
+            Label(photoTitle, systemImage: "photo")
         }.buttonStyle(.bordered)
         if model.hasPhoto {
             PreciseSlider(title: "等比例缩放", value: $model.settings.backgroundZoom, range: 1...4, standard: 1, precision: 2)

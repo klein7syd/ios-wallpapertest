@@ -72,12 +72,10 @@ struct WidgetAppearanceEditor: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil)
                     .accessibilityIdentifier("widget.undo")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
                 Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("小组件帮助")
             }
             ToolbarItemGroup(placement: .keyboard) {
