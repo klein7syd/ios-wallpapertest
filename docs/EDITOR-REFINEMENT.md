@@ -19,3 +19,18 @@ App `org.todowallpaper.app`, Widget `org.todowallpaper.app.widget`, App Group `g
 Checks include grouped/no-op/bounded undo, failure retention, external rebase, standard node coordinates, coordinated scaling, original custom draft decoding, fixed preview/keyboard allocation, existing repository/migration/4K/fonts/Emoji checks and actual iOS Simulator session/photo restore. Simulator screenshots cover standard/advanced Wallpaper, standard/text/advanced Widget, About and maximum system text. No automated touch or physical iPhone result is inferred.
 
 CI evidence and the final build number are recorded after the real workflow completes. The delivered IPA is unsigned and still needs the existing Windows R1 signing/install flow. Stop for user device feedback.
+
+
+## Actual final evidence
+
+Final **0.4.3 / 1017**, code commit `6ccd4901dc15d6f9c2aadc738ba909b7717606cf`, [Actions 40361177607](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40361177607), job 121706715269: **success**. Both App and Widget are unsigned ARM64 iOS-device bundles with their original IDs/group and `openAppWhenRun=false` App Intent metadata. No CI-probe entry point is embedded in the device binary. Zero Swift-source warnings.
+
+87 source/protected-file checks, production CRUD/migration/concurrency/backup/legacy-data checks, grouped/no-op/bounded undo, failed-apply retention and external-state rebase passed. The standard-scale renderer and existing 4K/font/54 Emoji raster checks passed. Independently opened PNGs: modern1890×4096, classic2304×4096, standard layout1890×4096.
+
+Actual iOS26.5 Simulator execution passed: one undo for120 continuous session updates; failed-apply retry; real private source-photo removal/restore and draft reload without Photos writes. The existing30 Widget font/space images, five text-completion pixel hashes and nine small-heart sizes passed. Actual app screenshots show the retained four-tab navigation, consistent tool pickers, standard-value dots and ordinary/advanced screens. Maximum system text remains on an independent scroll surface. These are simulated callback/render results, not automated finger taps or physical iPhone proof. The old blank offscreen marker-card ScrollView capture remains excluded from visual passes.
+
+Two necessary CI runs, both successful:1016 validated the full revision; review found a PhotosPicker label main-actor warning and a toolbar grouping concern. Final1017 captures the label value on the main actor and groups Widget Undo/help controls. No further full build for evidence-only documentation.
+
+Artifact `todo-wallpaper-0.4.3-17`, id12668528232, 17,606,263 bytes, SHA256 `91a5333bcce96fe362a1f3c5309de53c9f9c34a31402040faf484e25aedc2dc3`. Unsigned IPA SHA256 `cf4a7253a2402bcb5e863af88c0d272c98fb645a4d23d2ee583cc8e9d539284a`. Downloaded official ZIP retained unchanged; SHA256/CRC, actual bundle metadata, target pixels and original R1 script contents independently checked.
+
+Windows signing/install, actual iPhone control taps, gesture grouping, scrolling, system Display Zoom, Widget actions and upgrade retention remain pending user feedback. Keep the existing App and cover-install with the original R1 flow. This revision stops here.

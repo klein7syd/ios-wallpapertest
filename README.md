@@ -1,6 +1,6 @@
 # Todo Wallpaper · Native iOS
 
-**Current delivery: 0.4.2 / 1015** — [real CI success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40199284647). App+Widget device compilation, native regression and iOS Simulator rendering passed. New Windows signing and real iPhone acceptance remain pending.
+**Current delivery: 0.4.3 / 1017** — [real CI success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40361177607). App+Widget device compilation, native regression, grouped editor undo and iOS Simulator rendering passed. New Windows signing and real iPhone acceptance remain pending.
 
 Public source-only personal project. Windows+iPhone, free Apple Account, macOS GitHub Actions compilation, Windows iPASide/R1 local signing. No credentials, signed packages, profiles or device identities are committed; no automatic public Releases.
 
@@ -9,7 +9,7 @@ Public source-only personal project. Windows+iPhone, free Apple Account, macOS G
 - A/B/C passed user device acceptance. D1+D2 0.3.0/1005 received first real-device feedback.
 - Previous 0.4.0: D3+D4 native large-canvas editor, direct layer movement, true weighted fonts, arbitrary/global/per-task Emoji markers, independent Widget appearance, ratio-first 4096px-high output. No PWA, WebView, AI, translation or cloud sync.
 
-[0.4.3 refinement in validation](docs/EDITOR-REFINEMENT.md) · [0.4.2 feedback revision](docs/WIDGET-FEEDBACK.md) · [Previous UI revision](docs/UI-REVISION.md) · [Rendering and compatibility](docs/STAGE-D3-D4.md) · [Real validation status](docs/VALIDATION.json) · [Windows/iPhone test checklist](TodoWallpaper/DEVICE-TEST.md) · [Product workflow](https://github.com/klein7syd/ios-wallpapertest/actions/workflows/todo-wallpaper.yml)
+[Current editor refinement](docs/EDITOR-REFINEMENT.md) · [0.4.2 feedback revision](docs/WIDGET-FEEDBACK.md) · [Previous UI revision](docs/UI-REVISION.md) · [Rendering and compatibility](docs/STAGE-D3-D4.md) · [Real validation status](docs/VALIDATION.json) · [Windows/iPhone test checklist](TodoWallpaper/DEVICE-TEST.md) · [Product workflow](https://github.com/klein7syd/ios-wallpapertest/actions/workflows/todo-wallpaper.yml)
 
 CI executes actual production native rendering and persistence checks, packages unsigned ARM64 App+Widget IPA with unchanged R1 scripts. Compilation, signing, installation and device acceptance remain separate. The UI feedback revision awaits actual iPhone acceptance; compilation and source/state checks cannot prove the scrolling fix. Docs-only evidence commits use `[skip ci]`.
 

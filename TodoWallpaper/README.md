@@ -1,6 +1,6 @@
 # Todo Wallpaper 0.4.3 · Standard navigation and editing refinement
 
-[Changes and validation scope](../docs/EDITOR-REFINEMENT.md). Ordinary native tabs, shared tool selection, About advanced-controls switch, standard slider nodes and grouped editor undo. Actual CI evidence is recorded after the workflow; Windows signing/install and physical iPhone acceptance remain separate.
+[Changes and validation scope](../docs/EDITOR-REFINEMENT.md). Ordinary native tabs, shared tool selection, About advanced-controls switch, standard slider nodes and grouped editor undo. Build **1017 passed CI**: device App+Widget, regression and native iOS Simulator checks; zero Swift-source warnings. Windows signing/install and physical iPhone acceptance remain separate.
 
 # Previous native UI revision
 

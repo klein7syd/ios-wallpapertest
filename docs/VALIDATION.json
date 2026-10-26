@@ -469,6 +469,134 @@
         "checks": "all_declared_native_and_Simulator_checks_passed",
         "delivery": "final_unsigned_IPA_verified; actual_system_font_screenshot_reviewed"
       }
+    ],
+    "subsequent_user_feedback": "User requested returning to ordinary bottom tabs and simplifying fine controls; exact installed Build not reconfirmed. No blanket physical iPhone acceptance inferred."
+  },
+  "editor_refinement": {
+    "version": "0.4.3",
+    "build": "1017",
+    "commit": "6ccd4901dc15d6f9c2aadc738ba909b7717606cf",
+    "actions_run": 40361177607,
+    "job": 121706715269,
+    "compilation": "success_real_App_and_Widget_and_Simulator_logs",
+    "artifact_id": 12668528232,
+    "artifact_zip_sha256": "91a5333bcce96fe362a1f3c5309de53c9f9c34a31402040faf484e25aedc2dc3",
+    "ipa_sha256": "cf4a7253a2402bcb5e863af88c0d272c98fb645a4d23d2ee583cc8e9d539284a",
+    "ui_source_and_protected_checks": 87,
+    "unchanged_protected_source_files": 18,
+    "Swift_source_warnings": 0,
+    "repository_migration_backup_and_legacy_compatibility": "passed",
+    "grouped_noop_bounded_undo_failure_retention_and_external_rebase": "passed_compiled_production_history",
+    "coordinated_scale_and_standard_node_positions": "passed",
+    "iOS_Simulator_probe": {
+      "device_signing_installation_and_acceptance": "not_verified",
+      "environment": "iOS Simulator; not a real iPhone",
+      "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",
+      "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",
+      "result": "passed",
+      "small_heart_pixel_widths": {
+        "8": 20,
+        "10": 26,
+        "12": 31,
+        "16": 41,
+        "19": 50,
+        "20": 53,
+        "24": 65,
+        "32": 88,
+        "48": 132
+      },
+      "system": "26.5",
+      "text_effect_pixel_hashes": {
+        "color": "0bd6053094e75c0bfed549b087dd2397699f30f87e322ca1708ccf2cb8d498dc",
+        "fade": "c1f735a1602f6c0187170c6529f887f60cc7e1e87c103e11e665a68920e6c462",
+        "fadeStrike": "90f4f256467716a1076b48ff8bf1ae1f9220338de5231f477d16fb7db7a38615",
+        "keep": "c6558b5992948a589d317064fe53ae14ff1d1b445d61cce23e3e50c6d6d03230",
+        "strike": "df4f1c78d76dca8385a4b9ff439f410e9b03de620a3cc36cd8b8c571039fa0ee"
+      },
+      "UIFontMetrics_point_sizes": {
+        "a11y": 32.666666666666664,
+        "a11y-max": 42.333333333333336,
+        "large": 19.666666666666668,
+        "small": 13,
+        "standard": 15
+      },
+      "widget_type_size_matrix_images": 30
+    },
+    "actual_app_screenshot_review": "ordinary_tabs_plus_shared_segmented_tools; fixed_canvas_and_Widget_preview; advanced_off_on; visible_standard_nodes; maximum_system_text_remains_scrollable",
+    "native_UI_touch_automation": "not_run; native_editing_coordinator_callbacks_executed; real_control_taps_scroll_and_appearance_need_iPhone_feedback",
+    "offscreen_marker_card_snapshot": "previous_known_blank_ScrollView_capture_not_counted_as_visual_pass",
+    "actual_export_pixels": [
+      [
+        1890,
+        4096
+      ],
+      [
+        2304,
+        4096
+      ]
+    ],
+    "IPA": {
+      "sha256": "cf4a7253a2402bcb5e863af88c0d272c98fb645a4d23d2ee583cc8e9d539284a",
+      "bundles": [
+        {
+          "bundle_id": "org.todowallpaper.app",
+          "version": "0.4.3",
+          "build": "1017",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        },
+        {
+          "bundle_id": "org.todowallpaper.app.widget",
+          "version": "0.4.3",
+          "build": "1017",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        }
+      ],
+      "structural_verification": "passed",
+      "cryptographic_signature_verification": "not_performed",
+      "iphone_installation": "not_verified",
+      "device_capabilities": "not_verified"
+    },
+    "R1_installer": "original_source_bytes_verified_with_declared_CRLF_normalization",
+    "task_appearance_and_draft_schema": "unchanged; advanced_UI_switch_in_private_UserDefaults_only",
+    "windows_signing": "not_performed_for_1017",
+    "iPhone_installation": "not_verified_for_1017",
+    "physical_iPhone_UI_and_DisplayZoom_and_Widget_regression": "pending_user_feedback",
+    "undo_scope": "50_in_memory_editor_states; excludes_task_CRUD_completion_and_already_exported_or_saved_files",
+    "builds_this_delivery": 2,
+    "build_attempts": [
+      {
+        "code": "928b3624c6fbfe66f58b328fbaa7faceacabd9ad",
+        "run": 40356854361,
+        "job": 121691520634,
+        "build": "1016",
+        "artifact": 12666558787,
+        "zip_sha256": "f9a5845d85ec7abaf9b89c31142e0cb7963ff62fd8650ec602cd560b013fa3de",
+        "ipa_sha256": "835eb7be7a3cecdaeecf241c0c73374ec2b4494d6424c853d711848cad5025d1",
+        "conclusion": "success",
+        "followup": "Resolve PhotosPicker Sendable-label main-actor warning; stabilize Widget Undo/help toolbar grouping after screenshot review."
+      },
+      {
+        "run": 40361177607,
+        "job": 121706715269,
+        "build": "1017",
+        "commit": "6ccd4901dc15d6f9c2aadc738ba909b7717606cf",
+        "result": "success",
+        "source_warnings": 0
+      }
     ]
   }
 }
