@@ -9,21 +9,16 @@ struct TodoWallpaperApp: App {
     #if TODO_UI_CHECKS
     @State private var didRunUIProbe = false
     @MainActor init() {
-        if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") { _store = StateObject(wrappedValue: NativeUIProbe.makeStore()) }
+        if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
+            _store = StateObject(wrappedValue: NativeUIProbe.makeStore())
+            UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--native-advanced"), forKey: EditorStandards.advancedKey)
+        }
     }
     #endif
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if navigation.isEditing {
-                    // The system TabView is not mounted in editing mode. A custom
-                    // compact Dock owns navigation here; hiding a bar is not relied on.
-                    WallpaperEditorView(store: store, navigation: $navigation, model: wallpaperModel)
-                } else {
-                    primaryTabs
-                }
-            }
+            primaryTabs
             .task {
                 #if TODO_UI_CHECKS
                 if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
@@ -34,8 +29,16 @@ struct TodoWallpaperApp: App {
                         navigation.selectPage(.widget)
                         return
                     }
+                    if ProcessInfo.processInfo.arguments.contains("--native-about-screen") {
+                        navigation.selectPage(.about)
+                        return
+                    }
+                    if ProcessInfo.processInfo.arguments.contains("--native-wallpaper-panel") {
+                        navigation.selectTool(.panel)
+                        return
+                    }
                     await NativeUIProbe.run()
-                    navigation.selectTool(.marker)
+                    navigation.selectTool(.panel)
                     return
                 }
                 #endif
@@ -246,6 +249,7 @@ struct TodoEditorView: View {
 
 struct AboutView: View {
     @ObservedObject var store: TodoStore
+    @AppStorage(EditorStandards.advancedKey) private var advancedControls = false
     private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     private var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?" }
     var body: some View {
@@ -258,6 +262,12 @@ struct AboutView: View {
                 Section("数据") {
                     Text("待办保存在这台 iPhone，当前没有跨设备同步。")
                     Text("升级时请使用同一签名账号和安装标识直接覆盖。卸载 App 会删除本机数据。")
+                }
+                Section {
+                    Toggle("高级编辑选项", isOn: $advancedControls)
+                        .accessibilityIdentifier("about.advancedControls")
+                } header: { Text("编辑器") } footer: {
+                    Text("开启后可单独调整字号、间距、尺寸、线宽和精确位置。关闭仅隐藏这些控件，保留已有设置。排版缩放会按标准排版成套调整。")
                 }
                 Section("本次测试") {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")

@@ -2,14 +2,23 @@ import SwiftUI
 import PhotosUI
 import UIKit
 
+private struct WallpaperEditState: Equatable {
+    var settings: WallpaperSettings
+    var photoName: String?
+    var marker: TodoMarker
+    var markerStyle: MarkerStyle
+    var widgetStyle: WidgetAppearance
+}
+
 struct WallpaperEditorView: View {
     @ObservedObject var store: TodoStore
     @Binding var navigation: AppNavigationState
     @ObservedObject var model: WallpaperEditorModel
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var advanced = false
+    @AppStorage(EditorStandards.advancedKey) private var advanced = false
+    @StateObject private var edits = EditorUndoState<WallpaperEditState>()
     @State private var fullScreen = false
+    @State private var isVisible = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var resetConfirmation = false
     @State private var aspect = WallpaperAspect.modern
@@ -18,11 +27,24 @@ struct WallpaperEditorView: View {
     @State private var ratioHeight = "19.5"
     @State private var pixelWidth = "1890"
     @State private var pixelHeight = "4096"
-    private var tool: WallpaperTool { navigation.wallpaperTool ?? .background }
+    private var tool: WallpaperTool { navigation.wallpaperTool }
     private var dataReady: Bool { store.hasLoaded && store.loadError == nil }
     private var canExport: Bool { dataReady && model.ready && !model.busy && !model.draftBlocked && store.appearanceError == nil && model.previewError == nil }
     private var appearance: Binding<TodoAppearance> {
         Binding(get: { store.appearance }, set: { store.setAppearance($0) })
+    }
+    private var editState: WallpaperEditState {
+        WallpaperEditState(settings: model.settings, photoName: model.photoName,
+            marker: store.appearance.defaultMarker, markerStyle: store.appearance.markerStyle,
+            widgetStyle: store.appearance.widget)
+    }
+    private var layoutScale: Binding<Double> {
+        Binding(get: { model.settings.fontSize / 18 }, set: { scale in
+            model.settings = model.settings.withStandardScale(scale)
+            var next = store.appearance
+            next.markerStyle = EditorStandards.marker(next.markerStyle, scale: scale)
+            store.setAppearance(next)
+        })
     }
     var body: some View {
         NavigationStack {
@@ -36,20 +58,19 @@ struct WallpaperEditorView: View {
                     } else {
                         ContentUnavailableView("请先读取待办", systemImage: "checklist", description: Text(store.loadError ?? "正在读取"))
                     }
-                    if navigation.isEditing {
-                        inspector(height: EditorSizing.panelHeight(available: geometry.size.height,
-                            expanded: navigation.inspectorExpanded))
-                    } else {
-                        toolDock(editing: false).padding(.horizontal, 8)
-                            .frame(height: 60)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    }
+                    inspector(height: EditorSizing.panelHeight(available: geometry.size.height,
+                        expanded: navigation.inspectorExpanded, advanced: advanced))
                 }
                 .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 6)
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
+                        .disabled(!edits.canUndo || model.busy || model.draftBlocked)
+                        .accessibilityIdentifier("wallpaper.undo")
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button { fullScreen = true } label: { Label("全屏预览", systemImage: "arrow.up.left.and.arrow.down.right") }
                 }
@@ -57,7 +78,7 @@ struct WallpaperEditorView: View {
                     Menu {
                         Button("重新读取待办", systemImage: "arrow.clockwise") { store.flushAppearance(); store.reload() }
                         Button("恢复壁纸默认排版", systemImage: "arrow.counterclockwise") { resetConfirmation = true }
-                        if navigation.isEditing { Button("显示完整导航", systemImage: "rectangle.bottomthird.inset.filled") { navigation.exitEditing() } }
+                        Button(navigation.inspectorExpanded ? "收起设置" : "展开设置", systemImage: "slider.horizontal.3") { navigation.toggleInspector() }
                     } label: { Label("更多", systemImage: "ellipsis.circle") }.disabled(model.busy)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -66,7 +87,12 @@ struct WallpaperEditorView: View {
                 }
             }
             .task { await model.start(items: store.items, appearance: store.appearance); syncOutputFields() }
-            .onChange(of: model.ready) { _, ready in if ready { syncOutputFields() } }
+            .onChange(of: model.ready) { _, ready in
+                if ready { syncOutputFields(); edits.synchronize(editState) }
+            }
+            .onAppear { isVisible = true; if model.ready { edits.synchronize(editState) } }
+            .onChange(of: editState) { _, state in if model.ready && isVisible { edits.observe(state) } }
+            .onChange(of: advanced) { _, _ in edits.finish(editState) }
             .onChange(of: store.items) { _, items in model.updateItems(items) }
             .onChange(of: store.appearance) { _, value in model.updateAppearance(value) }
             .onChange(of: selectedPhoto) { _, selection in
@@ -74,7 +100,7 @@ struct WallpaperEditorView: View {
                 Task { await model.importPhoto(selection); selectedPhoto = nil }
             }
             .onChange(of: scenePhase) { _, phase in if phase != .active { Task { await model.saveNow() } } }
-            .onDisappear { store.flushAppearance(); Task { await model.saveNow() } }
+            .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance(); Task { await model.saveNow() } }
             .fullScreenCover(isPresented: $fullScreen) { WallpaperFullPreview(model: model, editsBackground: tool == .background) }
             .sheet(item: $model.shareFile) { WallpaperShareSheet(url: $0.url) }
             .overlay { if model.busy { busyOverlay } }
@@ -88,9 +114,29 @@ struct WallpaperEditorView: View {
                 Button("恢复默认") { Task { await model.resetLayout() } }
             } message: { Text("保留照片、画布比例和输出尺寸。待办与单项 Emoji 不变。") }
         }
+        .environment(\.editorInteraction, edits.context(read: { editState }))
+    }
+    private func undoEdit() {
+        Task {
+            do {
+                try await edits.undo(read: { editState }) { previous, expected in
+                    var next = store.appearance
+                    if previous.marker != expected.marker { next.defaultMarker = previous.marker }
+                    if previous.markerStyle != expected.markerStyle { next.markerStyle = previous.markerStyle }
+                    if previous.widgetStyle != expected.widgetStyle { next.widget = previous.widgetStyle }
+                    try next.validate()
+                    if model.settings != previous.settings || model.photoName != previous.photoName {
+                        try await model.restoreEditorState(settings: previous.settings, photoName: previous.photoName)
+                    }
+                    if next != store.appearance { store.setAppearance(next) }
+                }
+                syncOutputFields()
+            } catch { model.message = "未能撤销：\(error.localizedDescription)" }
+        }
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
+            toolSelector.frame(height: 44)
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic")) {
                     if model.draftBlocked { Text("草稿已保留，请用右上角菜单确认恢复默认。").font(.caption).foregroundStyle(.red) }
@@ -109,78 +155,26 @@ struct WallpaperEditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .disabled(!model.ready || model.busy || model.draftBlocked)
             }
-            toolDock(editing: true).frame(height: 56)
         }
         .frame(height: height)
         .accessibilityIdentifier("wallpaper.inspector")
     }
-    private func toolDock(editing: Bool) -> some View {
-        HStack(spacing: 10) {
-            if editing {
-                Menu {
-                    ForEach(AppPage.allCases) { page in
-                        Button {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            navigation.selectPage(page)
-                        } label: { Label(page.title, systemImage: page.icon) }
-                    }
-                    Divider()
-                    Button("显示完整导航", systemImage: "rectangle.bottomthird.inset.filled") { navigation.exitEditing() }
-                } label: {
-                    Image(systemName: AppPage.wallpaper.icon).font(.body.weight(.semibold))
-                        .frame(width: 48, height: 48)
-                        .modifier(CircularDockMaterial()).contentShape(Circle())
-                }
-                .accessibilityLabel("切换页面或恢复主导航").accessibilityIdentifier("editor.navigation")
-                HStack(spacing: 4) {
-                    Menu {
-                        ForEach(WallpaperTool.allCases) { item in
-                            Button { advanced = false; navigation.selectTool(item) } label: { Label(item.title, systemImage: item.icon) }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: tool.icon)
-                            if !typeSize.isAccessibilitySize {
-                                Text(tool.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                            }
-                        }.frame(minHeight: 48).padding(.horizontal, 12)
-                    }.accessibilityLabel("切换当前工具：\(tool.title)")
-                    Spacer(minLength: 0)
-                    if navigation.inspectorExpanded {
-                        Button { advanced.toggle() } label: {
-                            if typeSize.isAccessibilitySize { Image(systemName: advanced ? "arrow.uturn.backward" : "ellipsis").frame(width: 44, height: 48) }
-                            else { Text(advanced ? "常用" : "更多").font(.subheadline).frame(minHeight: 48) }
-                        }.accessibilityLabel(advanced ? "返回常用" : "更多参数")
-                    }
-                    Button { withAnimation(.snappy(duration: 0.2)) { navigation.toggleInspector() } } label: {
-                        Image(systemName: navigation.inspectorExpanded ? "chevron.down" : "slider.horizontal.3").frame(width: 44, height: 48)
-                    }.accessibilityLabel(navigation.inspectorExpanded ? "收起参数" : "展开参数")
-                }
-                .padding(.horizontal, 4).modifier(CapsuleDockMaterial())
-            } else {
-            ForEach(WallpaperTool.allCases) { item in
-                Button {
-                    if navigation.wallpaperTool != item { advanced = false }
-                    if navigation.isEditing { navigation.selectTool(item) }
-                    else { withAnimation(.snappy(duration: 0.2)) { navigation.selectTool(item) } }
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: item.icon).font(.body)
-                        if !typeSize.isAccessibilitySize { Text(item.title).font(.caption2).lineLimit(1).minimumScaleFactor(0.85) }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 46)
-                    .foregroundStyle(editing && tool == item ? Color.accentColor : Color.secondary)
-                    .background(editing && tool == item ? Color.accentColor.opacity(0.1) : .clear,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(.plain).accessibilityLabel(item.title)
-                .accessibilityAddTraits(editing && tool == item ? .isSelected : [])
-                .accessibilityIdentifier("editor.tool.\(item.id)")
-            }
-            }
+    private var toolSelector: some View {
+        HStack(spacing: 6) {
+            EditorToolPicker(choices: WallpaperTool.allCases,
+                selection: Binding(get: { tool }, set: { next in
+                    edits.finish(editState); navigation.selectTool(next)
+                }), title: { $0.title })
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { navigation.toggleInspector() }
+            } label: {
+                Image(systemName: navigation.inspectorExpanded ? "chevron.down" : "chevron.up")
+                    .font(.subheadline).frame(width: 36, height: 44)
+            }.buttonStyle(.plain)
+                .accessibilityLabel(navigation.inspectorExpanded ? "收起参数" : "展开参数")
         }
+        .padding(.horizontal, 6)
+        .accessibilityIdentifier("wallpaper.tools")
     }
     private var busyOverlay: some View {
         ZStack {
@@ -190,51 +184,51 @@ struct WallpaperEditorView: View {
         }
     }
     @ViewBuilder private var backgroundControls: some View {
-        let title = model.hasPhoto ? "更换背景照片" : "选择背景照片"
-        if !advanced {
-            PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
-                Label(title, systemImage: "photo")
-            }.buttonStyle(.bordered)
-        }
+        PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
+            Label(model.hasPhoto ? "更换背景照片" : "选择背景照片", systemImage: "photo")
+        }.buttonStyle(.bordered)
         if model.hasPhoto {
-            if !advanced {
-                PreciseSlider(title: "等比例缩放", value: $model.settings.backgroundZoom, range: 1...4, precision: 2)
-                Text("拖动照片 · 双指缩放").font(.caption).foregroundStyle(.secondary)
-            } else {
-                PreciseSlider(title: "水平偏移", value: $model.settings.backgroundPanX, range: -1...1, precision: 2)
-                PreciseSlider(title: "垂直偏移", value: $model.settings.backgroundPanY, range: -1...1, precision: 2)
-                Button("重置裁剪") { model.settings.backgroundZoom = 1; model.settings.backgroundPanX = 0; model.settings.backgroundPanY = 0 }
-                Button("使用默认背景") { model.removePhoto() }
-                if let info = model.livePhoto?.info { Text("原图 \(info.label)").font(.caption).foregroundStyle(.secondary) }
+            PreciseSlider(title: "等比例缩放", value: $model.settings.backgroundZoom, range: 1...4, standard: 1, precision: 2)
+            if advanced {
+                PreciseSlider(title: "水平偏移", value: $model.settings.backgroundPanX, range: -1...1, standard: 0, precision: 2)
+                PreciseSlider(title: "垂直偏移", value: $model.settings.backgroundPanY, range: -1...1, standard: 0, precision: 2)
             }
-            if model.sourceIsSoft { Text("原图或当前裁剪的有效像素不足，放大不能补出细节。").font(.caption).foregroundStyle(.secondary) }
-        } else if advanced {
-            Text("选择照片后可调整裁剪位置。").font(.subheadline).foregroundStyle(.secondary)
+            HStack {
+                Button("重置裁剪") { model.settings.backgroundZoom = 1; model.settings.backgroundPanX = 0; model.settings.backgroundPanY = 0 }
+                Spacer()
+                Button("默认背景") { model.removePhoto() }
+            }
+            if model.sourceIsSoft { Text("原图或当前裁剪的有效像素不足。").font(.caption).foregroundStyle(.secondary) }
         }
     }
     @ViewBuilder private var panelControls: some View {
         if !advanced {
-            PreciseSlider(title: "宽度比例", value: $model.settings.panelWidth, range: 0.3...0.96, precision: 2)
-            Toggle("自动高度", isOn: $model.settings.automaticHeight)
-            if !model.settings.automaticHeight { PreciseSlider(title: "高度比例", value: $model.settings.panelHeight, range: 0.12...0.94, precision: 2) }
-            PreciseSlider(title: "玻璃不透明度", value: $model.settings.glassOpacity, range: 0...0.85, precision: 2)
-            PreciseSlider(title: "模糊程度", value: $model.settings.blurRadius, range: 0...45)
-            Toggle("深色底色", isOn: $model.settings.darkGlass)
+            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
         } else {
+            PreciseSlider(title: "宽度比例", value: $model.settings.panelWidth, range: 0.3...0.96, standard: 0.88, precision: 2)
+            Toggle("自动高度", isOn: $model.settings.automaticHeight)
+            if !model.settings.automaticHeight {
+                PreciseSlider(title: "高度比例", value: $model.settings.panelHeight, range: 0.12...0.94, standard: 0.38, precision: 2)
+            }
             Toggle("自定义位置", isOn: $model.settings.customPosition)
             if model.settings.customPosition {
-                PreciseSlider(title: "水平中心", value: $model.settings.panelX, range: 0...1, precision: 3)
-                PreciseSlider(title: "垂直中心", value: $model.settings.panelY, range: 0...1, precision: 3)
+                PreciseSlider(title: "水平中心", value: $model.settings.panelX, range: 0...1, standard: 0.5, precision: 2)
+                PreciseSlider(title: "垂直中心", value: $model.settings.panelY, range: 0...1, standard: 0.5, precision: 2)
                 HStack {
                     nudge("arrow.left", dx: -1, dy: 0); nudge("arrow.right", dx: 1, dy: 0)
                     nudge("arrow.up", dx: 0, dy: -1); nudge("arrow.down", dx: 0, dy: 1)
                     Spacer(); Button("居中") { model.settings.panelX = 0.5; model.settings.panelY = 0.5 }
                 }
             }
-            PreciseSlider(title: "圆角", value: $model.settings.cornerRadius, range: 0...80)
-            PreciseSlider(title: "边框不透明度", value: $model.settings.borderOpacity, range: 0...1, precision: 2)
-            PreciseSlider(title: "高光", value: $model.settings.highlight, range: 0...0.6, precision: 2)
-            PreciseSlider(title: "内边距", value: $model.settings.padding, range: 8...48)
+            PreciseSlider(title: "圆角", value: $model.settings.cornerRadius, range: 0...80, standard: 24)
+            PreciseSlider(title: "内边距", value: $model.settings.padding, range: 8...48, standard: 20)
+        }
+        PreciseSlider(title: "玻璃不透明度", value: $model.settings.glassOpacity, range: 0...0.85, standard: 0.22, precision: 2)
+        PreciseSlider(title: "模糊程度", value: $model.settings.blurRadius, range: 0...45, standard: 22)
+        Toggle("深色底色", isOn: $model.settings.darkGlass)
+        if advanced {
+            PreciseSlider(title: "边框不透明度", value: $model.settings.borderOpacity, range: 0...1, standard: 0.25, precision: 2)
+            PreciseSlider(title: "高光", value: $model.settings.highlight, range: 0...0.6, standard: 0.12, precision: 2)
         }
     }
     private func nudge(_ icon: String, dx: Double, dy: Double) -> some View {
@@ -245,30 +239,33 @@ struct WallpaperEditorView: View {
         } label: { Image(systemName: icon) }.buttonStyle(.bordered).accessibilityLabel("面板移动一个像素 \(icon)")
     }
     @ViewBuilder private var textControls: some View {
-        if !advanced {
-            StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
-            PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38)
+        StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
+        if advanced {
+            PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
             if store.appearance.defaultMarker.kind != .none || store.items.contains(where: { store.appearance.marker(for: $0).kind != .none }) {
-                PreciseSlider(title: "与标记间距", value: appearance.markerStyle.gap, range: 0...32)
+                PreciseSlider(title: "与标记间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
             }
-            Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         } else {
-            Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
-            Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
+            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
+        }
+        Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
+        Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
+        if model.settings.includeCompleted {
+            Picker("完成文字", selection: $model.settings.completionStyle) { ForEach(WallpaperCompletionStyle.allCases) { Text($0.title).tag($0) } }
+        }
+        if advanced {
             Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20)
-            PreciseSlider(title: "事项间距", value: $model.settings.itemSpacing, range: 0...36)
+            PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20, standard: 4)
+            PreciseSlider(title: "事项间距", value: $model.settings.itemSpacing, range: 0...36, standard: 12)
             Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8)
-            if model.settings.includeCompleted {
-                Picker("完成文字", selection: $model.settings.completionStyle) { ForEach(WallpaperCompletionStyle.allCases) { Text($0.title).tag($0) } }
-            }
         }
     }
     @ViewBuilder private var markerControls: some View {
-        if !advanced { MarkerChoiceEditor(choice: appearance.defaultMarker) }
+        MarkerChoiceEditor(choice: appearance.defaultMarker)
         MarkerStyleEditor(style: appearance.markerStyle, kind: store.appearance.defaultMarker.kind, advanced: advanced, showsCompletion: false)
-        if !advanced && store.appearance.defaultMarker.kind == .none {
+        if store.appearance.defaultMarker.kind == .none {
             Text("默认不显示标记；任务单项覆盖仍保留。").font(.caption).foregroundStyle(.secondary)
         }
         if advanced {
@@ -277,7 +274,6 @@ struct WallpaperEditorView: View {
         }
     }
     @ViewBuilder private var outputControls: some View {
-        if !advanced {
         Picker("画布比例", selection: Binding(get: { aspect }, set: { chooseAspect($0) })) {
             ForEach(WallpaperAspect.allCases) { Text($0.title).tag($0) }
         }
@@ -297,7 +293,7 @@ struct WallpaperEditorView: View {
             Button { Task { await model.export(saveToPhotos: false) } } label: { Label("系统分享", systemImage: "square.and.arrow.up") }
         }.buttonStyle(.borderedProminent).disabled(!canExport)
         if let size = model.lastExportSize { Text("最近成品已校验：\(size) px").font(.caption) }
-        } else {
+        if advanced {
             Button("将壁纸样式应用到小组件") { applyWidgetStyle() }
             Button("清理导出缓存") { Task { await model.clearCache() } }
             Text("19.5:9 是通用近似比例。照片等比裁剪，重要内容请保留安全边距。")

@@ -7,7 +7,7 @@ path=Path(sys.argv[1])
 report=verify(path,unsigned=True)
 with zipfile.ZipFile(path) as z:
     for prefix,bundle in zip([ROOT,EXT],report['bundles']):
-        require(bundle['version']=='0.4.2','Version mismatch')
+        require(bundle['version']=='0.4.3','Version mismatch')
         if prefix==ROOT:
             require(b'--native-ui-probe' not in z.read(prefix+'TodoWallpaper'), 'CI probe must not be in device IPA')
             import plistlib

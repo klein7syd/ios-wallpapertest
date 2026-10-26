@@ -1,15 +1,32 @@
 import SwiftUI
 
-struct CircularDockMaterial: ViewModifier {
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26, *) { content.glassEffect(.regular.interactive(), in: Circle()) }
-        else { content.background(.regularMaterial, in: Circle()) }
-    }
-}
-struct CapsuleDockMaterial: ViewModifier {
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26, *) { content.glassEffect(.regular.interactive(), in: Capsule()) }
-        else { content.background(.regularMaterial, in: Capsule()) }
+/// Both editors use the system's selection animation and one compact tool row.
+struct EditorToolPicker<Selection: Hashable & Identifiable>: View {
+    let choices: [Selection]
+    @Binding var selection: Selection
+    let title: (Selection) -> String
+    var compact = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var body: some View {
+        Group {
+            if compact || typeSize.isAccessibilitySize {
+                HStack {
+                    Menu {
+                        ForEach(choices) { item in Button(title(item)) { selection = item } }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(title(selection)).font(.subheadline).lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold))
+                        }.fixedSize(horizontal: true, vertical: false).frame(minHeight: 44)
+                    }.accessibilityLabel("设置类别：\(title(selection))")
+                    Spacer(minLength: 0)
+                }
+            } else {
+                Picker("设置类别", selection: $selection) {
+                    ForEach(choices) { Text(title($0)).tag($0) }
+                }.pickerStyle(.segmented).frame(minHeight: 44)
+            }
+        }
     }
 }
 
@@ -41,21 +58,3 @@ struct InspectorViewport<Content: View>: View {
     }
 }
 
-struct InspectorHeading: View {
-    let title: String
-    @Binding var advanced: Bool
-    var body: some View {
-        HStack {
-            Text(title).font(.headline)
-            Spacer()
-            Button {
-                advanced.toggle()
-            } label: {
-                Label(advanced ? "返回常用" : "更多", systemImage: advanced ? "arrow.uturn.backward" : "slider.horizontal.3")
-                    .font(.subheadline)
-            }
-            .buttonStyle(.plain).frame(minHeight: 44)
-            .accessibilityIdentifier("inspector.details")
-        }
-    }
-}

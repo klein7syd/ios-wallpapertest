@@ -121,6 +121,27 @@ enum WallpaperRenderChecks {
         let empty = try WallpaperRenderer.layout(settings: WallpaperSettings(), items: [])
         try require(empty.rows.isEmpty && empty.emptyText != nil, "Empty state")
         try await draftChecks(out: out, fixture: fixture)
+        var custom = WallpaperSettings()
+        custom.panelX = 0.62; custom.panelY = 0.41; custom.customPosition = true
+        custom.lineSpacing = 13; custom.itemSpacing = 31; custom.backgroundZoom = 1.8
+        let untouched = try JSONEncoder().encode(custom)
+        for scale in stride(from: EditorStandards.wallpaperScale.lowerBound,
+                            through: EditorStandards.wallpaperScale.upperBound, by: 0.02) {
+            let scaled = try custom.withStandardScale(scale).validated()
+            try require(scaled.size == custom.size && scaled.canvasAspect == custom.canvasAspect &&
+                scaled.panelX == custom.panelX && scaled.panelY == custom.panelY && scaled.backgroundZoom == custom.backgroundZoom,
+                "Standard scaling keeps canvas, composition and crop")
+            try require(abs(scaled.padding / 20 - scaled.fontSize / 18) < 0.00001 &&
+                abs(scaled.itemSpacing / 12 - scaled.lineSpacing / 4) < 0.00001,
+                "Standard wallpaper metrics share one scale")
+        }
+        let oldCustom = try JSONDecoder().decode(WallpaperSettings.self, from: untouched)
+        try require(oldCustom == custom, "Advanced UI changes need no saved-draft schema migration")
+        let standard = custom.withStandardScale(1)
+        let image = try WallpaperRenderer.render(settings: standard, items: items, photoURL: fixture, ciContext: context)
+        try require(image.image.width == standard.size.width && image.image.height == standard.size.height,
+            "Standard-scale export still renders at actual target pixels")
+        try WallpaperRenderer.writePNG(image.image, to: out.appendingPathComponent("standard-layout-4k.png"), expected: standard.size)
         try await D34Checks.run(out: out, fixture: fixture)
         try WidgetFeedbackRenderChecks.run(out: out)
         let report: [String: Any] = [

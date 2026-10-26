@@ -29,11 +29,24 @@ print(json.dumps(r,ensure_ascii=False,indent=2))
 assert r.get('result')=='passed', r.get('error','Native Simulator render check failed')
 PY
 sleep 1
-xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-editor-dock.png >/dev/null 2>&1
+xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-wallpaper-standard.png >/dev/null 2>&1
+# The following are actual app screens; no offscreen ScrollView snapshots count as UI evidence.
+for UI_SCREEN in wallpaper-advanced widget-standard widget-text widget-advanced about; do
+    xcrun simctl terminate "$UI_SIMULATOR" org.todowallpaper.app >/dev/null
+    case "$UI_SCREEN" in
+        wallpaper-advanced) UI_ARGS=(--native-wallpaper-panel --native-advanced) ;;
+        widget-standard) UI_ARGS=(--native-widget-screen) ;;
+        widget-text) UI_ARGS=(--native-widget-screen --native-widget-text) ;;
+        widget-advanced) UI_ARGS=(--native-widget-screen --native-widget-text --native-advanced) ;;
+        about) UI_ARGS=(--native-about-screen) ;;
+    esac
+    xcrun simctl launch "$UI_SIMULATOR" org.todowallpaper.app --native-ui-probe "${UI_ARGS[@]}" >/dev/null
+    sleep 2
+    xcrun simctl io "$UI_SIMULATOR" screenshot "TodoWallpaper/out/ios-ui-checks/actual-$UI_SCREEN.png" >/dev/null 2>&1
+done
 xcrun simctl terminate "$UI_SIMULATOR" org.todowallpaper.app >/dev/null
-xcrun simctl launch "$UI_SIMULATOR" org.todowallpaper.app --native-ui-probe --native-widget-screen >/dev/null
+xcrun simctl launch "$UI_SIMULATOR" org.todowallpaper.app --native-ui-probe --native-widget-screen --native-widget-text --native-advanced >/dev/null
 sleep 2
-xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-widget-page.png >/dev/null 2>&1
 if xcrun simctl ui "$UI_SIMULATOR" content_size accessibility-extra-extra-extra-large >/dev/null 2>&1; then
     sleep 2
     xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-widget-max-system-text.png >/dev/null 2>&1

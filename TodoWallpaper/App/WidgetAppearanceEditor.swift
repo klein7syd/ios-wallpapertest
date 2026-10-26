@@ -5,12 +5,22 @@ private enum WidgetEditorTool: String, CaseIterable, Identifiable {
     case theme = "主题", text = "文字", marker = "标记", content = "内容"
     var id: String { rawValue }
 }
+private struct TaskMarkerState: Equatable {
+    let id: UUID
+    let marker: TodoMarker?
+}
+private struct WidgetEditState: Equatable {
+    let style: WidgetAppearance
+    let markers: [TaskMarkerState]
+}
 struct WidgetAppearanceEditor: View {
     @ObservedObject var store: TodoStore
     @State private var error: String?
+    @State private var isVisible = false
     @State private var tool = WidgetEditorTool.theme
     @State private var family = WidgetPreviewFamily.medium
-    @State private var advanced = false
+    @AppStorage(EditorStandards.advancedKey) private var advanced = false
+    @StateObject private var edits = EditorUndoState<WidgetEditState>()
     @State private var selectedTaskID: UUID?
     @State private var preview = WidgetPreviewState()
     @State private var showHelp = false
@@ -24,34 +34,22 @@ struct WidgetAppearanceEditor: View {
         let theme = store.appearance.widget.theme
         return theme == .system ? systemScheme : theme == .dark ? .dark : .light
     }
+    private var editState: WidgetEditState {
+        WidgetEditState(style: store.appearance.widget,
+            markers: store.items.map { TaskMarkerState(id: $0.id, marker: $0.marker) }.sorted { $0.id.uuidString < $1.id.uuidString })
+    }
+    private var layoutScale: Binding<Double> {
+        Binding(get: { store.appearance.widget.fontSize / 15 },
+            set: { widget.wrappedValue = EditorStandards.widget(store.appearance.widget, scale: $0) })
+    }
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
-                if geometry.size.height < 320 || typeSize.isAccessibilitySize {
-                    HStack {
-                        Menu {
-                            ForEach(WidgetEditorTool.allCases) { value in Button(value.rawValue) { tool = value } }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text(tool.rawValue).font(.subheadline).lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold))
-                            }.fixedSize(horizontal: true, vertical: false).frame(minHeight: 44)
-                        }.accessibilityLabel("设置类别：\(tool.rawValue)")
-                        Spacer()
-                        Button { advanced.toggle() } label: {
-                            Image(systemName: advanced ? "arrow.uturn.backward" : "slider.horizontal.3")
-                                .font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44)
-                        }.accessibilityLabel(advanced ? "返回常用" : "更多参数")
-                    }.padding(.horizontal, 18)
-                } else {
-                Picker("设置类别", selection: $tool) {
-                    ForEach(WidgetEditorTool.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented).padding(.horizontal, 16).padding(.vertical, 10)
-                .accessibilityIdentifier("widget.tools")
-                InspectorHeading(title: tool.rawValue, advanced: $advanced).padding(.horizontal, 18)
-                }
+                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
+                    title: { $0.rawValue }, compact: geometry.size.height < 320)
+                    .padding(.horizontal, 16).padding(.vertical, 6)
+                    .accessibilityIdentifier("widget.tools")
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") + (selectedTaskID?.uuidString ?? ".default")) {
                     if let message = store.appearanceError {
                         Text(message).font(.caption).foregroundStyle(.red)
@@ -75,6 +73,11 @@ struct WidgetAppearanceEditor: View {
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
+                    .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil)
+                    .accessibilityIdentifier("widget.undo")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("小组件帮助")
             }
             ToolbarItemGroup(placement: .keyboard) {
@@ -82,13 +85,52 @@ struct WidgetAppearanceEditor: View {
                 Button("完成") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
             }
         }
-        .onChange(of: tool) { _, _ in advanced = false }
+        .onAppear {
+            isVisible = true
+            edits.synchronize(editState)
+            #if TODO_UI_CHECKS
+            if ProcessInfo.processInfo.arguments.contains("--native-widget-text") { tool = .text }
+            #endif
+        }
+        .onChange(of: editState) { previous, next in
+            guard isVisible else { return }
+            if previous.markers.map(\.id) != next.markers.map(\.id) { edits.synchronize(next) }
+            else { edits.observe(next) }
+        }
+        .onChange(of: tool) { _, _ in edits.finish(editState) }
+        .onChange(of: advanced) { _, _ in edits.finish(editState) }
         .onChange(of: store.items.map(\.id)) { _, ids in if let selectedTaskID, !ids.contains(selectedTaskID) { self.selectedTaskID = nil } }
-        .onDisappear { store.flushAppearance() }
+        .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance() }
         .sheet(isPresented: $showHelp) { help }
         .alert("样式", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("好", role: .cancel) { }
         } message: { Text(error ?? "") }
+        .environment(\.editorInteraction, edits.context(read: { editState }))
+    }
+    private func undoEdit() {
+        Task {
+            do {
+                try await edits.undo(read: { editState }) { previous, expected in
+                    let changed = previous.markers.filter { old in
+                        expected.markers.first(where: { $0.id == old.id })?.marker != old.marker
+                    }
+                    // Only restore the marker field. Never restore stale titles,
+                    // completion, task order, or a task removed in another surface.
+                    for old in changed {
+                        guard let item = store.items.first(where: { $0.id == old.id }),
+                              item.marker == expected.markers.first(where: { $0.id == old.id })?.marker else {
+                            throw NSError(domain: "EditorUndo", code: 1, userInfo: [NSLocalizedDescriptionKey: "任务已发生变化，保留当前数据。"])
+                        }
+                    }
+                    for old in changed {
+                        if let item = store.items.first(where: { $0.id == old.id }) {
+                            try store.edit(id: item.id, title: item.title, marker: old.marker)
+                        }
+                    }
+                    if previous.style != expected.style { widget.wrappedValue = previous.style }
+                }
+            } catch { self.error = "未能撤销：\(error.localizedDescription)" }
+        }
     }
     private func fixedPreview(height: CGFloat) -> some View {
         VStack(spacing: 8) {
@@ -113,7 +155,7 @@ struct WidgetAppearanceEditor: View {
                 TodoWidgetContent(document: store.hasLoaded && store.loadError == nil ? TodoDocument(items: preview.items(store.items)) : nil,
                     appearance: store.appearance, error: store.loadError, family: family, interactive: false,
                     onPreviewToggle: { id in if let item = store.items.first(where: { $0.id == id }) { preview.toggle(item) } },
-                    onPreviewMarker: { id in selectedTaskID = id; tool = .marker; advanced = false }, selectedTaskID: selectedTaskID)
+                    onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID)
                     .padding(16)
                     .frame(width: family.width, height: family.height)
                     .background {
@@ -134,47 +176,46 @@ struct WidgetAppearanceEditor: View {
         .accessibilityIdentifier("widget.fixedPreview")
     }
     @ViewBuilder private var themeControls: some View {
-        if !advanced {
-            Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
-        } else {
-            Text("网格用于显示自定义底色的不透明度，不会出现在主屏幕小组件中。系统可能按主屏幕的深浅、着色或透明风格调整实际背景。")
-                .font(.subheadline).foregroundStyle(.secondary)
-            Button("请求更新小组件") { store.flushAppearance(); store.reload() }
+        Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
+        if advanced {
+            Text("网格不会出现在主屏幕。系统外观会影响实际小组件背景。")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
     @ViewBuilder private var textControls: some View {
-        if !advanced {
-            Toggle("文字跟随系统", isOn: widget.followsSystemText)
-            if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
-            PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20)
-            if hasVisibleMarker { PreciseSlider(title: "与标记间距", value: widget.markerStyle.gap, range: 0...32) }
-            Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            Picker("完成文字", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
-                ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
-            }.pickerStyle(.menu)
-            if store.appearance.widget.textCompletion == .color {
-                StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
-            }
+        Toggle("文字跟随系统", isOn: widget.followsSystemText)
+        if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
+        if advanced {
+            PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
+            if hasVisibleMarker { PreciseSlider(title: "与标记间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
         } else {
-            Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.widgetScale, standard: 1, precision: 2)
+        }
+        Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        Picker("完成文字", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
+            ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
+        }.pickerStyle(.menu)
+        if store.appearance.widget.textCompletion == .color {
+            StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
     }
     @ViewBuilder private var markerControls: some View {
         Menu {
-            Button("小组件默认") { selectedTaskID = nil; advanced = false }
-            ForEach(store.items) { item in Button(item.title) { selectedTaskID = item.id; advanced = false } }
+            Button("小组件默认") { selectedTaskID = nil }
+            ForEach(store.items) { item in Button(item.title) { selectedTaskID = item.id } }
         } label: { Label(selectedTask?.title ?? "小组件默认", systemImage: selectedTask == nil ? "square.grid.2x2" : "pencil.circle").lineLimit(2) }
         if let item = selectedTask {
-            if !advanced {
+            Group {
                 MarkerChoiceEditor(choice: Binding(get: { store.appearance.marker(for: item, widgetContext: true) }, set: { setTaskMarker($0, id: item.id) }))
                 if item.marker != nil { Button("恢复小组件默认") { setTaskMarker(nil, id: item.id) } }
             }
             MarkerStyleEditor(style: widget.markerStyle, kind: store.appearance.marker(for: item, widgetContext: true).kind, advanced: advanced)
             Text("此项标记单独保存；尺寸与完成效果用于整个小组件。").font(.caption).foregroundStyle(.secondary)
         } else {
-            if !advanced {
+            Group {
                 Toggle("继承壁纸标记", isOn: Binding(get: { store.appearance.widget.markerOverride == nil }, set: { inherit in
                     var next = store.appearance
                     if inherit { previousWidgetMarker = next.widget.markerOverride; next.widget.markerOverride = nil }
@@ -205,17 +246,12 @@ struct WidgetAppearanceEditor: View {
         catch { self.error = error.localizedDescription }
     }
     @ViewBuilder private var contentControls: some View {
-        if !advanced {
-            Toggle("紧凑布局", isOn: widget.compact)
-            PreciseSlider(title: "行距", value: widget.spacing, range: 0...12)
-            Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
-            Stepper("最多 \(store.appearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
-            Picker("完成事项", selection: widget.completed) { ForEach(WidgetCompleted.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu)
-        } else {
-            Button("请求更新小组件") { store.flushAppearance(); store.reload() }
-            Text("预览复用扩展的内容布局。实际尺寸、动态字体、系统外观及刷新时机会影响主屏幕显示。预览中的试点不会写入真实任务状态。")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
+        Toggle("紧凑布局", isOn: widget.compact)
+        if advanced { PreciseSlider(title: "行距", value: widget.spacing, range: 0...12, standard: 5) }
+        Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
+        Stepper("最多 \(store.appearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
+        Picker("完成事项", selection: widget.completed) { ForEach(WidgetCompleted.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu)
+        Button("请求更新小组件") { store.flushAppearance(); store.reload() }
     }
     private var help: some View {
         NavigationStack {

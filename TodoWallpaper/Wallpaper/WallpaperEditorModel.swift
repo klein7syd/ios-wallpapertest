@@ -98,6 +98,23 @@ final class WallpaperEditorModel: ObservableObject {
         schedulePreview(); scheduleSave()
     }
 
+    /// Restore a session snapshot through the same validated draft/photo paths.
+    /// Old source files remain local, so undo never needs to copy image bytes.
+    func restoreEditorState(settings next: WallpaperSettings, photoName name: String?) async throws {
+        guard ready, !busy, !draftBlocked else { throw WallpaperError.renderingFailed }
+        _ = try next.validated()
+        saveTask?.cancel(); isImporting = true
+        defer { isImporting = false }
+        let url = try await files.photoURL(for: name)
+        let photo: WallpaperLivePhoto?
+        if name == photoName { photo = livePhoto }
+        else if let url { photo = try await renderer.loadPhoto(at: url) }
+        else { photo = nil }
+        try await files.save(WallpaperDraft(settings: next, photoFileName: name))
+        photoURL = url; photoName = name; livePhoto = photo
+        settings = next; schedulePreview()
+    }
+
     func resetLayout() async {
         guard !busy else { return }
         saveTask?.cancel()

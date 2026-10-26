@@ -68,6 +68,17 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     }
 
     func filtered(_ items: [TodoItem]) -> [TodoItem] { items.filter { includeCompleted || !$0.isCompleted } }
+
+    /// An intentional adjustment applies the standard typographic proportions.
+    /// Merely hiding advanced controls never calls this or rewrites a draft.
+    func withStandardScale(_ scale: Double) -> WallpaperSettings {
+        let s = min(EditorStandards.wallpaperScale.upperBound,
+                    max(EditorStandards.wallpaperScale.lowerBound, scale.isFinite ? scale : 1))
+        var next = self
+        next.fontSize = 18 * s; next.padding = 20 * s; next.cornerRadius = 24 * s
+        next.lineSpacing = 4 * s; next.itemSpacing = 12 * s
+        return next
+    }
 }
 
 struct WallpaperDraft: Codable, Sendable {

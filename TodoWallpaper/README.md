@@ -1,6 +1,6 @@
-# Todo Wallpaper 0.4.2 · Widget feedback revision
+# Todo Wallpaper 0.4.3 · Standard navigation and editing refinement
 
-[Changes and validation scope](../docs/WIDGET-FEEDBACK.md). **1015 passed CI**, including the device App/Widget and isolated iOS Simulator rendering. Windows signing, installation, physical font/Display Zoom and Widget interaction remain pending user acceptance.
+[Changes and validation scope](../docs/EDITOR-REFINEMENT.md). Ordinary native tabs, shared tool selection, About advanced-controls switch, standard slider nodes and grouped editor undo. Actual CI evidence is recorded after the workflow; Windows signing/install and physical iPhone acceptance remain separate.
 
 # Previous native UI revision
 

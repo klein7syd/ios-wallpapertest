@@ -27,12 +27,11 @@ enum WallpaperTool: String, CaseIterable, Identifiable {
 }
 struct AppNavigationState: Equatable {
     private(set) var page = AppPage.todos
-    private(set) var wallpaperTool: WallpaperTool?
-    private(set) var inspectorExpanded = false
-    var isEditing: Bool { page == .wallpaper && wallpaperTool != nil }
+    private(set) var wallpaperTool = WallpaperTool.background
+    private(set) var inspectorExpanded = true
+    var isEditing: Bool { page == .wallpaper }
     mutating func selectPage(_ next: AppPage) {
         page = next
-        exitEditing()
     }
     mutating func selectTool(_ next: WallpaperTool) {
         page = .wallpaper
@@ -43,7 +42,6 @@ struct AppNavigationState: Equatable {
         guard isEditing else { return }
         inspectorExpanded.toggle()
     }
-    mutating func exitEditing() { wallpaperTool = nil; inspectorExpanded = false }
 }
 
 /// Capabilities drive conditional controls without clearing dormant saved values.
@@ -60,10 +58,12 @@ struct MarkerControlVisibility: Equatable {
 
 enum EditorSizing {
     /// Leave a real canvas above the Dock, including when the keyboard reduces height.
-    static func panelHeight(available: Double, expanded: Bool) -> Double {
+    static func panelHeight(available: Double, expanded: Bool, advanced: Bool = false) -> Double {
         guard available.isFinite, available > 0 else { return 0 }
-        if !expanded { return min(64, available) }
-        return min(310, max(160, available * 0.46), max(64, available - 110))
+        if !expanded { return min(52, available) }
+        // The system Tab Bar is already outside this proposed height. Reserve
+        // a compact toolbar + settings viewport and prioritize the portrait canvas.
+        return min(advanced ? 278 : 214, max(120, available * (advanced ? 0.42 : 0.31)), max(52, available - 110))
     }
     static func widgetPreviewHeight(available: Double, family: WidgetPreviewFamily = .large) -> Double {
         guard available.isFinite, available > 0 else { return 0 }

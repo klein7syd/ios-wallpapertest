@@ -7,6 +7,8 @@ struct WallpaperLiveCanvas: View {
     @ObservedObject var model: WallpaperEditorModel
     var editsBackground: Bool
     var editable = true
+    @Environment(\.editorInteraction) private var interaction
+    @State private var activeGestures = Set<String>()
     @State private var startPan: CGPoint?
     @State private var startCenter: CGPoint?
     @State private var startZoom: Double?
@@ -49,9 +51,9 @@ struct WallpaperLiveCanvas: View {
             .gesture(drag(width: width, height: height))
             .simultaneousGesture(MagnificationGesture().onChanged { value in
                 guard editable, editsBackground, model.hasPhoto, !model.busy else { return }
-                if startZoom == nil { startZoom = model.settings.backgroundZoom }
+                if startZoom == nil { begin("zoom"); startZoom = model.settings.backgroundZoom }
                 model.settings.backgroundZoom = min(4, max(1, (startZoom ?? 1) * Double(value)))
-            }.onEnded { _ in startZoom = nil })
+            }.onEnded { _ in startZoom = nil; end("zoom") })
             .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
             .transaction { $0.animation = nil }
         }
@@ -74,7 +76,7 @@ struct WallpaperLiveCanvas: View {
             guard editable, !model.busy, width > 0, height > 0 else { return }
             if editsBackground {
                 guard let live = model.livePhoto else { return }
-                if startPan == nil { startPan = CGPoint(x: model.settings.backgroundPanX, y: model.settings.backgroundPanY) }
+                if startPan == nil { begin("pan"); startPan = CGPoint(x: model.settings.backgroundPanX, y: model.settings.backgroundPanY) }
                 guard let startPan else { return }
                 let canvas = CGSize(width: 390, height: model.settings.logicalHeight)
                 let frame = WallpaperRenderer.backgroundRect(source: CGSize(width: live.info.width, height: live.info.height), canvas: canvas, settings: model.settings)
@@ -91,6 +93,7 @@ struct WallpaperLiveCanvas: View {
                 if startCenter == nil {
                     let hit = CGPoint(x: value.startLocation.x / width * 390, y: value.startLocation.y / height * layout.canvas.height)
                     guard layout.panel.contains(hit) else { return }
+                    begin("panel")
                     startCenter = CGPoint(x: layout.panel.midX / 390, y: layout.panel.midY / layout.canvas.height)
                     model.settings.customPosition = true
                 }
@@ -101,7 +104,18 @@ struct WallpaperLiveCanvas: View {
                 if guideX { x = 0.5 }; if guideY { y = 0.5 }
                 model.settings.panelX = Double(min(1, max(0, x))); model.settings.panelY = Double(min(1, max(0, y)))
             }
-        }.onEnded { _ in startPan = nil; startCenter = nil; guideX = false; guideY = false }
+        }.onEnded { _ in
+            startPan = nil; startCenter = nil; guideX = false; guideY = false
+            end("pan"); end("panel")
+        }
+    }
+    private func begin(_ key: String) {
+        if activeGestures.isEmpty { interaction.begin("canvas") }
+        activeGestures.insert(key)
+    }
+    private func end(_ key: String) {
+        guard activeGestures.remove(key) != nil else { return }
+        if activeGestures.isEmpty { interaction.end() }
     }
 }
 private struct WallpaperGlyphView: UIViewRepresentable {

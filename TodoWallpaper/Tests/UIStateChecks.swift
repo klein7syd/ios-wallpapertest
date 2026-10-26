@@ -7,30 +7,27 @@ enum UIStateChecks {
         }
         var navigation = AppNavigationState()
         try require(AppPage.allCases.count == 4 && AppPage.allCases.contains(.widget), "Widget is a real fourth root page")
-        try require(!navigation.isEditing && !navigation.inspectorExpanded, "Launch uses the system tabs")
+        try require(!navigation.isEditing && navigation.inspectorExpanded, "Launch starts on Todo with a ready wallpaper inspector")
         for page in AppPage.allCases {
             navigation.selectPage(page)
-            try require(navigation.page == page && !navigation.isEditing, "All root pages restore normal navigation")
+            try require(navigation.page == page, "Every native root tab remains selectable")
             for tool in WallpaperTool.allCases {
                 navigation.selectTool(tool)
-                try require(navigation.page == .wallpaper && navigation.isEditing && navigation.wallpaperTool == tool && navigation.inspectorExpanded,
-                    "Selecting a tool enters the wallpaper Dock and opens that tool")
+                try require(navigation.page == .wallpaper && navigation.wallpaperTool == tool && navigation.inspectorExpanded,
+                    "Tool selection replaces parameters while keeping the ordinary TabView")
                 navigation.toggleInspector()
-                try require(!navigation.inspectorExpanded && navigation.isEditing, "Collapse retains the escape/navigation Dock")
+                try require(!navigation.inspectorExpanded && navigation.wallpaperTool == tool, "Collapse keeps the selected tool")
                 navigation.selectTool(tool)
-                try require(navigation.inspectorExpanded, "Same tool reopens its parameters")
-                navigation.exitEditing()
-                try require(navigation.page == .wallpaper && !navigation.isEditing && navigation.wallpaperTool == nil, "Full tabs return without leaving wallpaper")
-                navigation.selectTool(tool)
+                try require(navigation.inspectorExpanded, "Tool selection reopens its parameters")
                 navigation.selectPage(page)
-                try require(navigation.page == page && !navigation.isEditing && !navigation.inspectorExpanded, "Dock can escape directly to every root page")
+                try require(navigation.page == page && navigation.wallpaperTool == tool, "Switching tabs retains tool choice")
             }
         }
         for _ in 0..<100 {
             for tool in WallpaperTool.allCases { navigation.selectTool(tool); navigation.toggleInspector(); navigation.selectTool(tool) }
             navigation.selectPage(.widget)
         }
-        try require(!navigation.isEditing, "Repeated tool/collapse/page cycles cannot leave a stale hidden Tab Bar")
+        try require(navigation.page == .widget, "Repeated editing and navigation cycles retain a usable root page")
 
         for kind in MarkerKind.allCases {
             let controls = MarkerControlVisibility(kind: kind)
@@ -55,9 +52,11 @@ enum UIStateChecks {
 
         for available in [0.0, 150, 260, 420, 650, 900] {
             for expanded in [false, true] {
-                let height = EditorSizing.panelHeight(available: available, expanded: expanded)
+              for advanced in [false, true] {
+                let height = EditorSizing.panelHeight(available: available, expanded: expanded, advanced: advanced)
                 try require(height >= 0 && height <= available, "Dock fits reduced keyboard/small-screen space")
                 if available >= 260 { try require(available - height >= 110, "Canvas retains useful space above controls") }
+              }
             }
         }
         for family in WidgetPreviewFamily.allCases {
@@ -89,6 +88,6 @@ enum UIStateChecks {
         try require(WidgetPreviewFamily.small.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 2, "Small Widget retains proven row capacity")
         try require(WidgetPreviewFamily.medium.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 3, "Medium Widget retains proven row capacity")
         try require(WidgetPreviewFamily.large.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 6, "Large Widget retains proven row capacity")
-        print("PASS: UI state — four root tabs, navigation Dock entry/escape, repeated collapse/tool switching, conditional marker controls, dormant value preservation, keyboard/small-screen allocation, three fixed-preview ratios and Widget row capacities. Not an iPhone visual/scroll test.")
+        print("PASS: UI state — four persistent root tabs, editing with ordinary navigation, repeated collapse/tool switching, conditional marker controls, dormant value preservation, keyboard/small-screen allocation, three fixed-preview ratios and Widget row capacities. Not an iPhone visual/scroll test.")
     }
 }

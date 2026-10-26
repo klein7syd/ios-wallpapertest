@@ -46,6 +46,46 @@ enum NativeUIProbe {
         do {
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
             try await Task.sleep(for: .milliseconds(200))
+            // Execute the production editing-session coordinator on iOS, including
+            // gesture coalescing, retry after failure, and the draft/photo restore path.
+            var position = 0
+            let session = EditorUndoState<Int>()
+            session.synchronize(position)
+            let events = session.context(read: { position })
+            events.begin("slider")
+            for index in 1...120 { position = index; session.observe(position) }
+            events.end()
+            try await session.undo(read: { position }) { previous, _ in position = previous }
+            try require(position == 0 && !session.canUndo, "One iOS undo reverses a full continuous gesture")
+            position = 2; session.observe(position)
+            do {
+                try await session.undo(read: { position }) { _, _ in throw NSError(domain: "ExpectedRestoreFailure", code: 1) }
+                throw NSError(domain: "UnexpectedRestoreSuccess", code: 1)
+            } catch let error as NSError where error.domain == "ExpectedRestoreFailure" { }
+            try require(session.canUndo && position == 2 && !session.isRestoring, "Failed restore keeps a retryable session")
+            try await session.undo(read: { position }) { previous, _ in position = previous }
+            try require(position == 0, "Failed restore can be retried")
+            let editor = WallpaperEditorModel()
+            await editor.start(items: [], appearance: TodoAppearance())
+            try require(editor.ready && !editor.draftBlocked, "CI draft is readable")
+            let initialSettings = editor.settings, initialName = editor.photoName
+            let sample = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 60)).pngData { drawing in
+                UIColor.systemBlue.setFill(); drawing.fill(CGRect(x: 0, y: 0, width: 40, height: 60))
+            }
+            let localFiles = WallpaperDraftStore()
+            let sampleURL = try await localFiles.importPhoto(sample)
+            var modified = initialSettings; modified.fontSize = 24
+            try await editor.restoreEditorState(settings: modified, photoName: sampleURL.lastPathComponent)
+            editor.removePhoto()
+            try await editor.restoreEditorState(settings: modified, photoName: sampleURL.lastPathComponent)
+            try require(editor.hasPhoto && editor.livePhoto != nil && editor.photoName == sampleURL.lastPathComponent,
+                "Undo restores the real local source photo without album writes")
+            let retainedSample = try Data(contentsOf: sampleURL)
+            try require(retainedSample == sample, "Undo keeps source image bytes unchanged")
+            try await editor.restoreEditorState(settings: initialSettings, photoName: initialName)
+            let restored = try await localFiles.load()
+            try require(restored.draft.settings == initialSettings && restored.draft.photoFileName == initialName,
+                "Restored editor state persists through the production draft store")
             var heartWidths: [String: Int] = [:]
             for size in [8, 10, 12, 16, 19, 20, 24, 32, 48] {
                 var style = MarkerStyle(); style.emojiSize = Double(size)
@@ -116,6 +156,7 @@ enum NativeUIProbe {
             }
             try require((measuredFonts["a11y-max"] ?? 0) > (measuredFonts["standard"] ?? 0), "System font metrics grow with accessibility category")
             report.merge(["result": "passed", "small_heart_pixel_widths": heartWidths, "text_effect_pixel_hashes": effectHashes,
+                "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",
                 "UIFontMetrics_point_sizes": measuredFonts, "widget_type_size_matrix_images": matrix,
                 "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",
                 "device_signing_installation_and_acceptance": "not_verified"], uniquingKeysWith: { _, next in next })
