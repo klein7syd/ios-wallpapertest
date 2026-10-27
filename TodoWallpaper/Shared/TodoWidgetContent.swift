@@ -190,7 +190,17 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)`n                .background {`n                    if style.textOutline == true {`n                        ZStack {`n                            ForEach([-0.8, 0.8], id: \.self) { dx in`n                                Text(item.title).font(Font(titleFont)).foregroundStyle(.black.opacity(0.85)).offset(x: dx)`n                            }`n                        }.lineLimit(metrics.lineLimit)`n                    }`n                }
+                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+                .background {
+                    if style.textOutline == true {
+                        ZStack {
+                            ForEach([-0.8, 0.8], id: \.self) { dx in
+                                Text(item.title).font(Font(titleFont))
+                                    .foregroundStyle(.black.opacity(0.85)).offset(x: dx)
+                            }
+                        }.lineLimit(metrics.lineLimit)
+                    }
+                }
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
