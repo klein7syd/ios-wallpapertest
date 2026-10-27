@@ -147,6 +147,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var unifiedMarkers: Bool?
     /// Completed tasks leave the widget immediately after a tap.
     var hidesCompletedTasks: Bool?
+    var textOutline: Bool?
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }

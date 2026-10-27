@@ -72,7 +72,7 @@ struct TodoWidgetContent: View {
         GeometryReader { geometry in
             let items = document?.items ?? []
             let headingMetrics = headerMetrics(width: geometry.size.width, height: geometry.size.height, items: items)
-            let metrics = WidgetLayoutMetrics.make(items: style.rows(items, capacity: style.maximumItems),
+            let metrics = WidgetLayoutMetrics.make(items: items,
                 appearance: appearance, family: family, width: geometry.size.width, height: geometry.size.height,
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
@@ -190,7 +190,7 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)`n                .background {`n                    if style.textOutline == true {`n                        ZStack {`n                            ForEach([-0.8, 0.8], id: \.self) { dx in`n                                Text(item.title).font(Font(titleFont)).foregroundStyle(.black.opacity(0.85)).offset(x: dx)`n                            }`n                        }.lineLimit(metrics.lineLimit)`n                    }`n                }
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
