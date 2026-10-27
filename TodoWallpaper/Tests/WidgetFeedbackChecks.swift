@@ -29,7 +29,7 @@ enum WidgetFeedbackChecks {
         try policy.validate()
         try require(policy.resolved(TodoMarker(kind: .hollow), completed: true).marker.emoji == "🧑🏽‍💻", "Replacement is user-selected composed Emoji")
         try require(policy.resolved(TodoMarker(kind: .none), completed: true).marker.kind == .none, "Hidden markers stay hidden")
-        try require(WidgetTextCompletion.allCases.count == 5 && WidgetTextCompletion.strike.strikes && !WidgetTextCompletion.strike.fades && !WidgetTextCompletion.keep.strikes,
+        try require(WidgetTextCompletion.allCases.count == 6 && WidgetTextCompletion.strike.strikes && !WidgetTextCompletion.strike.fades && !WidgetTextCompletion.keep.strikes && WidgetTextCompletion.hidden.hidesCompleted,
                     "Independent completed-text policies")
         for size in stride(from: 8.0, through: 48.0, by: 0.5) {
             look.widget.markerStyle.emojiSize = size
