@@ -307,6 +307,9 @@ struct WidgetAppearanceEditor: View {
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("单行").tag(1); Text("最多两行").tag(2)
         }.pickerStyle(.menu)
+        Toggle("统一标记（忽略每条的自定义标记）", isOn: Binding(
+            get: { store.appearance.widget.unifiedMarkers ?? false },
+            set: { widget.wrappedValue.unifiedMarkers = $0 }))
         Text("文字点按后效果").font(.subheadline)
         Picker("文字点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }

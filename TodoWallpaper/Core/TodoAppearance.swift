@@ -102,14 +102,17 @@ enum WidgetCompleted: String, Codable, CaseIterable, Identifiable {
     var title: String { self == .recent ? "最近完成一项" : self == .hidden ? "仅未完成" : "全部事项" }
 }
 enum WidgetTextCompletion: String, Codable, CaseIterable, Identifiable {
-    case fadeStrike, strike, fade, keep, color
+    case fadeStrike, strike, fade, keep, color, hidden
     var id: String { rawValue }
     var title: String {
         switch self { case .fadeStrike: return "变淡并划线"; case .strike: return "仅划线"
-        case .fade: return "仅变淡"; case .keep: return "保持原样"; case .color: return "自定义颜色" }
+        case .fade: return "仅变淡"; case .keep: return "保持原样"; case .color: return "自定义颜色"
+        case .hidden: return "点按后隐藏" }
     }
     var strikes: Bool { self == .fadeStrike || self == .strike }
     var fades: Bool { self == .fadeStrike || self == .fade }
+    /// Completed rows leave the widget entirely instead of staying visibly crossed out.
+    var hidesCompleted: Bool { self == .hidden }
 }
 struct WidgetAppearance: Codable, Equatable, Sendable {
     var theme = WidgetTheme.system
@@ -140,6 +143,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     /// Extra inter-row padding; the separate line-count policy avoids forcing
     /// two text lines into every large Widget row when tight spacing is selected.
     var maximumTitleLines: Int?
+    /// One marker style for every task, ignoring per-item overrides.
+    var unifiedMarkers: Bool?
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
@@ -157,6 +162,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
         let limit = max(1, min(capacity, maximumItems))
         let pending = items.filter { !$0.isCompleted }
+        if textCompletion.hidesCompleted { return Array(pending.prefix(limit)) }
         if completed == .all { return Array(items.prefix(limit)) }
         if completed == .hidden { return Array(pending.prefix(limit)) }
         let recent = items.filter(\.isCompleted).max { $0.updatedAt < $1.updatedAt }
@@ -170,7 +176,10 @@ struct TodoAppearance: Codable, Equatable, Sendable {
     var markerStyle = MarkerStyle()
     var widget = WidgetAppearance()
     func marker(for item: TodoItem, widgetContext: Bool = false) -> TodoMarker {
-        item.marker ?? (widgetContext ? widget.markerOverride : nil) ?? defaultMarker
+        if widgetContext && widget.unifiedMarkers == true {
+            return widget.markerOverride ?? defaultMarker
+        }
+        return item.marker ?? (widgetContext ? widget.markerOverride : nil) ?? defaultMarker
     }
     func validate() throws {
         guard schemaVersion == 1 else { throw AppearanceError.unsupportedVersion }
