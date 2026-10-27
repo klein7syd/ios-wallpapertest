@@ -136,7 +136,6 @@ struct TodoWidgetContent: View {
             if heading.visibleTitle {
                 Text(heading.text).font(Font(headingFont))
                     .foregroundStyle(heading.followsTextColor ? foreground : safeColor(heading.color))
-                    .shadow(color: textShadow, radius: 1.2, y: 0.6)
                     .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
@@ -191,8 +190,10 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                .shadow(color: textShadow, radius: 1.2, y: 0.6)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+            if let schedule = item.schedule {
+                Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 

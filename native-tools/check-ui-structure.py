@@ -74,7 +74,7 @@ require('wallpaperInspectorHeight(' in wallpaper and 'previewScale: previewScale
 require('PhotoMotionView' in read('TodoWallpaper/Wallpaper/WallpaperLiveCanvas.swift') and 'UIPanGestureRecognizer' in read('TodoWallpaper/App/PhotoMotionView.swift'), 'Interactive photos use retained UIKit/CA gesture layers')
 require('WidgetPhotoMotionSurface' in widget and '照片不透明度' in widget, 'Widget photo supports direct crop and alpha controls')
 require('显示左下角说明' in widget and 'style.footerVisible' in read('TodoWallpaper/Core/WidgetLayout.swift'), 'Footer switch changes both content and space budget')
-require('Text("文字点按后效果")' in widget, 'Text completion menu has a visible label')
+require('Text("点按后效果")' in widget, 'Text completion menu has a visible label')
 require('isExplicitlyDark' in shared and 'systemScheme' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Widget colors resolve explicit theme instead of inheriting system-light background')
 require('WidgetDayTimeline.dates' in extension and 'entry.date' in extension and '.after(dates[1])' in extension, 'Daily image uses actual Widget timeline entries')
 require('WidgetAlbumPicker' in widget and 'PHAssetCollection.fetchAssetCollections' in read('TodoWallpaper/App/WidgetAlbumPicker.swift'), 'Album selector uses native PhotoKit with explicit access')
