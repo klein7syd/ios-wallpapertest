@@ -28,7 +28,7 @@ struct WidgetLayoutMetrics: Equatable {
         let separator = 0.0
         let header = min(max(0, height), max(0, headerHeight))
         let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
-        let dateHeight = items.contains(where: { $0.schedule != nil }) ? max(11, fontLineHeight * 0.65) + 2 : 0
+        let dateHeight = 0.0
         let padding = style.compact ? 0.0 : min(4, max(0, spacing) * 0.8)
         let minimumRow = max(marker + vertical, fontLineHeight + dateHeight) + padding
         let footerFits = style.footerVisible && afterHeader >= minimumRow + footerHeight + spacing
@@ -37,7 +37,7 @@ struct WidgetLayoutMetrics: Equatable {
         let proposedLines = style.maximumTitleLines ?? (family == .large && !style.compact && spacing > 2 && fontLineHeight < 30 ? 2 : 1)
         let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2 + dateHeight) + padding ? 2 : 1
         // 负行距同时压缩行高，否则只是把行间空隙挪走，看起来几乎没变。
-        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight + min(0, spacing)) + padding
+        let row = max(marker + vertical, fontLineHeight * Double(lines)) + padding
         let pitch = max(1, row + spacing + separator)
         let raw = row > 0 ? Int(max(0, (rowSpace + spacing + separator) / pitch).rounded(.down)) : 0
         return WidgetLayoutMetrics(rowHeight: row, markerWidth: marker, gap: gap, lineHeight: fontLineHeight,

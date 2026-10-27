@@ -193,9 +193,6 @@ struct TodoWidgetContent: View {
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
                 .shadow(color: textShadow, radius: 1.2, y: 0.6)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
-            if let schedule = item.schedule {
-                Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 
