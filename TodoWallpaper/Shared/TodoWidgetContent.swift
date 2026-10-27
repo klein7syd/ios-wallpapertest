@@ -194,9 +194,9 @@ struct TodoWidgetContent: View {
                 .background {
                     if style.textOutline == true {
                         ZStack {
-                            ForEach([-0.8, 0.8], id: \.self) { dx in
+                            ForEach([(-0.4, 0.0), (0.4, 0.0), (0.0, -0.4), (0.0, 0.4)], id: \.0) { dx, dy in
                                 Text(item.title).font(Font(titleFont))
-                                    .foregroundStyle(.black.opacity(0.85)).offset(x: dx)
+                                    .foregroundStyle(.black.opacity(0.7)).offset(x: dx, y: dy)
                             }
                         }.lineLimit(metrics.lineLimit)
                     }
