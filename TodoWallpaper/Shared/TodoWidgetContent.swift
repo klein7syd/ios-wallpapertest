@@ -112,7 +112,9 @@ struct TodoWidgetContent: View {
                     .frame(width: layout.summaryWidth, height: layout.height, alignment: .topTrailing)
                     .offset(x: layout.summaryX)
             }
-        }.frame(height: layout.height).clipped()
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: layout.height).clipped()
     }
     @ViewBuilder private func task(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         if interactive {

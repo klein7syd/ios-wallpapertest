@@ -124,6 +124,18 @@ enum NativeUIProbe {
             var headingLook = TodoAppearance(); headingLook.widget.completed = .all
             headingLook.widget.header = WidgetHeaderAppearance(text: "今天的计划", followsTextColor: false,
                 color: WallpaperColor(red: 1, green: 0, blue: 0), fontSize: 24, horizontalPosition: 0.5)
+            func redInk(_ image: CGImage) throws -> Int {
+                let bytes = [UInt8](try pixels(image)); var count = 0
+                for i in stride(from: 0, to: bytes.count, by: 4) {
+                    if Int(bytes[i]) - max(Int(bytes[i+1]), Int(bytes[i+2])) > 80 { count += 1 }
+                }
+                return count
+            }
+            let headerReference = try render(Text("今天的计划")
+                .font(Font(NativeTypography.font(family: .system, weight: .semibold, size: 24)))
+                .foregroundStyle(.red).fixedSize().padding(4).background(.white),
+                name: "header-complete-glyph-reference", directory: output)
+            let referenceInk = try redInk(headerReference)
             var headingHashes = Set<String>()
             for summary in [true, false] {
                 headingLook.widget.header?.showsSummary = summary
@@ -132,11 +144,16 @@ enum NativeUIProbe {
                     .background(.white).environment(\.colorScheme, .light),
                     name: "widget-custom-header-\(summary ? "summary" : "no-summary")", directory: output)
                 headingHashes.insert(SHA256.hash(data: try pixels(image)).map { String(format: "%02x", $0) }.joined())
-                let bytes = [UInt8](try pixels(image)); var redPixels = 0
-                for i in stride(from: 0, to: bytes.count, by: 4) {
-                    if Int(bytes[i]) - max(Int(bytes[i+1]), Int(bytes[i+2])) > 80 { redPixels += 1 }
-                }
-                try require(redPixels > 100, "Independent red header is actually rendered")
+                let redPixels = try redInk(image)
+                try require(Double(redPixels) >= Double(referenceInk) * 0.85,
+                    "Complete custom title glyphs remain visible, not just its first characters")
+                let bytes = [UInt8](try pixels(image)); var summaryInk = 0
+                for y in 0..<min(image.height, 48 * 3) { for x in (image.width * 7 / 10)..<image.width {
+                    let i = (y * image.width + x) * 4
+                    if max(bytes[i], max(bytes[i+1], bytes[i+2])) < 160 { summaryInk += 1 }
+                } }
+                try require(summary ? summaryInk > 10 : summaryInk == 0,
+                    "Top-right count pixels actually follow the summary switch")
             }
             try require(headingHashes.count == 2, "Summary toggle changes native Widget output")
             var heartWidths: [String: Int] = [:]
