@@ -55,13 +55,15 @@ enum FeedbackRepairChecks {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("feedback-import-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = TodoRepository(directoryURL: root)
-        let original = try repository.add(title: "原来的待办", marker: TodoMarker(kind: .emoji, emoji: "❤️")).items[0]
+        _ = try repository.add(title: "原来的待办", marker: TodoMarker(kind: .emoji, emoji: "❤️"))
+        let original = try repository.load().items[0]
         let sourceID = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-27")
         let repeatID = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-27")
         let nextOccurrence = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-28")
         try require(sourceID == repeatID && sourceID != nextOccurrence && sourceID != TodoImportIdentity.make(source: "reminder", calendar: "fixture-calendar", item: "fixture-event"),
             "Calendar/reminder IDs are stable and recurring dates stay separate")
-        let imported = TodoItem(id: sourceID, title: "导入的日程", isCompleted: false, createdAt: .now, updatedAt: .now)
+        let imported = TodoItem(id: sourceID, title: "导入的日程", isCompleted: false,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000), updatedAt: Date(timeIntervalSince1970: 1_700_000_000))
         _ = try repository.importItems([imported, imported])
         var changed = imported; changed.title = "不能覆盖的较新源标题"; changed.isCompleted = true
         _ = try repository.importItems([changed, original])

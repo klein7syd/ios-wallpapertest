@@ -534,7 +534,7 @@
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS" = ("DEBUG");
-                "CURRENT_PROJECT_VERSION" = "1018";
+                "CURRENT_PROJECT_VERSION" = "1019";
                 "MARKETING_VERSION" = "0.4.4";
                 "CODE_SIGN_ENTITLEMENTS" = "App/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
@@ -553,7 +553,7 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app.widget";
-                "CURRENT_PROJECT_VERSION" = "1018";
+                "CURRENT_PROJECT_VERSION" = "1019";
                 "MARKETING_VERSION" = "0.4.4";
                 "CODE_SIGN_ENTITLEMENTS" = "Widget/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
@@ -585,7 +585,7 @@
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app";
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS" = ();
-                "CURRENT_PROJECT_VERSION" = "1018";
+                "CURRENT_PROJECT_VERSION" = "1019";
                 "MARKETING_VERSION" = "0.4.4";
                 "CODE_SIGN_ENTITLEMENTS" = "App/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";
@@ -604,7 +604,7 @@
                 "CODE_SIGN_STYLE" = "Automatic";
                 "PRODUCT_NAME" = "$(TARGET_NAME)";
                 "PRODUCT_BUNDLE_IDENTIFIER" = "org.todowallpaper.app.widget";
-                "CURRENT_PROJECT_VERSION" = "1018";
+                "CURRENT_PROJECT_VERSION" = "1019";
                 "MARKETING_VERSION" = "0.4.4";
                 "CODE_SIGN_ENTITLEMENTS" = "Widget/TodoWallpaper.entitlements";
                 "GENERATE_INFOPLIST_FILE" = "YES";

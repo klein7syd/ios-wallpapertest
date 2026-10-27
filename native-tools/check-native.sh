@@ -3,7 +3,8 @@ set -euo pipefail
 # Compile and execute the production persistence code with independent files.
 python3 native-tools/check-ui-structure.py
 swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
-"$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log
+REPOSITORY_CHECKS_PASSED=true
+if "$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log; then :; else REPOSITORY_CHECKS_PASSED=false; fi
 mkdir -p TodoWallpaper/out/render-checks
 python3 native-tools/make-render-fixture.py TodoWallpaper/out/render-checks/fixture-input.png
 # Execute the exact production renderer on macOS, not HTML or a Python imitation.
@@ -13,3 +14,5 @@ swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
     TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift TodoWallpaper/Tests/WidgetFeedbackRenderChecks.swift TodoWallpaper/Tests/FeedbackRepairRenderChecks.swift \
     -o "$RUNNER_TEMP/todo-wallpaper-render-checks" 2>&1 | tee TodoWallpaper/out/render-compile.log
 "$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
+
+if [ "$REPOSITORY_CHECKS_PASSED" != true ]; then exit 1; fi
