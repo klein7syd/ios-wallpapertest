@@ -4,7 +4,7 @@ import hashlib
 import json
 
 root = Path(__file__).resolve().parents[1]
-read = lambda path: (root / path).read_text()
+read = lambda path: (root / path).read_text(encoding='utf-8')
 checks = []
 
 def require(condition, description):
@@ -94,10 +94,9 @@ protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')
 for path, expected in protected.items():
-    # Git intentionally checks Windows text scripts out as CRLF; signing code is unchanged.
-    data = (root/path).read_bytes()
-    if path.endswith(('.cmd','.ps1')):
-        data = data.replace(b'\r\n', b'\n')
+    # Git may check text files out as CRLF on Windows (core.autocrlf=true).
+    # Normalize before hashing so the guard measures content, not line endings.
+    data = (root/path).read_bytes().replace(b'\r\n', b'\n')
     require(hashlib.sha256(data).hexdigest() == expected, f'Protected source matches reviewed manifest: {path}')
 out = root/'TodoWallpaper/out'
 out.mkdir(exist_ok=True)

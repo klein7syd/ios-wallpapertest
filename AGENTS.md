@@ -45,6 +45,8 @@ git -c http.sslBackend=openssl pull --ff-only
 - `check-native.sh` / `check-ios-ui.sh` / `check-ui-structure.py` —— 源码与 UI 结构校验。
 - `verify_product_ipa.py` —— 产物校验。
 - 具体参数以脚本内注释和 `.github/workflows/*.yml` 为准，不要凭记忆编参数。
+- Windows 上唯一能直接跑的真检查：`python native-tools/check-ui-structure.py`（126 项，约 1 秒）。其余脚本需要 macOS 或 bash。
+  该脚本已适配 Windows：显式 UTF-8 读文件、哈希前统一 CRLF，否则 `core.autocrlf=true` 会让保护源码全部误报。
 
 ## 记忆文件
 
