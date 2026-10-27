@@ -67,7 +67,7 @@ class PhotoMotionView: UIView, UIGestureRecognizerDelegate {
         }
         if [.ended, .cancelled, .failed].contains(gesture.state) { finish(gesture) }
     }
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { editingEnabled && image != nil }
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { editingEnabled && image != nil }
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
 }
 struct WidgetPhotoMotionSurface: UIViewRepresentable {

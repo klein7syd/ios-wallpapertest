@@ -68,7 +68,7 @@ private final class WallpaperLayerView: PhotoMotionView {
         let scale = bounds.width / 390
         let rect = positioned.panel.applying(CGAffineTransform(scaleX: scale, y: scale))
         withoutLayerAnimation {
-            panel.frame = rect; panel.layer.cornerRadius = settings.cornerRadius * scale
+            panel.frame = rect; panel.layer.cornerRadius = min(settings.cornerRadius, min(positioned.panel.width, positioned.panel.height) / 2) * scale
             panel.layer.borderColor = UIColor.white.withAlphaComponent(settings.borderOpacity).cgColor
             panel.layer.borderWidth = 0.8 * scale
             blurLayer.isHidden = image == nil
