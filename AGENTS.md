@@ -50,6 +50,8 @@ git -c http.sslBackend=openssl pull --ff-only
 
 - `AGENTS.md`（本文件）—— 不常变的约定与环境事实。
 - `docs/STATE.md` —— 当前版本、已验证/未验证、下一步。**每次任务结束更新。**
+- `docs/PRODUCT.md` —— 产品意图、用户是谁、明确不做什么、验收规矩。改需求前先读。
+- `docs/KNOWN-ISSUES.md` —— 用户真机反馈台账，只追加不改写。
 - `docs/VALIDATION.json` —— 历史验证证据，只追加。
 - `docs/DEVICE-TEST.md`、`TodoWallpaper/DEVICE-TEST.md` —— 真机测试步骤。
 
