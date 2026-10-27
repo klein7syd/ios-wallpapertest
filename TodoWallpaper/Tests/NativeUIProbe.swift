@@ -324,7 +324,7 @@ enum NativeUIProbe {
                     name: "text-\(effect.rawValue)", directory: output, scale: 2)
                 effectHashes[effect.rawValue] = SHA256.hash(data: try pixels(image)).map { String(format: "%02x", $0) }.joined()
             }
-            try require(Set(effectHashes.values).count == 5, "Five text-completion effects must change actual iOS-rendered pixels")
+            try require(Set(effectHashes.values).count == WidgetTextCompletion.allCases.count, "Every text-completion effect must change actual iOS-rendered pixels")
             items[0].isCompleted = false
             let types: [(String, DynamicTypeSize, UIContentSizeCategory)] = [
                 ("small", .xSmall, .extraSmall), ("standard", .large, .large), ("large", .xxxLarge, .extraExtraExtraLarge),
