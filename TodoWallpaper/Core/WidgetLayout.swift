@@ -24,7 +24,8 @@ struct WidgetLayoutMetrics: Equatable {
         let gap = marker > 0 ? style.markerStyle.gap : 0
         let vertical = marker > 0 ? abs(style.markerStyle.verticalOffset) * 2 : 0
         let spacing = style.spacing
-        let separator = style.separatesRows ? max(2, 4 + spacing * 0.6) : 0
+        // 分隔线画在行的 overlay 上，不占布局高度，否则每行间距会被它撑得不均匀。
+        let separator = 0.0
         let header = min(max(0, height), max(0, headerHeight))
         let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
         let dateHeight = items.contains(where: { $0.schedule != nil }) ? max(11, fontLineHeight * 0.65) + 2 : 0

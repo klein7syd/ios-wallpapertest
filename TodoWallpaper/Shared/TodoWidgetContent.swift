@@ -40,7 +40,9 @@ struct TodoWidgetContent: View {
             ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
         let resolved = TextLegibility.readable(requested, on: background)
-        return TextLegibility.luminance(resolved) > 0.5 ? .black.opacity(0.55) : .clear
+        // 浅字配深影、深字配浅影，两边都压低不透明度：
+        // 原来只给浅字加黑影，黄色这类高亮色会出硬边，深绿这类低亮色又完全没有景深。
+        return TextLegibility.luminance(resolved) > 0.5 ? .black.opacity(0.38) : .white.opacity(0.28)
     }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
@@ -89,14 +91,14 @@ struct TodoWidgetContent: View {
                         ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
                             VStack(spacing: 0) {
                                 task(item, metrics: metrics)
-                                if style.separatesRows && index < shown.count - 1 {
-                                    // System Divider stays black on a black panel and disappears.
-                                    // Tint it from the readable text colour so it shows on both.
-                                    Rectangle().fill(foreground.opacity(0.18))
-                                        .frame(height: 0.5)
-                                        .padding(.leading, metrics.markerWidth + metrics.gap)
-                                        .padding(.vertical, 4).frame(height: metrics.separatorHeight)
-                                }
+                                    .overlay(alignment: .bottom) {
+                                        if style.separatesRows && index < shown.count - 1 {
+                                            // 画在行底部，不参与布局：每行间距才会完全一致。
+                                            Rectangle().fill(foreground.opacity(0.35))
+                                                .frame(height: 0.5)
+                                                .padding(.leading, metrics.markerWidth + metrics.gap)
+                                        }
+                                    }
                             }
                         }
                     }
