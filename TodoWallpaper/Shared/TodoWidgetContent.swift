@@ -1,6 +1,7 @@
 import SwiftUI
 import WidgetKit
 import CoreText
+import UIKit
 
 /// Actual Widget and app preview use identical geometry and completion visuals.
 /// Only the action routing differs: App Intent on the Home Screen, local try-out in preview.
@@ -186,27 +187,34 @@ struct TodoWidgetContent: View {
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(item.title).font(Font(titleFont))
+            Text(outlined(item.title))
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
-                .background {
-                    if style.textOutline == true {
-                        ZStack {
-                            ForEach([(-0.4, 0.0), (0.4, 0.0), (0.0, -0.4), (0.0, 0.4)], id: \.0) { dx, dy in
-                                Text(item.title).font(Font(titleFont))
-                                    .foregroundStyle(.black.opacity(0.7)).offset(x: dx, y: dy)
-                            }
-                        }.lineLimit(metrics.lineLimit)
-                    }
-                }
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 
+    }
+    /// 真描边：strokeWidth 负值表示描边+填充，按字号的百分比给出细边。
+    private func outlined(_ text: String) -> AttributedString {
+        let ns = NSMutableAttributedString(string: text)
+        ns.addAttribute(.font, value: titleFont, range: NSRange(location: 0, length: ns.length))
+        if style.textOutline == true {
+            ns.addAttribute(.strokeWidth, value: -2.5, range: NSRange(location: 0, length: ns.length))
+            ns.addAttribute(.strokeColor, value: strokeColor, range: NSRange(location: 0, length: ns.length))
+        }
+        return AttributedString(ns)
+    }
+    private var strokeColor: UIColor {
+        let requested = style.followsSystemText
+            ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            : style.textColor
+        let resolved = TextLegibility.readable(requested, on: background)
+        return TextLegibility.luminance(resolved) > 0.5 ? .black : .white
     }
 }
 

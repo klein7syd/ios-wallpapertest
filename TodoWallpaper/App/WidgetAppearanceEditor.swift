@@ -301,7 +301,15 @@ struct WidgetAppearanceEditor: View {
         Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if advanced {
-            PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("行距").font(.subheadline)
+                    Spacer(minLength: 6)
+                    Text(widget.wrappedValue.spacing, format: .number.precision(.fractionLength(0...1)))
+                        .font(.subheadline.monospacedDigit())
+                }
+                Slider(value: widget.spacing, in: -10...40, step: 0.5)
+            }
         }
         Toggle("紧凑布局", isOn: widget.compact)
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {

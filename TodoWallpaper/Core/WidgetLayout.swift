@@ -23,8 +23,8 @@ struct WidgetLayoutMetrics: Equatable {
         let marker = marks.max() ?? 0
         let gap = marker > 0 ? style.markerStyle.gap : 0
         let vertical = marker > 0 ? abs(style.markerStyle.verticalOffset) * 2 : 0
-        // 负值真正收紧行距：允许最多 3pt 重叠，超过会把下一行文字压进上一行日期。
-        let spacing = max(-3, style.spacing)
+        // 负值真正收紧行距：允许最多 5pt 重叠。
+        let spacing = max(-5, style.spacing)
         // 分隔线画在行的 overlay 上，不占布局高度，否则每行间距会被它撑得不均匀。
         let separator = 0.0
         let header = min(max(0, height), max(0, headerHeight))
