@@ -145,6 +145,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
     var unifiedMarkers: Bool?
+    /// Completed tasks leave the widget immediately after a tap.
+    var hidesCompletedTasks: Bool?
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
@@ -162,6 +164,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
         let limit = max(1, min(capacity, maximumItems))
         let pending = items.filter { !$0.isCompleted }
+        if widget.hidesCompletedTasks == true { return Array(pending.prefix(limit)) }
         if textCompletion.hidesCompleted { return Array(pending.prefix(limit)) }
         if completed == .all { return Array(items.prefix(limit)) }
         if completed == .hidden { return Array(pending.prefix(limit)) }
