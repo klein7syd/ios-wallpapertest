@@ -1,14 +1,16 @@
-# Todo Wallpaper 0.5.0 / 1025
+# Todo Wallpaper 0.5.1 / 1029
 
-[Implementation and limits](../docs/MEDIA-MOTION-050.md) · [Validation](../docs/VALIDATION.json) · [Windows/iPhone checklist](DEVICE-TEST.md).
+[Implementation, evidence and limits](../docs/PHOTO-EDITOR-REPAIRS-051.md) · [Validation](../docs/VALIDATION.json) · [Windows/iPhone checklist](DEVICE-TEST.md).
 
-Actions run 40465212518 passed actual unsigned ARM64 App+Widget compilation, production native Core/PNG tests and iOS Simulator rendering. Physical iPhone performance, signing/install, Photos permissions/album selection and Widget system-material appearance remain separate and pending.
+Actions [40481159418](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40481159418) passed unsigned ARM64 App+Widget compilation, production native Core/PNG tests and iOS Simulator checks. Zero Swift-source warnings. Signing/install, Home Screen photo behavior, iPhone touch FPS and default-icon glass remain pending real-device testing.
 
-- Native four tabs with pinned previews; reducing wallpaper preview now grows the inspector.
-- Retained CA photo/panel gestures with one commit at end; small cached blur texture, full target-pixel composition for exact preview/export.
-- Widget photo normalized crop, pinch/pan, opacity; explicit theme contrast, footer switch and labeled text-tap effects.
-- Native PhotoKit album selection, up to 60 local cached photos, daily Widget timeline. Reselect the album after changes. Actual delivery is system scheduled.
-- Optional floating date/time per task; legacy records unchanged until edited; dates survive title/marker/completion operations. Existing Calendar/Reminders import available from create sheet.
-- Experimental public material background request; clear/tinted system rendering retained. No assertion of Batteries-style glass in default/dark modes.
+- Native four tabs, pinned previews and wallpaper 4K export preserved.
+- Widget timeline carries bounded prepared photos; today/tomorrow only, decoded sources released after handoff. Views do not resolve source photos at render time. Daily rotation is system scheduled.
+- Global and per-task custom photo markers join existing Emoji/geometry; generated 512px PNG assets stay in the App Group. Emoji/images request full-color accented rendering on supported iOS.
+- Native UISlider tracks immediately and coalesces model publications by display frame. Appearance writes/Widget reload requests wait until a continuous edit ends; grouped undo retained.
+- Row spacing lives in Text, range 0–40, with tight single-line layout. Count switch lives in Content. Marker-tap effects have a visible heading.
+- Header top inset uses a top-aligned frame. Native rendered title ink is identical at 0/12/24 inset with the summary hidden.
+- Automatic solid-background text contrast preserves user opacity; subtle shadows protect text on photos/translucent panels. Wallpaper preview/PNG share text drawing.
+- First theme control requests public Liquid Glass on iOS26, older systems use material. Default/dark icon mode is experimental; no Batteries equivalence claim. System clear/tinted mode is a distinct system path.
 
-Minimum iOS17. Stable IDs org.todowallpaper.app / org.todowallpaper.app.widget / group.org.todowallpaper.app. R1 scripts, Intent and shared migration remain unchanged. Use the same account and cover-install; do not uninstall the existing app. No PWA, AI or cloud-sync implementation is introduced.
+Minimum iOS17. Stable IDs `org.todowallpaper.app` / `org.todowallpaper.app.widget` / `group.org.todowallpaper.app`. Original R1 scripts, Intent, task repository and shared migration stay unchanged. Use the same account and cover-install; do not uninstall. No PWA, AI or cloud sync.

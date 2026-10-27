@@ -867,5 +867,117 @@
         "commit": "78228c653a0608d6d3cacac14dc0d3760f94cdfe"
       }
     ]
+  },
+  "photo_editor_repairs_051": {
+    "version": "0.5.1",
+    "build": "1029",
+    "repository_visibility": "public",
+    "commit": "9210e85a78e5cf3a67a64fc4002a3dd58731f6ed",
+    "identities_unchanged": [
+      "org.todowallpaper.app",
+      "org.todowallpaper.app.widget",
+      "group.org.todowallpaper.app"
+    ],
+    "actions_run_id": 40481159418,
+    "job_id": 122111527496,
+    "actions_conclusion": "success",
+    "artifact_id": 12723845598,
+    "artifact_size": 21022212,
+    "zip_sha256": "76cb462fa98dbc24bc6b496c26fe5a16e0398e95278f2c37730157be0a944a99",
+    "ipa_sha256": "859f138eb86cc372db0055ee5951a86cf0137569909c798e25b13687ace7b03c",
+    "native_core_persistence_migration_and_png": "passed",
+    "device_ARM64_app_and_widget_compilation": "passed",
+    "iOS_Simulator_native_checks": "passed",
+    "Swift_source_warnings": 0,
+    "ui_structure_guards": 126,
+    "native_ui_evidence": {
+      "full_title_ink_at_insets": {
+        "0": 9267,
+        "12": 9267,
+        "24": 9267
+      },
+      "photo_background_settings_and_completion_pixel_variants": 4,
+      "prepared_widget_photo_sizes_and_bytes": {
+        "large": [
+          728,
+          764,
+          2224768
+        ],
+        "medium": [
+          728,
+          340,
+          990080
+        ],
+        "small": [
+          340,
+          340,
+          462400
+        ]
+      },
+      "custom_image_marker_native_color_pixels": 1944,
+      "black_on_black_light_mode_visible_ink": 3422,
+      "native_slider_600_samples_one_forced_frame_model_publications": 1,
+      "widget_type_size_matrix_images": 30,
+      "performance_scope": "layer/model CPU callbacks, not real iPhone touch FPS"
+    },
+    "R1_installer_Intent_repository_and_shared_migration": "unchanged; packaged four R1 files verified against source",
+    "compatibility": "optional marker imageName and maximumTitleLines; old records/IDs/order/completion/date/photo/draft retained; avoid downgrade to older unknown image-kind decoder",
+    "reviewed_protected_changes": [
+      "TodoStore defers writes during gestures",
+      "NativeTypography bounded font cache",
+      "WallpaperGeometry cached glyph contrast category"
+    ],
+    "photo_flicker_root_cause": "high-risk resource/file-I/O path corrected; unique device root cause not established without device logs",
+    "Windows_signing": "not_performed_for_1029",
+    "iPhone_installation_and_acceptance": "pending_user_feedback",
+    "real_iPhone_FPS": "not_measured",
+    "Home_Screen_photo_updates_and_flicker": "pending_device_retest",
+    "default_icon_Batteries_style_glass": "experimental_public_API_request; not_verified",
+    "known_limits": [
+      "No guarantee of Batteries-equivalent wallpaper glass in default/dark icon modes",
+      "System controls clear/tinted rendering and daily timeline timing",
+      "Widget photos capped to their display budget; cached albums need reselection to sync source changes",
+      "Custom image markers are 512px local PNG; older referenced assets retained for undo/backups",
+      "Rows cannot shrink below real glyph/marker height; explicit maximum two lines requires extra space",
+      "Simulator and source checks do not prove iPhone touch FPS, Home Screen behavior or signing"
+    ],
+    "build_attempts": [
+      {
+        "build": 1026,
+        "commit": "efd6177081fe3955eccdd478dd3be8f9140b0ce4",
+        "run_id": 40473323299,
+        "job_id": 122085410480,
+        "conclusion": "failure",
+        "device_app_and_extension_compilation": "succeeded",
+        "core_checks": "passed",
+        "failure": "New PNG test used throwing digest in nonthrowing assertion autoclosure; no IPA packaged"
+      },
+      {
+        "build": 1027,
+        "commit": "f2f5eb328c10c7343df781f76396c3326e5344ab",
+        "run_id": 40473693447,
+        "job_id": 122086631939,
+        "conclusion": "failure",
+        "native_checks": "passed",
+        "device_app_and_extension_compilation": "succeeded",
+        "simulator_checks": "passed",
+        "failure": "Packaging verifier still required 0.5.0; unify generator/verifier product-version metadata"
+      },
+      {
+        "build": 1028,
+        "commit": "d8ede8da09c64dc2d52a4e90994378a2ef0bd20f",
+        "run_id": 40478981439,
+        "job_id": 122104204462,
+        "conclusion": "success",
+        "followup": "Manual review of generated inset-24 screenshot detected remaining bottom clipping; outer fixed frame centered its smaller ZStack before offset. Explicit topLeading and stricter 99-percent ink invariance added."
+      },
+      {
+        "build": 1029,
+        "run_id": 40481159418,
+        "conclusion": "success",
+        "commit": "9210e85a78e5cf3a67a64fc4002a3dd58731f6ed",
+        "delivery": "unsigned_IPA; physical_acceptance_pending"
+      }
+    ]
   }
 }
