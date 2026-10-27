@@ -5,7 +5,8 @@
 ## 版本
 
 - 交付版本 **0.5.1 / build 1029**，代码提交 `9210e85`，CI run `40481159418`。
-- 仓库 HEAD `540e02a`（接棒记忆文件提交）；它之前是 `d63dd87`，即 0.5.1 的证据记录提交（只改文档，`[skip ci]`）。
+- 接棒阶段的提交从 `540e02a`（Add agent handoff memory）开始，之后见 `git log --oneline`。
+- `d63dd87` 是 0.5.1 的证据记录提交（只改文档，`[skip ci]`），也是「Codex 最后一版」的标签位置。
 - 近期链路：0.4.2(1015) → 0.4.3(1017) → 0.4.4(1022) → 0.5.0(1025) → 0.5.1(1027/1028/1029)。
 
 ## CI 已通过（0.5.1）
@@ -38,6 +39,21 @@
 - 标签 `checkpoint-handoff-2026-10-27` → `d63dd87`：接棒基线。
 - 离线快照：`..\backups\todo-wallpaper-codex-final-0.5.1.bundle`（可用 git clone 还原）。
 - 回退命令示例：`git checkout codex-final-0.5.1`，或 `git reset --hard codex-final-0.5.1`（会丢弃之后的提交，谨慎）。
+
+## 接棒状态（2026-10-27）
+
+已完成：
+
+- 最新源码拉到 0.5.1（`d63dd87`），工作区干净，42 + 接棒提交。
+- 记忆文件：`AGENTS.md`、`docs/STATE.md`、`docs/PRODUCT.md`、`docs/KNOWN-ISSUES.md`。
+- 标签：`codex-final-0.5.1`（钉住 Codex 最后一版）、`checkpoint-handoff-2026-10-27`。
+- 离线备份：`../backups/*.bundle`，已实测可用 `git clone` 还原（43 提交、123 文件、两个标签都在）。
+- Windows 上可直接跑仓库自带的 126 项检查：`python native-tools/check-ui-structure.py`。
+
+仍待完成：
+
+- **推送到 GitHub**：本机没有 GitHub 凭据，需要在真实终端里登录一次。
+- 把 `../backups` 复制到第二个物理位置（OneDrive / U 盘）。
 
 ## 下一步候选
 
