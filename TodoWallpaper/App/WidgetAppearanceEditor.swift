@@ -301,7 +301,7 @@ struct WidgetAppearanceEditor: View {
         Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if advanced {
-            PreciseSlider(title: "行距", value: widget.spacing, range: 0...40, standard: 5)
+            PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
         }
         Toggle("紧凑布局", isOn: widget.compact)
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {

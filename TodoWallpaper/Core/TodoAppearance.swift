@@ -150,7 +150,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         try backgroundCrop?.validate(); try photoRotation?.validate()
         if let backgroundPhotoOpacity, !backgroundPhotoOpacity.isFinite || !(0...1).contains(backgroundPhotoOpacity) { throw AppearanceError.invalidStyle }
         if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }
-        guard (12...20).contains(fontSize), (0...40).contains(spacing), (1...10).contains(maximumItems),
+        guard (12...20).contains(fontSize), (-10...40).contains(spacing), (1...10).contains(maximumItems),
               maximumTitleLines == nil || (1...2).contains(maximumTitleLines!),
               textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }
     }
