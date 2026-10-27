@@ -18,7 +18,12 @@ struct TodoWidgetProvider: TimelineProvider {
         completion(context.isPreview ? placeholder(in: context) : read())
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoWidgetEntry>) -> Void) {
-        completion(Timeline(entries: [read()], policy: .never))
+        let initial = read()
+        let dates = WidgetDayTimeline.dates(now: initial.date)
+        let entries = dates.map { date in
+            TodoWidgetEntry(date: date, document: initial.document, appearance: initial.appearance, error: initial.error)
+        }
+        completion(Timeline(entries: entries, policy: .atEnd))
     }
     private func read() -> TodoWidgetEntry {
         do {
@@ -39,7 +44,7 @@ struct TodoWidgetView: View {
         TodoWidgetContent(document: entry.document, appearance: entry.appearance,
             error: entry.error, family: previewFamily)
             .containerBackground(for: .widget) {
-                WidgetBackgroundView(style: style)
+                WidgetBackgroundView(style: style, date: entry.date)
             }
             .environment(\.colorScheme, scheme)
     }

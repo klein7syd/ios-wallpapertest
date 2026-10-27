@@ -18,7 +18,12 @@ struct TodoWidgetContent: View {
     @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
     @ScaledMetric(relativeTo: .caption2) private var footerUnit = 11.0
     private var style: WidgetAppearance { appearance.widget }
-    private var foreground: Color { style.followsSystemText ? .primary : style.textColor.swiftColor }
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.colorScheme) private var hostScheme
+    private var foreground: Color {
+        if renderingMode != .fullColor { return .primary }
+        return style.followsSystemText ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? .white : .black) : style.textColor.swiftColor
+    }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
     private var fontSize: Double { style.fontSize * bodyUnit / 15 }
@@ -148,12 +153,17 @@ struct TodoWidgetContent: View {
             }
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
-        Text(item.title).font(Font(titleFont))
-            .strikethrough(item.isCompleted && style.textCompletion.strikes)
-            .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-            .foregroundStyle(item.isCompleted && style.textCompletion == .color ? style.completionColor.swiftColor : foreground)
-            .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight)
-            .clipped()
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.title).font(Font(titleFont))
+                .strikethrough(item.isCompleted && style.textCompletion.strikes)
+                .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
+                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? style.completionColor.swiftColor : foreground)
+                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+            if let schedule = item.schedule {
+                Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
+
     }
 }

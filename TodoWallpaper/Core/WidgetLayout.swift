@@ -27,13 +27,14 @@ struct WidgetLayoutMetrics: Equatable {
         let separator = style.separatesRows ? 9.0 : 0
         let header = min(max(0, height), max(0, headerHeight))
         let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
-        let minimumRow = max(marker + vertical, fontLineHeight) + (style.compact ? 0 : 4)
-        let footerFits = afterHeader >= minimumRow + footerHeight + spacing
+        let dateHeight = items.contains(where: { $0.schedule != nil }) ? max(11, fontLineHeight * 0.65) + 2 : 0
+        let minimumRow = max(marker + vertical, fontLineHeight + dateHeight) + (style.compact ? 0 : 4)
+        let footerFits = style.footerVisible && afterHeader >= minimumRow + footerHeight + spacing
         let footer = footerFits ? footerHeight : 0
         let rowSpace = max(0, afterHeader - (footerFits ? footer + spacing : 0))
         let proposedLines = family == .large && !style.compact && fontLineHeight < 30 ? 2 : 1
-        let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2) + 4 ? 2 : 1
-        let row = max(marker + vertical, fontLineHeight * Double(lines)) + (style.compact ? 0 : 4)
+        let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2 + dateHeight) + 4 ? 2 : 1
+        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight) + (style.compact ? 0 : 4)
         let raw = row > 0 ? Int(max(0, (rowSpace + spacing + separator) / (row + spacing + separator)).rounded(.down)) : 0
         return WidgetLayoutMetrics(rowHeight: row, markerWidth: marker, gap: gap, lineHeight: fontLineHeight,
             headerHeight: header, footerHeight: footer, separatorHeight: separator, spacing: spacing,

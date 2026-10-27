@@ -6,17 +6,26 @@ import ImageIO
 struct WidgetBackgroundView: View {
     let style: WidgetAppearance
     var sharedDirectory: URL?
+    var date: Date = .now
+    @Environment(\.colorScheme) private var systemScheme
     var body: some View {
         GeometryReader { geometry in
-            let image = style.backdrop == .photo ? WidgetPhotoCache.image(named: style.backgroundPhotoName, sharedDirectory: sharedDirectory) : nil
+            let image = style.backdrop == .photo ? WidgetPhotoCache.image(named: style.photoName(at: date), sharedDirectory: sharedDirectory) : nil
             ZStack {
-                if style.backdrop == .system || style.backdrop == .photo && image == nil { Rectangle().fill(.background) }
-                else { style.panelColor.swiftColor }
-                if let image {
-                    Image(decorative: image, scale: 1).resizable().scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                if style.materialEnabled {
+                    Rectangle().fill(.ultraThinMaterial)
+                } else {
+                    (style.backdrop == .solid ? style.panelColor.swiftColor :
+                        (style.isExplicitlyDark ?? (systemScheme == .dark) ? Color(white: 0.09) : .white))
+                    if let image {
+                        let frame = style.photoCrop.frame(source: CGSize(width: image.width, height: image.height), canvas: geometry.size)
+                        Image(decorative: image, scale: 1).resizable()
+                            .frame(width: frame.width, height: frame.height)
+                            .position(x: frame.midX, y: frame.midY).opacity(style.photoOpacity)
+                    }
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
+
         }
     }
 }

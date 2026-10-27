@@ -130,6 +130,11 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var showsSeparators: Bool?
     var header: WidgetHeaderAppearance?
     var backgroundPhotoName: String?
+    var backgroundCrop: PhotoCrop?
+    var backgroundPhotoOpacity: Double?
+    var photoRotation: WidgetAlbumRotation?
+    var systemMaterial: Bool?
+    var showsFooter: Bool?
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
@@ -137,6 +142,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func validate() throws {
         try markerOverride?.validate(); try markerStyle.validate()
         try header?.validate()
+        try backgroundCrop?.validate(); try photoRotation?.validate()
+        if let backgroundPhotoOpacity, !backgroundPhotoOpacity.isFinite || !(0...1).contains(backgroundPhotoOpacity) { throw AppearanceError.invalidStyle }
         if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }
         guard (12...20).contains(fontSize), (0...12).contains(spacing), (1...10).contains(maximumItems),
               textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }

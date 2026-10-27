@@ -36,8 +36,8 @@ private actor CalendarReader {
                 let occurrence = event.hasRecurrenceRules ? String((event.occurrenceDate ?? date).timeIntervalSince1970) : "single"
                 return TodoImportCandidate(id: TodoImportIdentity.make(source: "event", calendar: event.calendar.calendarIdentifier,
                     item: event.calendarItemIdentifier, occurrence: occurrence),
-                    title: String("\(label) · \(title)".prefix(200)), detail: event.calendar.title,
-                    isCompleted: false, sortDate: date)
+                    title: String(title.prefix(200)), detail: "\(event.calendar.title) · \(label)",
+                    isCompleted: false, sortDate: date, schedule: TodoSchedule(date: date, includesTime: !event.isAllDay))
             }.sorted { $0.sortDate < $1.sortDate }
         }
         guard try await events.requestFullAccessToReminders() else { throw CalendarImportError.permission }
@@ -50,7 +50,8 @@ private actor CalendarReader {
                     guard !title.isEmpty else { return nil }
                     return TodoImportCandidate(id: TodoImportIdentity.make(source: "reminder", calendar: reminder.calendar.calendarIdentifier,
                         item: reminder.calendarItemIdentifier), title: String(title.prefix(200)), detail: reminder.calendar.title,
-                        isCompleted: reminder.isCompleted, sortDate: reminder.dueDateComponents?.date ?? .distantFuture)
+                        isCompleted: reminder.isCompleted, sortDate: reminder.dueDateComponents?.date ?? .distantFuture,
+                        schedule: reminder.dueDateComponents?.date.map { TodoSchedule(date: $0, includesTime: reminder.dueDateComponents?.hour != nil) })
                 }
                 continuation.resume(returning: candidates)
             }

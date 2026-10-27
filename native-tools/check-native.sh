@@ -2,7 +2,7 @@
 set -euo pipefail
 # Compile and execute the production persistence code with independent files.
 python3 native-tools/check-ui-structure.py
-swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
+swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift TodoWallpaper/Tests/MediaInteractionChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
 REPOSITORY_CHECKS_PASSED=true
 if "$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log; then :; else REPOSITORY_CHECKS_PASSED=false; fi
 mkdir -p TodoWallpaper/out/render-checks

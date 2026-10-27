@@ -390,10 +390,23 @@ actor WallpaperRenderService {
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: 2048,
+                kCGImageSourceThumbnailMaxPixelSize: 1536,
                 kCGImageSourceShouldCacheImmediately: true
               ] as CFDictionary) else { throw WallpaperError.unreadablePhoto }
         return WallpaperLivePhoto(image: image, info: info)
+    }
+    func liveBlur(photo: WallpaperLivePhoto, settings: WallpaperSettings) throws -> WallpaperLivePhoto {
+        try Task.checkCancellation()
+        let image = photo.image
+        let factor = min(1, 768 / Double(max(image.width, image.height)))
+        let source = CIImage(cgImage: image).transformed(by: CGAffineTransform(scaleX: factor, y: factor))
+        let rect = WallpaperRenderer.backgroundRect(source: CGSize(width: image.width, height: image.height),
+            canvas: CGSize(width: 390, height: settings.logicalHeight), settings: settings)
+        let sourceScale = rect.width / Double(image.width)
+        let radius = settings.blurRadius / max(0.0001, sourceScale) * factor
+        let result = source.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius]).cropped(to: source.extent)
+        guard let output = context.createCGImage(result, from: result.extent) else { throw WallpaperError.renderingFailed }
+        return WallpaperLivePhoto(image: output, info: photo.info)
     }
     func preview(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, appearance: TodoAppearance = TodoAppearance()) throws -> WallpaperRendered {
         try Task.checkCancellation()

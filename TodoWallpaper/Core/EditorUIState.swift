@@ -75,6 +75,12 @@ enum EditorSizing {
         // a compact toolbar + settings viewport and prioritize the portrait canvas.
         return min(advanced ? 278 : 214, max(120, available * (advanced ? 0.42 : 0.31)), max(52, available - 110))
     }
+    static func wallpaperInspectorHeight(available: Double, expanded: Bool, advanced: Bool, previewScale: Double) -> Double {
+        let base = panelHeight(available: available, expanded: expanded, advanced: advanced)
+        guard expanded else { return base }
+        let scale = min(1, max(0.55, previewScale))
+        return min(max(base, available - 110), base + max(0, available - base - 20) * (1 - scale))
+    }
     static func widgetPreviewHeight(available: Double, family: WidgetPreviewFamily = .large) -> Double {
         guard available.isFinite, available > 0 else { return 0 }
         if available < 320 { return min(100, max(52, available * 0.30)) }

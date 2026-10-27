@@ -21,5 +21,7 @@
 	<string>读取日历日程，供你选择并导入为本机待办；不会修改原日程。</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>读取提醒事项，供你选择并导入为本机待办；不会修改原提醒事项。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>读取您选择的相册，将照片保存在本机供小组件每日轮换；不会上传或修改原照片。</string>
 </dict>
 </plist>

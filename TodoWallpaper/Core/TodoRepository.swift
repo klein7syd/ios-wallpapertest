@@ -54,12 +54,26 @@ struct TodoRepository {
         }
     }
 
+    func saveTask(id: UUID?, title: String, marker: TodoMarker?, schedule: TodoSchedule?) throws -> TodoDocument {
+        let title = try validatedTitle(title); try marker?.validate(); try schedule?.validate()
+        return try update { document in
+            if let id {
+                guard let index = document.items.firstIndex(where: { $0.id == id }) else { throw TodoDataError.missingItem }
+                document.items[index].title = title; document.items[index].marker = marker
+                document.items[index].schedule = schedule; document.items[index].updatedAt = .now
+            } else {
+                document.items.append(TodoItem(id: UUID(), title: title, marker: marker, isCompleted: false,
+                    createdAt: .now, updatedAt: .now, schedule: schedule))
+            }
+        }
+    }
+
     /// A single locked transaction for selected local imports. Stable source IDs
     /// make repeated imports idempotent; existing tasks are never rewritten.
     func importItems(_ candidates: [TodoItem]) throws -> TodoDocument {
         guard candidates.count <= 500 else { throw TodoDataError.invalidDocument }
         let validated = try candidates.map { item in
-            var copy = item; copy.title = try validatedTitle(item.title); try copy.marker?.validate(); return copy
+            var copy = item; copy.title = try validatedTitle(item.title); try copy.marker?.validate(); try copy.schedule?.validate(); return copy
         }
         return try update { document in
             var known = Set(document.items.map(\.id))
@@ -113,6 +127,7 @@ struct TodoRepository {
         guard document.schemaVersion == 1 else { throw TodoDataError.unsupportedSchema(document.schemaVersion) }
         guard Set(document.items.map(\.id)).count == document.items.count else { throw TodoDataError.invalidDocument }
         for item in document.items {
+            try item.schedule?.validate()
             do { try item.marker?.validate() } catch { throw TodoDataError.invalidDocument }
             guard (try? validatedTitle(item.title)) == item.title else { throw TodoDataError.invalidDocument }
         }

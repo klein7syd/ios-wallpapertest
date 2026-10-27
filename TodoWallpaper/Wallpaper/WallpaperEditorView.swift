@@ -58,14 +58,14 @@ struct WallpaperEditorView: View {
                 VStack(spacing: 8) {
                     if dataReady {
                         WallpaperLiveCanvas(model: model, editsBackground: tool == .background,
-                            editable: navigation.isEditing, previewScale: previewScale)
+                            editable: navigation.isEditing)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped().accessibilityIdentifier("wallpaper.canvas")
                     } else {
                         ContentUnavailableView("请先读取待办", systemImage: "checklist", description: Text(store.loadError ?? "正在读取"))
                     }
-                    inspector(height: EditorSizing.panelHeight(available: geometry.size.height,
-                        expanded: navigation.inspectorExpanded, advanced: advanced))
+                    inspector(height: EditorSizing.wallpaperInspectorHeight(available: geometry.size.height,
+                        expanded: navigation.inspectorExpanded, advanced: advanced, previewScale: previewScale))
                 }
                 .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: navigation.inspectorExpanded)
                 .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 6)

@@ -7,8 +7,9 @@ struct TodoImportCandidate: Identifiable, Equatable, Sendable {
     let detail: String
     let isCompleted: Bool
     let sortDate: Date
+    var schedule: TodoSchedule? = nil
     func item(now: Date = .now) -> TodoItem {
-        TodoItem(id: id, title: title, isCompleted: isCompleted, createdAt: now, updatedAt: now)
+        TodoItem(id: id, title: title, isCompleted: isCompleted, createdAt: now, updatedAt: now, schedule: schedule)
     }
 }
 enum TodoImportIdentity {

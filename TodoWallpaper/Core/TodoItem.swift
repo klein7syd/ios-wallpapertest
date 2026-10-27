@@ -7,6 +7,7 @@ struct TodoItem: Identifiable, Codable, Equatable {
     var isCompleted: Bool
     let createdAt: Date
     var updatedAt: Date
+    var schedule: TodoSchedule? = nil
 }
 
 struct TodoDocument: Codable {

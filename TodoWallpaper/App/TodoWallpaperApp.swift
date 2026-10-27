@@ -87,6 +87,7 @@ struct TodoListView: View {
     @State private var displayError: DisplayError?
     @State private var confirmRecovery = false
     @State private var importCalendar = false
+    @State private var importAfterEditor = false
 
     var body: some View {
         NavigationStack {
@@ -153,10 +154,11 @@ struct TodoListView: View {
                 }
             }
             .sheet(isPresented: $importCalendar) { CalendarImportView(store: store) }
-            .sheet(item: $editor) { request in
-                TodoEditorView(item: request.item) { title, marker in
-                    if let item = request.item { try store.edit(id: item.id, title: title, marker: marker) }
-                    else { try store.add(title: title, marker: marker) }
+            .sheet(item: $editor, onDismiss: {
+                if importAfterEditor { importAfterEditor = false; importCalendar = true }
+            }) { request in
+                TodoEditorView(item: request.item, onImport: { importAfterEditor = true }) { title, marker, schedule in
+                    try store.saveTask(id: request.item?.id, title: title, marker: marker, schedule: schedule)
                 }
             }
             .alert(item: $displayError) { error in
@@ -184,12 +186,12 @@ struct TodoListView: View {
             .buttonStyle(.borderless)
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
             Button { editor = EditorRequest(item: item) } label: {
-                Text(item.title)
-                    .strikethrough(item.isCompleted)
-                    .foregroundStyle(item.isCompleted ? Color.secondary : Color.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(3)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title).strikethrough(item.isCompleted)
+                        .foregroundStyle(item.isCompleted ? Color.secondary : Color.primary)
+                        .multilineTextAlignment(.leading).lineLimit(3)
+                    if let schedule = item.schedule { Label(schedule.label, systemImage: schedule.includesTime ? "clock" : "calendar").font(.caption).foregroundStyle(.secondary) }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.borderless)
         }
@@ -204,17 +206,24 @@ struct TodoListView: View {
 
 struct TodoEditorView: View {
     let item: TodoItem?
-    let onSave: (String, TodoMarker?) throws -> Void
+    let onSave: (String, TodoMarker?, TodoSchedule?) throws -> Void
+    let onImport: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
     @State private var markerOverride: TodoMarker
     @State private var inheritsMarker: Bool
+    @State private var scheduled: Bool
+    @State private var scheduleDate: Date
+    @State private var includesTime: Bool
     @State private var saveError: DisplayError?
     @FocusState private var focused: Bool
 
-    init(item: TodoItem?, onSave: @escaping (String, TodoMarker?) throws -> Void) {
+    init(item: TodoItem?, onImport: @escaping () -> Void = { }, onSave: @escaping (String, TodoMarker?, TodoSchedule?) throws -> Void) {
         self.item = item
-        self.onSave = onSave
+        self.onSave = onSave; self.onImport = onImport
+        _scheduled = State(initialValue: item?.schedule != nil)
+        _scheduleDate = State(initialValue: item?.schedule?.date() ?? .now)
+        _includesTime = State(initialValue: item?.schedule?.includesTime ?? false)
         _title = State(initialValue: item?.title ?? "")
         _markerOverride = State(initialValue: item?.marker ?? TodoMarker(kind: .emoji, emoji: "⭐"))
         _inheritsMarker = State(initialValue: item?.marker == nil)
@@ -229,6 +238,15 @@ struct TodoEditorView: View {
                 } footer: {
                     Text("\(title.trimmingCharacters(in: .whitespacesAndNewlines).count) / 200 字符")
                 }
+                Section("日期") {
+                    Toggle("指定日期", isOn: $scheduled)
+                    if scheduled {
+                        DatePicker("日期", selection: $scheduleDate, displayedComponents: .date)
+                        Toggle("指定时间", isOn: $includesTime)
+                        if includesTime { DatePicker("时间", selection: $scheduleDate, displayedComponents: .hourAndMinute) }
+                    }
+                    if item == nil { Button("从日历 / 提醒事项导入", systemImage: "calendar.badge.plus") { onImport(); dismiss() } }
+                }
                 Section("单项标记") {
                     Toggle("继承壁纸标记", isOn: $inheritsMarker)
                     if !inheritsMarker { MarkerChoiceEditor(choice: $markerOverride) }
@@ -242,7 +260,7 @@ struct TodoEditorView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        do { try onSave(title, inheritsMarker ? nil : markerOverride); dismiss() }
+                        do { try onSave(title, inheritsMarker ? nil : markerOverride, scheduled ? TodoSchedule(date: scheduleDate, includesTime: includesTime) : nil); dismiss() }
                         catch { saveError = DisplayError(message: error.localizedDescription) }
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.trimmingCharacters(in: .whitespacesAndNewlines).count > 200)

@@ -1,154 +1,131 @@
 import SwiftUI
 import UIKit
 
-/// GPU transformed photos + clipped blur/tint layers. The small vector glyph view
-/// reuses production Core Text/marker layout, and never creates a poster bitmap.
+/// The live canvas is a retained layer tree. Gesture callbacks move existing
+/// textures and the panel; only a finished gesture commits one editor state.
 struct WallpaperLiveCanvas: View {
     @ObservedObject var model: WallpaperEditorModel
     var editsBackground: Bool
     var editable = true
-    var previewScale: Double = 1
     @Environment(\.editorInteraction) private var interaction
-    @State private var activeGestures = Set<String>()
-    @State private var startPan: CGPoint?
-    @State private var startCenter: CGPoint?
-    @State private var startZoom: Double?
-    @State private var guideX = false
-    @State private var guideY = false
     var body: some View {
         GeometryReader { proxy in
-            let ratio = CGFloat(model.settings.aspectRatio)
-            let width = min(proxy.size.width, proxy.size.height * ratio) * CGFloat(min(1, max(0.55, previewScale)))
-            let height = width / ratio
-            let scale = width / 390
-            ZStack(alignment: .topLeading) {
-                if let template = model.layout {
-                    let layout = template.positioned(using: model.settings)
-                    let panel = layout.panel
-                    background(scale: scale)
-                    ZStack(alignment: .topLeading) {
-                        background(scale: scale)
-                            .blur(radius: CGFloat(model.settings.blurRadius) * scale)
-                            .offset(x: -panel.minX * scale, y: -panel.minY * scale)
-                            .frame(width: panel.width * scale, height: panel.height * scale, alignment: .topLeading)
-                        Rectangle().fill((model.settings.darkGlass ? Color.black : Color.white).opacity(model.settings.glassOpacity))
-                        LinearGradient(colors: [.white.opacity(model.settings.highlight), .clear], startPoint: .top, endPoint: .bottom)
-                        WallpaperGlyphView(settings: model.settings, appearance: model.appearance, items: model.items, layout: template, scale: scale)
-                            .frame(width: panel.width * scale, height: panel.height * scale)
-                    }
-                    .frame(width: panel.width * scale, height: panel.height * scale, alignment: .topLeading)
-                    .clipShape(RoundedRectangle(cornerRadius: CGFloat(model.settings.cornerRadius) * scale))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: CGFloat(model.settings.cornerRadius) * scale)
-                            .strokeBorder(.white.opacity(model.settings.borderOpacity), lineWidth: 0.8 * scale)
-                    }
-                    .offset(x: panel.minX * scale, y: panel.minY * scale)
-                    if guideX { Rectangle().fill(.white.opacity(0.7)).frame(width: 0.6, height: height).position(x: width / 2, y: height / 2) }
-                    if guideY { Rectangle().fill(.white.opacity(0.7)).frame(width: width, height: 0.6).position(x: width / 2, y: height / 2) }
-                } else { ProgressView("正在读取画布").frame(width: width, height: height) }
-            }
-            .frame(width: max(1, width), height: max(1, height), alignment: .topLeading)
-            .clipped().contentShape(Rectangle())
-            .gesture(drag(width: width, height: height))
-            .simultaneousGesture(MagnificationGesture().onChanged { value in
-                guard editable, editsBackground, model.hasPhoto, !model.busy else { return }
-                if startZoom == nil { begin("zoom"); startZoom = model.settings.backgroundZoom }
-                model.settings.backgroundZoom = min(4, max(1, (startZoom ?? 1) * Double(value)))
-            }.onEnded { _ in startZoom = nil; end("zoom") })
-            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            .transaction { if !activeGestures.isEmpty { $0.animation = nil } }
+            let width = min(proxy.size.width, proxy.size.height * model.settings.aspectRatio)
+            WallpaperLayerSurface(model: model, editsBackground: editsBackground, editable: editable, interaction: interaction)
+                .frame(width: max(1, width), height: max(1, width / model.settings.aspectRatio))
+                .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
         }
-        .onDisappear { if !activeGestures.isEmpty { interaction.end(); activeGestures.removeAll() } }
-    }
-    @ViewBuilder private func background(scale: CGFloat) -> some View {
-        let canvas = CGSize(width: 390, height: model.settings.logicalHeight)
-        if let live = model.livePhoto {
-            let frame = WallpaperRenderer.backgroundRect(source: CGSize(width: live.info.width, height: live.info.height), canvas: canvas, settings: model.settings)
-            Image(decorative: live.image, scale: 1).resizable().interpolation(.high)
-                .frame(width: frame.width * scale, height: frame.height * scale)
-                .position(x: frame.midX * scale, y: frame.midY * scale)
-                .frame(width: canvas.width * scale, height: canvas.height * scale, alignment: .topLeading)
-        } else {
-            LinearGradient(colors: [Color(white: 0.30), Color(white: 0.08)], startPoint: .top, endPoint: .bottom)
-                .frame(width: canvas.width * scale, height: canvas.height * scale)
-        }
-    }
-    private func drag(width: CGFloat, height: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 1).onChanged { value in
-            guard editable, !model.busy, width > 0, height > 0 else { return }
-            if editsBackground {
-                guard let live = model.livePhoto else { return }
-                if startPan == nil { begin("pan"); startPan = CGPoint(x: model.settings.backgroundPanX, y: model.settings.backgroundPanY) }
-                guard let startPan else { return }
-                let canvas = CGSize(width: 390, height: model.settings.logicalHeight)
-                let frame = WallpaperRenderer.backgroundRect(source: CGSize(width: live.info.width, height: live.info.height), canvas: canvas, settings: model.settings)
-                if frame.width > 390.01 {
-                    let next = startPan.x + value.translation.width * 390 / width / ((frame.width - 390) / 2)
-                    model.settings.backgroundPanX = Double(min(1, max(-1, next)))
-                }
-                if frame.height > canvas.height + 0.01 {
-                    let next = startPan.y + value.translation.height * 390 / width / ((frame.height - canvas.height) / 2)
-                    model.settings.backgroundPanY = Double(min(1, max(-1, next)))
-                }
-            } else {
-                guard let layout = model.layout?.positioned(using: model.settings) else { return }
-                if startCenter == nil {
-                    let hit = CGPoint(x: value.startLocation.x / width * 390, y: value.startLocation.y / height * layout.canvas.height)
-                    guard layout.panel.contains(hit) else { return }
-                    begin("panel")
-                    startCenter = CGPoint(x: layout.panel.midX / 390, y: layout.panel.midY / layout.canvas.height)
-                    model.settings.customPosition = true
-                }
-                guard let startCenter else { return }
-                var x = startCenter.x + value.translation.width / width
-                var y = startCenter.y + value.translation.height / height
-                guideX = abs(x - 0.5) * width < 3; guideY = abs(y - 0.5) * height < 3
-                if guideX { x = 0.5 }; if guideY { y = 0.5 }
-                model.settings.panelX = Double(min(1, max(0, x))); model.settings.panelY = Double(min(1, max(0, y)))
-            }
-        }.onEnded { _ in
-            startPan = nil; startCenter = nil; guideX = false; guideY = false
-            end("pan"); end("panel")
-        }
-    }
-    private func begin(_ key: String) {
-        if activeGestures.isEmpty { interaction.begin("canvas") }
-        activeGestures.insert(key)
-    }
-    private func end(_ key: String) {
-        guard activeGestures.remove(key) != nil else { return }
-        if activeGestures.isEmpty { interaction.end() }
     }
 }
-private struct WallpaperGlyphView: UIViewRepresentable {
-    let settings: WallpaperSettings
-    let appearance: TodoAppearance
-    let items: [TodoItem]
-    let layout: WallpaperLayout
-    let scale: CGFloat
-    func makeUIView(context: Context) -> GlyphUIView {
-        let view = GlyphUIView(); view.isOpaque = false; view.backgroundColor = .clear
-        view.clipsToBounds = true
-        view.contentMode = .redraw; view.isUserInteractionEnabled = false; return view
-    }
-    func updateUIView(_ view: GlyphUIView, context: Context) {
-        let changed = view.settings?.glyphKey != settings.glyphKey || view.appearance != appearance || view.items != items || view.scale != scale
-        view.settings = settings; view.appearance = appearance; view.items = items; view.layout = layout; view.scale = scale
-        if changed { view.setNeedsDisplay() }
+private struct WallpaperLayerSurface: UIViewRepresentable {
+    @ObservedObject var model: WallpaperEditorModel
+    let editsBackground: Bool
+    let editable: Bool
+    let interaction: EditorInteractionContext
+    func makeUIView(context: Context) -> WallpaperLayerView { WallpaperLayerView() }
+    func updateUIView(_ view: WallpaperLayerView, context: Context) {
+        guard !view.isTracking else { return }
+        view.settings = model.settings; view.template = model.layout
+        view.backgroundMode = editsBackground; view.editingEnabled = editable && !model.busy
+        view.setPhoto(model.livePhoto?.image)
+        view.crop = PhotoCrop(zoom: model.settings.backgroundZoom, panX: model.settings.backgroundPanX, panY: model.settings.backgroundPanY)
+        view.blurLayer.contents = model.liveBlurPhoto?.image ?? model.livePhoto?.image
+        view.glyphs.configure(settings: model.settings, appearance: model.appearance, layout: model.layout)
+        view.onBegin = { interaction.begin("canvas") }
+        view.onFinish = { [weak view] crop in
+            guard let view else { interaction.end(); return }
+            var next = view.settings
+            next.backgroundZoom = crop.zoom; next.backgroundPanX = crop.panX; next.backgroundPanY = crop.panY
+            model.settings = next
+            interaction.end()
+        }
+        view.updateLayers()
     }
 }
-private final class GlyphUIView: UIView {
-    var settings: WallpaperSettings?
-    var appearance = TodoAppearance()
-    var items: [TodoItem] = []
-    var layout: WallpaperLayout?
-    var scale: CGFloat = 1
+private final class WallpaperLayerView: PhotoMotionView {
+    var settings = WallpaperSettings()
+    var template: WallpaperLayout?
+    var backgroundMode = true
+    let panel = UIView()
+    let blurLayer = CALayer()
+    let tintLayer = CALayer()
+    let highlightLayer = CAGradientLayer()
+    let glyphs = WallpaperGlyphUIView()
+    private var panelStart: WallpaperSettings?
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        panel.isUserInteractionEnabled = false; panel.clipsToBounds = true
+        panel.layer.addSublayer(blurLayer); panel.layer.addSublayer(tintLayer); panel.layer.addSublayer(highlightLayer)
+        panel.addSubview(glyphs); addSubview(panel)
+        panel.layer.cornerCurve = .continuous; blurLayer.contentsGravity = .resize
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func updateLayers() {
+        super.updateLayers()
+        guard let template, bounds.width > 0 else { panel.isHidden = true; return }
+        panel.isHidden = false
+        let positioned = template.positioned(using: settings)
+        let scale = bounds.width / 390
+        let rect = positioned.panel.applying(CGAffineTransform(scaleX: scale, y: scale))
+        withoutLayerAnimation {
+            panel.frame = rect; panel.layer.cornerRadius = settings.cornerRadius * scale
+            panel.layer.borderColor = UIColor.white.withAlphaComponent(settings.borderOpacity).cgColor
+            panel.layer.borderWidth = 0.8 * scale
+            blurLayer.isHidden = image == nil
+            blurLayer.frame = imageLayer.frame.offsetBy(dx: -rect.minX, dy: -rect.minY)
+            tintLayer.frame = panel.bounds
+            tintLayer.backgroundColor = (settings.darkGlass ? UIColor.black : .white).withAlphaComponent(settings.glassOpacity).cgColor
+            highlightLayer.frame = panel.bounds
+            highlightLayer.colors = [UIColor.white.withAlphaComponent(settings.highlight).cgColor, UIColor.clear.cgColor]
+            glyphs.frame = panel.bounds; glyphs.drawScale = scale
+        }
+    }
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard editingEnabled else { return false }
+        if backgroundMode { return image != nil }
+        return gestureRecognizer === panRecognizer && panel.frame.contains(gestureRecognizer.location(in: self))
+    }
+    override func panGesture(_ gesture: UIPanGestureRecognizer) {
+        if backgroundMode { super.panGesture(gesture); return }
+        if gesture.state == .began { panelStart = settings; begin(gesture) }
+        if gesture.state == .changed || gesture.state == .began, let template {
+            let delta = gesture.translation(in: self)
+            let rect = template.positioned(using: settings).panel
+            settings.customPosition = true
+            var x = rect.midX / 390 + delta.width / max(1, bounds.width)
+            var y = rect.midY / template.canvas.height + delta.height / max(1, bounds.height)
+            if abs(x - 0.5) * bounds.width < 3 { x = 0.5 }
+            if abs(y - 0.5) * bounds.height < 3 { y = 0.5 }
+            settings.panelX = min(1, max(0, x)); settings.panelY = min(1, max(0, y))
+            gesture.setTranslation(.zero, in: self); updateLayers()
+        }
+        if [.ended, .cancelled, .failed].contains(gesture.state) {
+            if gesture.state != .ended, let panelStart { settings = panelStart }
+            finish(gesture); panelStart = nil
+        }
+    }
+}
+private final class WallpaperGlyphUIView: UIView {
+    private var settings: WallpaperSettings?
+    private var appearance = TodoAppearance()
+    private var template: WallpaperLayout?
+    var drawScale: CGFloat = 1 { didSet { if abs(oldValue - drawScale) > 0.0001 { setNeedsDisplay() } } }
+    override init(frame: CGRect) {
+        super.init(frame: frame); isOpaque = false; backgroundColor = .clear
+        isUserInteractionEnabled = false; clipsToBounds = true; contentMode = .redraw
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    func configure(settings: WallpaperSettings, appearance: TodoAppearance, layout: WallpaperLayout?) {
+        let changed = self.settings?.glyphKey != settings.glyphKey || self.appearance.defaultMarker != appearance.defaultMarker ||
+            self.appearance.markerStyle != appearance.markerStyle || self.template?.rows.map(\.item) != layout?.rows.map(\.item)
+        self.settings = settings; self.appearance = appearance; template = layout
+        if changed { setNeedsDisplay() }
+    }
     override func draw(_ rect: CGRect) {
-        guard let context = UIGraphicsGetCurrentContext(), let settings, let layout else { return }
+        guard let context = UIGraphicsGetCurrentContext(), let settings, let template else { return }
         context.saveGState(); defer { context.restoreGState() }
-        context.translateBy(x: 0, y: bounds.height)
-        context.scaleBy(x: scale, y: -scale)
-        context.translateBy(x: -layout.panel.minX, y: -(layout.canvas.height - layout.panel.maxY))
-        WallpaperRenderer.drawContent(layout: layout, settings: settings, appearance: appearance, context: context)
+        context.translateBy(x: 0, y: bounds.height); context.scaleBy(x: drawScale, y: -drawScale)
+        context.translateBy(x: -template.panel.minX, y: -(template.canvas.height - template.panel.maxY))
+        WallpaperRenderer.drawContent(layout: template, settings: settings, appearance: appearance, context: context)
     }
 }

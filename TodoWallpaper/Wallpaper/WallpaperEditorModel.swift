@@ -12,10 +12,11 @@ struct WallpaperShareFile: Identifiable {
 @MainActor
 final class WallpaperEditorModel: ObservableObject {
     @Published var settings = WallpaperSettings() {
-        didSet { if ready { schedulePreview(); scheduleSave() } }
+        didSet { if ready && oldValue != settings { schedulePreview(); scheduleSave() } }
     }
     @Published private(set) var preview: WallpaperRendered?
     @Published private(set) var livePhoto: WallpaperLivePhoto?
+    @Published private(set) var liveBlurPhoto: WallpaperLivePhoto?
     @Published private(set) var layout: WallpaperLayout?
     @Published private(set) var appearance = TodoAppearance()
     private var layoutKey: WallpaperSettings?
@@ -40,6 +41,8 @@ final class WallpaperEditorModel: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private var hasBootstrapped = false
     private var wantsExactPreview = false
+    private var blurTask: Task<Void, Never>?
+    private var blurKey = ""
 
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
@@ -165,6 +168,7 @@ final class WallpaperEditorModel: ObservableObject {
     }
 
     private func schedulePreview() {
+        scheduleLiveBlur()
         // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
         if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle {
             do {
@@ -175,7 +179,7 @@ final class WallpaperEditorModel: ObservableObject {
         previewTask?.cancel()
         // Ordinary editing uses native photo/text layers. Render the poster bitmap
         // only when the user asks for exact preview or explicitly exports.
-        guard wantsExactPreview else { isRendering = false; return }
+        guard wantsExactPreview else { if isRendering { isRendering = false }; return }
         isRendering = true
         let snapshot = settings, tasks = items, photo = photoURL, look = appearance
         previewTask = Task {
@@ -188,6 +192,22 @@ final class WallpaperEditorModel: ObservableObject {
             catch {
                 if !Task.isCancelled { previewError = error.localizedDescription; isRendering = false }
             }
+        }
+    }
+
+    private func scheduleLiveBlur() {
+        guard let photo = livePhoto else { blurTask?.cancel(); blurKey = ""; liveBlurPhoto = nil; return }
+        let key = "\(photoName ?? ""):\(settings.blurRadius):\(settings.backgroundZoom):\(settings.aspectRatio)"
+        guard key != blurKey else { return }
+        blurKey = key; blurTask?.cancel()
+        let snapshot = settings
+        blurTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(140)); try Task.checkCancellation()
+                let image = try await renderer.liveBlur(photo: photo, settings: snapshot)
+                try Task.checkCancellation(); liveBlurPhoto = image
+            } catch is CancellationError { }
+            catch { /* Live texture is an approximation; exact export reports real failures. */ }
         }
     }
 

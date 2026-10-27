@@ -156,6 +156,50 @@ enum NativeUIProbe {
                     "Top-right count pixels actually follow the summary switch")
             }
             try require(headingHashes.count == 2, "Summary toggle changes native Widget output")
+            // The production gesture display path updates retained CA layers only.
+            let motion = PhotoMotionView(frame: CGRect(x: 0, y: 0, width: 170, height: 170))
+            motion.setPhoto(decodedPhoto)
+            var displayCommits = 0; motion.onFinish = { _ in displayCommits += 1 }
+            let motionStarted = Date.timeIntervalSinceReferenceDate
+            for index in 0..<600 {
+                motion.crop = PhotoCrop(zoom: 2, panX: Double(index % 100) / 50 - 1, panY: 0)
+                motion.updateLayers()
+            }
+            let motionMilliseconds = (Date.timeIntervalSinceReferenceDate - motionStarted) * 1000
+            try require(displayCommits == 0, "Motion frames never commit editor state or trigger persistence")
+            motion.onFinish(motion.crop)
+            try require(displayCommits == 1, "One finished gesture owns one commit")
+            let halves = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 60), format: sampleFormat).pngData { drawing in
+                UIColor.red.setFill(); drawing.fill(CGRect(x: 0, y: 0, width: 60, height: 60))
+                UIColor.blue.setFill(); drawing.fill(CGRect(x: 60, y: 0, width: 60, height: 60))
+            }
+            let halvesName = try await WidgetPhotoStore().importPhoto(halves, sharedDirectory: sharedPhotoFixture)
+            var croppedStyle = WidgetAppearance(); croppedStyle.theme = .light; croppedStyle.backdrop = .photo
+            croppedStyle.backgroundPhotoName = halvesName
+            for pan in [-1.0, 1.0] {
+                croppedStyle.backgroundCrop = PhotoCrop(panX: pan)
+                let image = try render(WidgetBackgroundView(style: croppedStyle, sharedDirectory: sharedPhotoFixture)
+                    .frame(width: 170, height: 170), name: "widget-crop-\(pan)", directory: output)
+                let bytes = [UInt8](try pixels(image)); let center = ((image.height / 2) * image.width + image.width / 2) * 4
+                try require(pan < 0 ? Int(bytes[center+2]) > Int(bytes[center]) + 100 : Int(bytes[center]) > Int(bytes[center+2]) + 100,
+                    "Real Widget pixels follow normalized photo pan")
+            }
+            croppedStyle.backgroundPhotoOpacity = 0
+            let transparent = try render(WidgetBackgroundView(style: croppedStyle, sharedDirectory: sharedPhotoFixture)
+                .frame(width: 170, height: 170), name: "widget-photo-opacity-zero", directory: output)
+            let transparentBytes = [UInt8](try pixels(transparent)); let tc = ((transparent.height / 2) * transparent.width + transparent.width / 2) * 4
+            try require(transparentBytes[tc] > 240 && transparentBytes[tc+1] > 240 && transparentBytes[tc+2] > 240,
+                "Photo opacity zero reveals light theme base")
+            var darkLook = TodoAppearance(); darkLook.widget.theme = .dark
+            let darkImage = try render(TodoWidgetContent(document: TodoDocument(items: []), appearance: darkLook,
+                error: nil, family: .medium, interactive: false).padding(16).frame(width: 364, height: 170)
+                .background { WidgetBackgroundView(style: darkLook.widget) }.environment(\.colorScheme, .light),
+                name: "widget-dark-on-system-light", directory: output)
+            let darkBytes = [UInt8](try pixels(darkImage)); var whiteInk = 0
+            for i in stride(from: 0, to: darkBytes.count, by: 4) {
+                if min(darkBytes[i], min(darkBytes[i+1], darkBytes[i+2])) > 200 { whiteInk += 1 }
+            }
+            try require(darkBytes[0] < 50 && whiteInk > 100, "Dark Widget on light system keeps dark base and visible white text")
             var heartWidths: [String: Int] = [:]
             for size in [8, 10, 12, 16, 19, 20, 24, 32, 48] {
                 var style = MarkerStyle(); style.emojiSize = Double(size)
@@ -227,6 +271,10 @@ enum NativeUIProbe {
             try require((measuredFonts["a11y-max"] ?? 0) > (measuredFonts["standard"] ?? 0), "System font metrics grow with accessibility category")
             report.merge(["result": "passed", "small_heart_pixel_widths": heartWidths,
                 "ordinary_undo_40_steps_milliseconds_on_Simulator": undoMilliseconds,
+                "retained_photo_layer_600_updates_ms_on_Simulator": motionMilliseconds,
+                "gesture_display_frame_commits": 0, "gesture_end_commits": 1,
+                "widget_crop_opacity_and_mismatched_system_theme_pixels": "passed",
+                "performance_scope": "layer/model CPU callbacks, not real iPhone touch FPS",
                 "ordinary_undo_photo_loading_and_full_bitmap_work": "none",
                 "live_wallpaper_marker_ownership": "passed", "widget_header_summary_and_photo_pixels": "passed", "text_effect_pixel_hashes": effectHashes,
                 "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",

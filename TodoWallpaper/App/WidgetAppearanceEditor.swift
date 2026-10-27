@@ -27,6 +27,9 @@ struct WidgetAppearanceEditor: View {
     @State private var showHelp = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var importingPhoto = false
+    @State private var cropPhoto = false
+    @State private var chooseAlbum = false
+    @State private var previewDay = 0
     private let photos = WidgetPhotoStore()
     @State private var previousWidgetMarker: TodoMarker?
     @Environment(\.colorScheme) private var systemScheme
@@ -34,6 +37,10 @@ struct WidgetAppearanceEditor: View {
     private var widget: Binding<WidgetAppearance> {
         Binding(get: { store.appearance.widget }, set: { var next = store.appearance; next.widget = $0; store.setAppearance(next) })
     }
+    private var photoCrop: Binding<PhotoCrop> {
+        Binding(get: { store.appearance.widget.photoCrop }, set: { widget.wrappedValue.backgroundCrop = $0 })
+    }
+    private var photoDate: Date { Calendar.current.date(byAdding: .day, value: previewDay, to: .now) ?? .now }
     private var heading: Binding<WidgetHeaderAppearance> {
         Binding(get: { store.appearance.widget.heading }, set: { widget.wrappedValue.header = $0 })
     }
@@ -82,7 +89,7 @@ struct WidgetAppearanceEditor: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
-                    .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil)
+                    .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil || importingPhoto)
                     .accessibilityIdentifier("widget.undo")
                 Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("小组件帮助")
             }
@@ -113,16 +120,25 @@ struct WidgetAppearanceEditor: View {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
                     var next = store.appearance.widget
-                    next.backgroundPhotoName = name; next.backdrop = .photo
+                    next.backgroundPhotoName = name; next.backdrop = .photo; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
                     widget.wrappedValue = next
                 } catch { self.error = error.localizedDescription }
             }
         }
-        .onChange(of: tool) { _, _ in edits.finish(editState) }
+        .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
+        .onChange(of: store.appearance.widget.backdrop) { _, _ in cropPhoto = false }
         .onChange(of: advanced) { _, _ in edits.finish(editState) }
         .onChange(of: store.items.map(\.id)) { _, ids in if let selectedTaskID, !ids.contains(selectedTaskID) { self.selectedTaskID = nil } }
         .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance() }
         .sheet(isPresented: $showHelp) { help }
+        .sheet(isPresented: $chooseAlbum) {
+            WidgetAlbumPicker { rotation in
+                var next = store.appearance.widget
+                next.photoRotation = rotation; next.backgroundPhotoName = rotation.photos.first
+                next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop()
+                widget.wrappedValue = next; previewDay = 0; store.flushAppearance()
+            }
+        }
         .alert("样式", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("好", role: .cancel) { }
         } message: { Text(error ?? "") }
@@ -177,7 +193,13 @@ struct WidgetAppearanceEditor: View {
                     onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID, onPreviewHeader: { tool = .header })
                     .padding(16)
                     .frame(width: family.width, height: family.height)
-                    .background { WidgetBackgroundView(style: store.appearance.widget) }
+                    .allowsHitTesting(!cropPhoto)
+                    .background {
+                        if cropPhoto && store.appearance.widget.backdrop == .photo && !store.appearance.widget.materialEnabled, let image = WidgetPhotoCache.image(named: store.appearance.widget.photoName(at: photoDate)) {
+                            WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: store.appearance.widget.photoOpacity,
+                                background: scheme == .dark ? UIColor(white: 0.09, alpha: 1) : .white)
+                        } else { WidgetBackgroundView(style: store.appearance.widget, date: photoDate) }
+                    }
                     .environment(\.colorScheme, scheme)
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .scaleEffect(scale)
@@ -193,20 +215,46 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var themeControls: some View {
         Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
-        if store.appearance.widget.backdrop == .photo {
-            PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
-                Label("选择或更换照片", systemImage: "photo")
-            }.buttonStyle(.bordered).disabled(importingPhoto)
-            if importingPhoto { ProgressView("正在处理照片…") }
-            if store.appearance.widget.backgroundPhotoName != nil {
-                Button("移除照片") {
-                    var next = store.appearance.widget; next.backgroundPhotoName = nil; next.backdrop = .system
-                    widget.wrappedValue = next
+        Toggle("系统材质背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
+            widget.wrappedValue.systemMaterial = $0; cropPhoto = false
+        }))
+        if store.appearance.widget.materialEnabled {
+            Text("使用系统材质请求。桌面默认/深色模式的实际合成由 iOS 决定；透明图标模式仍交给系统处理。")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
+            if store.appearance.widget.backdrop == .photo {
+                PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
+                    Label("选择或更换照片", systemImage: "photo")
+                }.buttonStyle(.bordered).disabled(importingPhoto)
+                Button("选择相册，每天换一张", systemImage: "photo.stack") { chooseAlbum = true }
+                if importingPhoto { ProgressView("正在处理照片…") }
+                if let rotation = store.appearance.widget.photoRotation {
+                    Toggle("每日轮换 · \(rotation.title)", isOn: Binding(get: { store.appearance.widget.photoRotation?.enabled ?? false }, set: {
+                        widget.wrappedValue.photoRotation?.enabled = $0; previewDay = 0
+                    }))
+                    if rotation.enabled {
+                        Button("预览下一张") { previewDay += 1 }
+                        Text("\(rotation.photos.count) 张；裁剪与透明度用于整个相册。相册变动后重新选择同步。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if store.appearance.widget.photoName(at: photoDate) != nil {
+                    Toggle("手指调整照片", isOn: $cropPhoto)
+                    PreciseSlider(title: "照片缩放", value: photoCrop.zoom, range: 1...4, standard: 1, precision: 2)
+                    PreciseSlider(title: "照片不透明度", value: Binding(get: { store.appearance.widget.photoOpacity }, set: { widget.wrappedValue.backgroundPhotoOpacity = $0 }), range: 0...1, standard: 1, precision: 2)
+                    if advanced {
+                        PreciseSlider(title: "照片水平位置", value: photoCrop.panX, range: -1...1, standard: 0, precision: 2)
+                        PreciseSlider(title: "照片垂直位置", value: photoCrop.panY, range: -1...1, standard: 0, precision: 2)
+                    }
+                    Button("恢复照片构图") { photoCrop.wrappedValue = PhotoCrop() }
+                    Button("移除照片") {
+                        var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation?.enabled = false; next.backdrop = .system
+                        widget.wrappedValue = next; cropPhoto = false
+                    }
                 }
             }
-            Text("照片等比填充，仅保存在本机共享目录。").font(.caption).foregroundStyle(.secondary)
         }
         if advanced {
             Text("网格不会出现在主屏幕。系统外观会影响实际小组件背景。")
@@ -248,7 +296,8 @@ struct WidgetAppearanceEditor: View {
         }
         Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        Picker("完成文字", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
+        Text("文字点按后效果").font(.subheadline)
+        Picker("文字点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.menu)
         if store.appearance.widget.textCompletion == .color {
@@ -299,6 +348,7 @@ struct WidgetAppearanceEditor: View {
         catch { self.error = error.localizedDescription }
     }
     @ViewBuilder private var contentControls: some View {
+        Toggle("显示左下角说明", isOn: Binding(get: { store.appearance.widget.footerVisible }, set: { widget.wrappedValue.showsFooter = $0 }))
         Toggle("紧凑布局", isOn: widget.compact)
         if advanced { PreciseSlider(title: "行距", value: widget.spacing, range: 0...12, standard: 5) }
         Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
