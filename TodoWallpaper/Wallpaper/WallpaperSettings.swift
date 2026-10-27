@@ -45,6 +45,12 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     var alignment = WallpaperAlignment.leading
     var completionStyle = WallpaperCompletionStyle.strikeAndDim
     var maximumLines: Int = 4
+    // Missing in older drafts: keep their existing per-task marker behavior.
+    var usesTaskMarkers: Bool?
+    var inheritsTaskMarkers: Bool { usesTaskMarkers ?? true }
+    func marker(for item: TodoItem, appearance: TodoAppearance) -> TodoMarker {
+        inheritsTaskMarkers ? appearance.marker(for: item) : appearance.defaultMarker
+    }
 
     func validated() throws -> WallpaperSettings {
         guard size.isValid, aspectRatio.isFinite, (0.25...2).contains(aspectRatio) else { throw WallpaperError.invalidSize }

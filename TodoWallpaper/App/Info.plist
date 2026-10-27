@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-    <key>CFBundleDisplayName</key><string>Todo Wallpaper</string>
-    <key>NSPhotoLibraryAddUsageDescription</key><string>仅在您点击保存时，将生成的壁纸添加到相册。</string>
-    <key>ITSAppUsesNonExemptEncryption</key><false/>
-    <key>TodoAppGroupIdentifier</key><string>group.org.todowallpaper.app</string>
-    <key>UISupportedInterfaceOrientations</key><array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-    </array>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Todo Wallpaper</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>仅在您点击保存时，将生成的壁纸添加到相册。</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>TodoAppGroupIdentifier</key>
+	<string>group.org.todowallpaper.app</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>读取日历日程，供你选择并导入为本机待办；不会修改原日程。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>读取提醒事项，供你选择并导入为本机待办；不会修改原提醒事项。</string>
+</dict>
+</plist>

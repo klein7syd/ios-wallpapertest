@@ -54,6 +54,34 @@ struct TodoRepository {
         }
     }
 
+    /// A single locked transaction for selected local imports. Stable source IDs
+    /// make repeated imports idempotent; existing tasks are never rewritten.
+    func importItems(_ candidates: [TodoItem]) throws -> TodoDocument {
+        guard candidates.count <= 500 else { throw TodoDataError.invalidDocument }
+        for item in candidates { _ = try validatedTitle(item.title); try item.marker?.validate() }
+        return try update { document in
+            var known = Set(document.items.map(\.id))
+            for item in candidates where known.insert(item.id).inserted { document.items.append(item) }
+        }
+    }
+
+    /// Compare before writing, then restore all changed markers together. Undo
+    /// cannot overwrite a more recent task edit made by another surface.
+    func updateMarkers(_ changes: [TodoMarkerUpdate]) throws -> TodoDocument {
+        for change in changes { try change.marker?.validate() }
+        return try update { document in
+            guard Set(changes.map(\.id)).count == changes.count else { throw TodoDataError.invalidDocument }
+            for change in changes {
+                guard let item = document.items.first(where: { $0.id == change.id }), item.marker == change.expected else { throw TodoDataError.missingItem }
+            }
+            for change in changes {
+                guard let index = document.items.firstIndex(where: { $0.id == change.id }) else { throw TodoDataError.missingItem }
+                document.items[index].marker = change.marker
+                document.items[index].updatedAt = .now
+            }
+        }
+    }
+
     func delete(ids: Set<UUID>) throws -> TodoDocument {
         try update { document in
             guard ids.isSubset(of: Set(document.items.map(\.id))) else { throw TodoDataError.missingItem }

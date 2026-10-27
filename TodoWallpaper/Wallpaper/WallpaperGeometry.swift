@@ -36,6 +36,8 @@ extension WallpaperSettings {
         copy.backgroundZoom = 1; copy.backgroundPanX = 0; copy.backgroundPanY = 0
         copy.glassOpacity = 0; copy.blurRadius = 0; copy.borderOpacity = 0; copy.highlight = 0
         copy.cornerRadius = 0; copy.darkGlass = false
+        // Legacy completion effects are retained in JSON but never affect static wallpaper.
+        copy.completionStyle = .check
         return copy
     }
 }

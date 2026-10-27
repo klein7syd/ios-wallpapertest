@@ -114,7 +114,7 @@ enum WallpaperRenderer {
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
         let visibleItems = Array(settings.filtered(items).prefix(settings.maximumItems))
         let markerStyle = appearance.markerStyle
-        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: appearance.marker(for: $0), style: markerStyle, completed: false) }.max() ?? 0
+        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: settings.marker(for: $0, appearance: appearance), style: markerStyle, completed: false) }.max() ?? 0
         let markerColumn: CGFloat = markerWidth > 0 ? CGFloat(markerWidth + markerStyle.gap) : 0
         let textWidth: CGFloat = max(12, panelWidth - 2 * padding - markerColumn)
         let itemSpacing = CGFloat(settings.itemSpacing)
@@ -122,15 +122,14 @@ enum WallpaperRenderer {
         let candidates = Array(filtered.prefix(settings.maximumItems))
         var blocks: [(TodoItem, WallpaperTextBlock)] = []
         for item in candidates {
-            let opacity: Double = item.isCompleted && settings.completionStyle != .check ? 0.5 : 1
-            blocks.append((item, text(item.title, width: textWidth, settings: settings, opacity: opacity)))
+            blocks.append((item, text(item.title, width: textWidth, settings: settings)))
         }
         let empty = filtered.isEmpty ? text(items.isEmpty ? "还没有待办" : "今天的待办都完成了",
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
         func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
-            let extent = CGFloat(MarkerDrawing.extent(marker: appearance.marker(for: pair.0), style: markerStyle, completed: false))
+            let extent = CGFloat(MarkerDrawing.extent(marker: settings.marker(for: pair.0, appearance: appearance), style: markerStyle, completed: false))
             let lineHeight = pair.1.ascent + CTFontGetDescent(pair.1.font)
             let textOffset = max(0, (extent - lineHeight) / 2) + max(0, -CGFloat(markerStyle.verticalOffset))
             let markerOffset = max(0, (lineHeight - extent) / 2) + max(0, CGFloat(markerStyle.verticalOffset))
@@ -160,7 +159,7 @@ enum WallpaperRenderer {
             used += spacing
             let top = panel.minY + padding + used
             rows.append(WallpaperRow(item: pair.0, block: pair.1, top: top + metrics.textOffset,
-                marker: appearance.marker(for: pair.0), markerTop: top + metrics.markerOffset, markerSize: metrics.extent))
+                marker: settings.marker(for: pair.0, appearance: appearance), markerTop: top + metrics.markerOffset, markerSize: metrics.extent))
             used += metrics.height
         }
         let hidden = max(0, filtered.count - rows.count)
@@ -311,15 +310,13 @@ enum WallpaperRenderer {
         context.clip(to: panel)
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panel.width - 50) / 2))
         for row in layout.rows {
-            let opacity: Double = row.item.isCompleted && settings.completionStyle != .check ? 0.5 : 1
-            let rect = CGRect(x: panel.minX + padding, y: layout.canvas.height - row.markerTop - row.markerSize,
+            let placement = rowPlacement(row, layout: layout, settings: settings)
+            let rect = CGRect(x: placement.markerX, y: layout.canvas.height - row.markerTop - row.markerSize,
                               width: row.markerSize, height: row.markerSize)
             MarkerDrawing.draw(marker: row.marker, completed: false, style: appearance.markerStyle,
                                textColor: settings.textColor, rect: rect, context: context)
-            drawText(row.block, in: context, x: panel.minX + padding + layout.markerColumn, top: row.top,
-                width: layout.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment,
-                strike: row.item.isCompleted && settings.completionStyle == .strikeAndDim,
-                strikeColor: color(settings.textColor, opacity: opacity))
+            drawText(row.block, in: context, x: placement.textX, top: row.top,
+                width: placement.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         if let empty = layout.emptyText {
             drawText(empty, in: context, x: panel.minX + padding, top: layout.emptyTop,
@@ -330,6 +327,19 @@ enum WallpaperRenderer {
                 width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         context.restoreGState()
+    }
+
+    /// Align the marker and its text as a group. Aligning text alone inside a
+    /// shrinking column cancels gap changes in trailing alignment.
+    static func rowPlacement(_ row: WallpaperRow, layout: WallpaperLayout, settings: WallpaperSettings)
+        -> (markerX: CGFloat, textX: CGFloat, textWidth: CGFloat) {
+        let padding = min(CGFloat(settings.padding), max(8, (layout.panel.width - 50) / 2))
+        let measured = row.block.lines.map { CGFloat(CTLineGetTypographicBounds($0, nil, nil, nil)) }.max() ?? 0
+        let textWidth = min(layout.textWidth, max(1, ceil(measured)))
+        let inner = layout.panel.width - 2 * padding
+        let groupWidth = layout.markerColumn + textWidth
+        let start = layout.panel.minX + padding + max(0, inner - groupWidth) * settings.alignment.flush
+        return (start, start + layout.markerColumn, textWidth)
     }
 
     private static func drawText(_ block: WallpaperTextBlock, in context: CGContext, x: CGFloat,

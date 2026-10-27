@@ -83,9 +83,61 @@ enum NativeUIProbe {
             let retainedSample = try Data(contentsOf: sampleURL)
             try require(retainedSample == sample, "Undo keeps source image bytes unchanged")
             try await editor.restoreEditorState(settings: initialSettings, photoName: initialName)
+            await editor.saveNow()
             let restored = try await localFiles.load()
             try require(restored.draft.settings == initialSettings && restored.draft.photoFileName == initialName,
                 "Restored editor state persists through the production draft store")
+            // Parameter undo must not enter the photo-loading path or queue full bitmaps.
+            let undoStarted = Date.timeIntervalSinceReferenceDate
+            for index in 0..<40 {
+                var snapshot = initialSettings; snapshot.panelX = Double(index) / 40; snapshot.customPosition = true
+                try await editor.restoreEditorState(settings: snapshot, photoName: initialName)
+                try require(!editor.isImporting && !editor.isRendering, "Ordinary undo avoids photo/bitmap work")
+            }
+            let undoMilliseconds = (Date.timeIntervalSinceReferenceDate - undoStarted) * 1000
+            try await editor.restoreEditorState(settings: initialSettings, photoName: initialName)
+            await editor.saveNow()
+            let ownershipItem = TodoItem(id: UUID(), title: "已有单项 Emoji", marker: TodoMarker(kind: .emoji, emoji: "❤️"),
+                isCompleted: false, createdAt: .now, updatedAt: .now)
+            editor.updateItems([ownershipItem]); editor.settings.usesTaskMarkers = false
+            var independent = TodoAppearance(); independent.defaultMarker = TodoMarker(kind: .square)
+            independent.widget.markerOverride = TodoMarker(kind: .emoji, emoji: "🌙")
+            editor.updateAppearance(independent)
+            try require(editor.layout?.rows.first?.marker.kind == .square, "Live model draws edited wallpaper marker despite task/Widget overrides")
+            editor.settings.usesTaskMarkers = true
+            try require(editor.layout?.rows.first?.marker.emoji == "❤️", "Live model restores preserved individual Emoji")
+            try await editor.restoreEditorState(settings: initialSettings, photoName: initialName)
+            editor.updateItems([]); editor.updateAppearance(TodoAppearance()); await editor.saveNow()
+            let sharedPhotoFixture = output.appendingPathComponent("widget-photo-fixture", isDirectory: true)
+            let widgetPhoto = try await WidgetPhotoStore().importPhoto(sample, sharedDirectory: sharedPhotoFixture)
+            guard let decodedPhoto = WidgetPhotoCache.image(named: widgetPhoto, sharedDirectory: sharedPhotoFixture) else {
+                throw NSError(domain: "WidgetPhotoReadback", code: 1)
+            }
+            try require(decodedPhoto.width == 40 && decodedPhoto.height == 60, "Widget photo roundtrip reads generated shared reference")
+            var photoStyle = WidgetAppearance(); photoStyle.backdrop = .photo; photoStyle.backgroundPhotoName = widgetPhoto
+            let photoImage = try render(WidgetBackgroundView(style: photoStyle, sharedDirectory: sharedPhotoFixture)
+                .frame(width: 170, height: 170), name: "widget-photo-background", directory: output)
+            let photoBytes = [UInt8](try pixels(photoImage))
+            let center = ((photoImage.height / 2) * photoImage.width + photoImage.width / 2) * 4
+            try require(Int(photoBytes[center+2]) > Int(photoBytes[center]) + 50, "Actual Widget background pixels contain the selected blue photo")
+            var headingLook = TodoAppearance(); headingLook.widget.completed = .all
+            headingLook.widget.header = WidgetHeaderAppearance(text: "今天的计划", followsTextColor: false,
+                color: WallpaperColor(red: 1, green: 0, blue: 0), fontSize: 24, horizontalPosition: 0.5)
+            var headingHashes = Set<String>()
+            for summary in [true, false] {
+                headingLook.widget.header?.showsSummary = summary
+                let image = try render(TodoWidgetContent(document: TodoDocument(items: []), appearance: headingLook,
+                    error: nil, family: .medium, interactive: false).padding(16).frame(width: 364, height: 170)
+                    .background(.white).environment(\.colorScheme, .light),
+                    name: "widget-custom-header-\(summary ? "summary" : "no-summary")", directory: output)
+                headingHashes.insert(SHA256.hash(data: try pixels(image)).map { String(format: "%02x", $0) }.joined())
+                let bytes = [UInt8](try pixels(image)); var redPixels = 0
+                for i in stride(from: 0, to: bytes.count, by: 4) {
+                    if Int(bytes[i]) - max(Int(bytes[i+1]), Int(bytes[i+2])) > 80 { redPixels += 1 }
+                }
+                try require(redPixels > 100, "Independent red header is actually rendered")
+            }
+            try require(headingHashes.count == 2, "Summary toggle changes native Widget output")
             var heartWidths: [String: Int] = [:]
             for size in [8, 10, 12, 16, 19, 20, 24, 32, 48] {
                 var style = MarkerStyle(); style.emojiSize = Double(size)
@@ -155,7 +207,10 @@ enum NativeUIProbe {
                 }
             }
             try require((measuredFonts["a11y-max"] ?? 0) > (measuredFonts["standard"] ?? 0), "System font metrics grow with accessibility category")
-            report.merge(["result": "passed", "small_heart_pixel_widths": heartWidths, "text_effect_pixel_hashes": effectHashes,
+            report.merge(["result": "passed", "small_heart_pixel_widths": heartWidths,
+                "ordinary_undo_40_steps_milliseconds_on_Simulator": undoMilliseconds,
+                "ordinary_undo_photo_loading_and_full_bitmap_work": "none",
+                "live_wallpaper_marker_ownership": "passed", "widget_header_summary_and_photo_pixels": "passed", "text_effect_pixel_hashes": effectHashes,
                 "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",
                 "UIFontMetrics_point_sizes": measuredFonts, "widget_type_size_matrix_images": matrix,
                 "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",

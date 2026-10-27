@@ -33,6 +33,10 @@ struct TodoWallpaperApp: App {
                         navigation.selectPage(.about)
                         return
                     }
+                    if ProcessInfo.processInfo.arguments.contains("--native-wallpaper-marker") {
+                        navigation.selectTool(.marker)
+                        return
+                    }
                     if ProcessInfo.processInfo.arguments.contains("--native-wallpaper-panel") {
                         navigation.selectTool(.panel)
                         return
@@ -82,6 +86,7 @@ struct TodoListView: View {
     @State private var editor: EditorRequest?
     @State private var displayError: DisplayError?
     @State private var confirmRecovery = false
+    @State private var importCalendar = false
 
     var body: some View {
         NavigationStack {
@@ -138,11 +143,16 @@ struct TodoListView: View {
                     EditButton().disabled(store.items.isEmpty || store.loadError != nil)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button { importCalendar = true } label: { Label("从日历或提醒事项导入", systemImage: "calendar.badge.plus") }
+                        .disabled(!store.hasLoaded || store.loadError != nil)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { editor = EditorRequest(item: nil) } label: {
                         Label("新增待办", systemImage: "plus")
                     }.disabled(!store.hasLoaded || store.loadError != nil)
                 }
             }
+            .sheet(isPresented: $importCalendar) { CalendarImportView(store: store) }
             .sheet(item: $editor) { request in
                 TodoEditorView(item: request.item) { title, marker in
                     if let item = request.item { try store.edit(id: item.id, title: title, marker: marker) }

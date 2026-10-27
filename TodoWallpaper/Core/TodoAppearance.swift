@@ -71,9 +71,28 @@ enum WidgetTheme: String, Codable, CaseIterable, Identifiable {
     var title: String { self == .system ? "跟随系统" : self == .light ? "亮色" : "深色" }
 }
 enum WidgetBackdrop: String, Codable, CaseIterable, Identifiable {
-    case system, solid
+    case system, solid, photo
     var id: String { rawValue }
-    var title: String { self == .system ? "系统背景" : "自定义底色" }
+    var title: String { self == .system ? "系统" : self == .solid ? "底色" : "照片" }
+}
+struct WidgetHeaderAppearance: Codable, Equatable, Sendable {
+    var text = "待办"
+    var showsTitle = true
+    var showsSummary = true
+    var followsTextColor = true
+    var color = WallpaperColor()
+    var font = WallpaperFont.system
+    var weight = WallpaperWeight.semibold
+    var fontSize: Double = 17
+    /// Position within the available title region, excluding the summary.
+    var horizontalPosition: Double = 0
+    var topInset: Double = 0
+    var visibleTitle: Bool { showsTitle && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    func validate() throws {
+        guard text.count <= 40, !text.contains(where: { $0.isNewline }), color.isValid,
+              (12...32).contains(fontSize), (0...1).contains(horizontalPosition),
+              (0...24).contains(topInset) else { throw AppearanceError.invalidStyle }
+    }
 }
 enum WidgetCompleted: String, Codable, CaseIterable, Identifiable {
     case recent, hidden, all
@@ -109,11 +128,16 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var completedTextStyle: WidgetTextCompletion?
     var completedTextColor: WallpaperColor?
     var showsSeparators: Bool?
+    var header: WidgetHeaderAppearance?
+    var backgroundPhotoName: String?
+    var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
     var separatesRows: Bool { showsSeparators ?? false }
     func validate() throws {
         try markerOverride?.validate(); try markerStyle.validate()
+        try header?.validate()
+        if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }
         guard (12...20).contains(fontSize), (0...12).contains(spacing), (1...10).contains(maximumItems),
               textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }
     }

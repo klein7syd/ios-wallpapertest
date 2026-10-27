@@ -7,6 +7,7 @@ struct WallpaperLiveCanvas: View {
     @ObservedObject var model: WallpaperEditorModel
     var editsBackground: Bool
     var editable = true
+    var previewScale: Double = 1
     @Environment(\.editorInteraction) private var interaction
     @State private var activeGestures = Set<String>()
     @State private var startPan: CGPoint?
@@ -17,7 +18,7 @@ struct WallpaperLiveCanvas: View {
     var body: some View {
         GeometryReader { proxy in
             let ratio = CGFloat(model.settings.aspectRatio)
-            let width = min(proxy.size.width, proxy.size.height * ratio)
+            let width = min(proxy.size.width, proxy.size.height * ratio) * CGFloat(min(1, max(0.55, previewScale)))
             let height = width / ratio
             let scale = width / 390
             ZStack(alignment: .topLeading) {
@@ -55,8 +56,9 @@ struct WallpaperLiveCanvas: View {
                 model.settings.backgroundZoom = min(4, max(1, (startZoom ?? 1) * Double(value)))
             }.onEnded { _ in startZoom = nil; end("zoom") })
             .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            .transaction { $0.animation = nil }
+            .transaction { if !activeGestures.isEmpty { $0.animation = nil } }
         }
+        .onDisappear { if !activeGestures.isEmpty { interaction.end(); activeGestures.removeAll() } }
     }
     @ViewBuilder private func background(scale: CGFloat) -> some View {
         let canvas = CGSize(width: 390, height: model.settings.logicalHeight)

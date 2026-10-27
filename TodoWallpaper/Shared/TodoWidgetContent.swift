@@ -13,11 +13,14 @@ struct TodoWidgetContent: View {
     var onPreviewToggle: ((UUID) -> Void)?
     var onPreviewMarker: ((UUID) -> Void)?
     var selectedTaskID: UUID?
+    var onPreviewHeader: (() -> Void)?
     @ScaledMetric(relativeTo: .body) private var bodyUnit = 15.0
     @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
     @ScaledMetric(relativeTo: .caption2) private var footerUnit = 11.0
     private var style: WidgetAppearance { appearance.widget }
     private var foreground: Color { style.followsSystemText ? .primary : style.textColor.swiftColor }
+    private var heading: WidgetHeaderAppearance { style.heading }
+    private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
     private var fontSize: Double { style.fontSize * bodyUnit / 15 }
     private var titleFont: CTFont { NativeTypography.font(family: style.font, weight: style.weight, size: fontSize) }
     private var lineHeight: Double {
@@ -36,18 +39,16 @@ struct TodoWidgetContent: View {
     var body: some View {
         GeometryReader { geometry in
             let items = document?.items ?? []
+            let headingMetrics = headerMetrics(width: geometry.size.width, height: geometry.size.height, items: items)
             let metrics = WidgetLayoutMetrics.make(items: style.rows(items, capacity: style.maximumItems),
                 appearance: appearance, family: family, width: geometry.size.width, height: geometry.size.height,
-                fontLineHeight: lineHeight, headerHeight: ceil(headerUnit * 1.25), footerHeight: ceil(footerUnit * 1.3))
+                fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("待办").font(.system(size: headerUnit, weight: .semibold))
-                    Spacer(minLength: 4)
-                    Text("\(items.filter { !$0.isCompleted }.count) 未完成")
-                        .font(.system(size: footerUnit)).lineLimit(1).opacity(0.7)
-                }.frame(height: metrics.headerHeight).clipped()
-                Color.clear.frame(height: metrics.spacing)
+                if headingMetrics.height > 0 {
+                    header(items: items, layout: headingMetrics)
+                    Color.clear.frame(height: metrics.spacing)
+                }
                 if document == nil {
                     Text(error ?? "请先打开 App 完成迁移").font(.system(size: footerUnit)).lineLimit(3)
                 } else if items.isEmpty {
@@ -78,6 +79,40 @@ struct TodoWidgetContent: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             .foregroundStyle(foreground).clipped()
         }
+    }
+    private func measure(_ text: String, font: CTFont) -> (width: Double, height: Double) {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text,
+            attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]) as CFAttributedString)
+        var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+        let width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
+        return (ceil(width) + 1, ceil(ascent + descent + leading) + 1)
+    }
+    private func headerMetrics(width: Double, height: Double, items: [TodoItem]) -> WidgetHeaderLayout {
+        let title = measure(heading.text, font: headingFont)
+        let summary = measure("\(items.filter { !$0.isCompleted }.count) 未完成",
+            font: NativeTypography.font(family: .system, weight: .regular, size: footerUnit))
+        return .make(style: heading, width: width, maximumHeight: height * 0.6,
+            measuredTitleWidth: title.width, titleLineHeight: title.height,
+            measuredSummaryWidth: summary.width, summaryHeight: summary.height)
+    }
+    private func header(items: [TodoItem], layout: WidgetHeaderLayout) -> some View {
+        ZStack(alignment: .topLeading) {
+            if heading.visibleTitle {
+                Text(heading.text).font(Font(headingFont))
+                    .foregroundStyle(heading.followsTextColor ? foreground : heading.color.swiftColor)
+                    .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
+                    .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
+                    .offset(x: layout.titleX, y: heading.topInset)
+                    .onTapGesture { if !interactive { onPreviewHeader?() } }
+                    .accessibilityLabel("小组件标题：\(heading.text)")
+            }
+            if heading.showsSummary {
+                Text("\(items.filter { !$0.isCompleted }.count) 未完成")
+                    .font(.system(size: footerUnit)).opacity(0.7).lineLimit(1).minimumScaleFactor(0.7)
+                    .frame(width: layout.summaryWidth, height: layout.height, alignment: .topTrailing)
+                    .offset(x: layout.summaryX)
+            }
+        }.frame(height: layout.height).clipped()
     }
     @ViewBuilder private func task(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         if interactive {

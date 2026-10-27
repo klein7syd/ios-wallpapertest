@@ -26,7 +26,7 @@ struct WidgetLayoutMetrics: Equatable {
         let spacing = style.spacing
         let separator = style.separatesRows ? 9.0 : 0
         let header = min(max(0, height), max(0, headerHeight))
-        let afterHeader = max(0, height - header - spacing)
+        let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
         let minimumRow = max(marker + vertical, fontLineHeight) + (style.compact ? 0 : 4)
         let footerFits = afterHeader >= minimumRow + footerHeight + spacing
         let footer = footerFits ? footerHeight : 0

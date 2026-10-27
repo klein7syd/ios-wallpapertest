@@ -42,6 +42,7 @@ struct EditorHistory<Value: Equatable> {
 
 enum EditorStandards {
     static let advancedKey = "editor.advancedControls.v1"
+    static let previewScaleKey = "editor.wallpaperPreviewScale.v1"
     static let wallpaperScale: ClosedRange<Double> = (10.0 / 18)...(38.0 / 18)
     static let widgetScale: ClosedRange<Double> = 0.8...(20.0 / 15)
     static func fraction(_ value: Double, in range: ClosedRange<Double>) -> Double {
@@ -62,4 +63,24 @@ enum EditorStandards {
         next.markerStyle = marker(current.markerStyle, scale: s)
         return next
     }
+}
+
+/// Hysteresis prevents chatter at the standard point while keeping motion continuous
+/// outside a narrow 4-point track region. Numeric entry remains exact and unsnapped.
+struct StandardDetent {
+    private(set) var isLatched = false
+    mutating func reset() { isLatched = false }
+    mutating func value(_ proposed: Double, standard: Double, range: ClosedRange<Double>, trackWidth: Double) -> Double {
+        let bounded = proposed.isFinite ? min(range.upperBound, max(range.lowerBound, proposed)) : standard
+        let unitsPerPoint = (range.upperBound - range.lowerBound) / max(80, trackWidth - 28)
+        let distance = abs(bounded - standard)
+        isLatched = distance <= unitsPerPoint * (isLatched ? 7 : 4)
+        return isLatched ? standard : bounded
+    }
+}
+
+struct TodoMarkerUpdate {
+    let id: UUID
+    let expected: TodoMarker?
+    let marker: TodoMarker?
 }

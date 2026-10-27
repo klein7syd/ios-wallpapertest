@@ -39,8 +39,7 @@ struct TodoWidgetView: View {
         TodoWidgetContent(document: entry.document, appearance: entry.appearance,
             error: entry.error, family: previewFamily)
             .containerBackground(for: .widget) {
-                if style.backdrop == .solid { style.panelColor.swiftColor }
-                else { Rectangle().fill(.background) }
+                WidgetBackgroundView(style: style)
             }
             .environment(\.colorScheme, scheme)
     }

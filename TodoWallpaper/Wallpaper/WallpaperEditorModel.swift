@@ -39,6 +39,7 @@ final class WallpaperEditorModel: ObservableObject {
     private var previewTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var hasBootstrapped = false
+    private var wantsExactPreview = false
 
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
@@ -61,8 +62,15 @@ final class WallpaperEditorModel: ObservableObject {
     }
 
     func updateAppearance(_ value: TodoAppearance) {
+        // Widget-only changes never invalidate wallpaper rendering.
+        guard appearance.defaultMarker != value.defaultMarker || appearance.markerStyle != value.markerStyle else { return }
         appearance = value
         if ready { schedulePreview() }
+    }
+    func requestExactPreview(_ enabled: Bool) {
+        wantsExactPreview = enabled
+        if enabled { schedulePreview() }
+        else { previewTask?.cancel(); isRendering = false }
     }
     var sourceIsSoft: Bool {
         guard let info = livePhoto?.info else { return false }
@@ -70,6 +78,7 @@ final class WallpaperEditorModel: ObservableObject {
         return needed > 1.01 || Double(max(info.width, info.height)) * needed > 6144
     }
     func updateItems(_ items: [TodoItem]) {
+        guard self.items != items else { return }
         self.items = items
         if ready { schedulePreview() }
     }
@@ -103,16 +112,20 @@ final class WallpaperEditorModel: ObservableObject {
     func restoreEditorState(settings next: WallpaperSettings, photoName name: String?) async throws {
         guard ready, !busy, !draftBlocked else { throw WallpaperError.renderingFailed }
         _ = try next.validated()
-        saveTask?.cancel(); isImporting = true
+        // Most undo steps touch only parameters. Apply to live layers immediately;
+        // do not read photos, write a draft or show an import overlay on this path.
+        if name == photoName {
+            settings = next
+            return
+        }
+        saveTask?.cancel()
+        isImporting = true
         defer { isImporting = false }
         let url = try await files.photoURL(for: name)
         let photo: WallpaperLivePhoto?
-        if name == photoName { photo = livePhoto }
-        else if let url { photo = try await renderer.loadPhoto(at: url) }
-        else { photo = nil }
-        try await files.save(WallpaperDraft(settings: next, photoFileName: name))
+        if let url { photo = try await renderer.loadPhoto(at: url) } else { photo = nil }
         photoURL = url; photoName = name; livePhoto = photo
-        settings = next; schedulePreview()
+        settings = next
     }
 
     func resetLayout() async {
@@ -156,10 +169,13 @@ final class WallpaperEditorModel: ObservableObject {
         if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle {
             do {
                 layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance)
-                layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance
+                layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance; previewError = nil
             } catch { previewError = error.localizedDescription }
         }
         previewTask?.cancel()
+        // Ordinary editing uses native photo/text layers. Render the poster bitmap
+        // only when the user asks for exact preview or explicitly exports.
+        guard wantsExactPreview else { isRendering = false; return }
         isRendering = true
         let snapshot = settings, tasks = items, photo = photoURL, look = appearance
         previewTask = Task {

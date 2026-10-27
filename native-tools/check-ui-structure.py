@@ -56,6 +56,18 @@ require('if model.hasPhoto' in wallpaper and 'if model.settings.customPosition' 
 require('DisclosureGroup' not in marker and '精细 RGB' not in marker and 'ColorPicker(' in marker, 'Color editing uses native picker plus swatches without extra RGB disclosure trees')
 for forbidden in ['UITabBar.appearance', 'setValue(', 'WebView', 'WKWebView']:
     require(all(forbidden not in source for source in [app,wallpaper,widget,marker]), f'No {forbidden} workaround in edited UI')
+require('Picker("完成文字"' not in wallpaper and 'strike: row.item.isCompleted' not in read('TodoWallpaper/Wallpaper/WallpaperRenderer.swift'), 'Static wallpaper has no completed-text interaction controls or rendering')
+require('rowPlacement(' in read('TodoWallpaper/Wallpaper/WallpaperRenderer.swift') and '标记与文字间距' in wallpaper + widget + marker, 'Marker and text group alignment shares the explicitly named gap')
+require('toggleInspector()' in wallpaper and 'value: navigation.inspectorExpanded' in wallpaper and '.transaction { $0.animation = nil }' not in read('TodoWallpaper/Wallpaper/WallpaperLiveCanvas.swift'), 'Inspector entry points share animation; canvas does not blanket-disable it')
+require('editor.wallpaperPreviewScale.v1' in read('TodoWallpaper/Core/EditorHistory.swift') and 'if advanced { PreciseSlider(title: "编辑预览大小"' in wallpaper, 'Editor preview-size preference is advanced-only, separate from exported composition')
+require('StandardDetent()' in marker and 'UISelectionFeedbackGenerator().selectionChanged()' in marker and 'value: sliding' in marker, 'Sliders capture the standard node with selection feedback, separate from numeric entry')
+require('wallpaperMarkerChoice' in wallpaper and 'usesTaskMarkers = false' in wallpaper and 'model.updateAppearance(store.appearance)' in wallpaper, 'Uniform wallpaper marker changes reach its own live model despite task overrides')
+require('WidgetHeaderAppearance' in read('TodoWallpaper/Core/TodoAppearance.swift') and 'headerControls' in widget and 'heading.showsSummary' in widget and 'Text("待办").font' not in shared, 'Widget title and summary are configurable in shared actual content')
+require('WidgetBackgroundView' in widget + extension and 'PhotosPicker(' in widget and 'WidgetPhotoStore' in widget, 'Widget preview and extension share the selected local photo background')
+require('CalendarImportView(store: store)' in app and 'requestFullAccessToEvents()' in read('TodoWallpaper/App/CalendarImportView.swift') and 'requestFullAccessToReminders()' in read('TodoWallpaper/App/CalendarImportView.swift'), 'Explicit Calendar/Reminders import uses native EventKit full-access APIs')
+require('func importItems(' in read('TodoWallpaper/Core/TodoRepository.swift') and 'func updateMarkers(' in read('TodoWallpaper/Core/TodoRepository.swift'), 'Import and marker undo use existing process-locked repository transactions')
+model = read('TodoWallpaper/Wallpaper/WallpaperEditorModel.swift')
+require('guard wantsExactPreview else' in model and model.index('if name == photoName {') < model.index('saveTask?.cancel()', model.index('func restoreEditorState')), 'Ordinary undo applies live settings before any photo I/O; whole bitmap previews are on demand')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')
@@ -64,7 +76,7 @@ for path, expected in protected.items():
     data = (root/path).read_bytes()
     if path.endswith(('.cmd','.ps1')):
         data = data.replace(b'\r\n', b'\n')
-    require(hashlib.sha256(data).hexdigest() == expected, f'Protected source unchanged: {path}')
+    require(hashlib.sha256(data).hexdigest() == expected, f'Protected source matches reviewed manifest: {path}')
 out = root/'TodoWallpaper/out'
 out.mkdir(exist_ok=True)
 (out/'ui-structure-checks.json').write_text(json.dumps({'result':'passed','checks':checks,

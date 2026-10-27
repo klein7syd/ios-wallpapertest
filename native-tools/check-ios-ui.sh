@@ -31,10 +31,12 @@ PY
 sleep 1
 xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-wallpaper-standard.png >/dev/null 2>&1
 # The following are actual app screens; no offscreen ScrollView snapshots count as UI evidence.
-for UI_SCREEN in wallpaper-advanced widget-standard widget-text widget-advanced about; do
+for UI_SCREEN in wallpaper-advanced wallpaper-marker widget-standard widget-text widget-header widget-advanced about; do
     xcrun simctl terminate "$UI_SIMULATOR" org.todowallpaper.app >/dev/null
     case "$UI_SCREEN" in
         wallpaper-advanced) UI_ARGS=(--native-wallpaper-panel --native-advanced) ;;
+        wallpaper-marker) UI_ARGS=(--native-wallpaper-marker --native-advanced) ;;
+        widget-header) UI_ARGS=(--native-widget-screen --native-widget-header --native-advanced) ;;
         widget-standard) UI_ARGS=(--native-widget-screen) ;;
         widget-text) UI_ARGS=(--native-widget-screen --native-widget-text) ;;
         widget-advanced) UI_ARGS=(--native-widget-screen --native-widget-text --native-advanced) ;;

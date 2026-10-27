@@ -31,8 +31,14 @@ final class TodoStore: ObservableObject {
     }
 
     func add(title: String, marker: TodoMarker? = nil) throws { accept(try activeRepository().add(title: title, marker: marker)) }
+    func importItems(_ items: [TodoItem]) throws { accept(try activeRepository().importItems(items)) }
+    func updateMarkers(_ changes: [TodoMarkerUpdate]) throws {
+        guard !changes.isEmpty else { return }
+        accept(try activeRepository().updateMarkers(changes))
+    }
     func edit(id: UUID, title: String, marker: TodoMarker?) throws { accept(try activeRepository().edit(id: id, title: title, marker: marker)) }
     func setAppearance(_ value: TodoAppearance) {
+        guard value != appearance else { return }
         do { try value.validate() } catch { appearanceError = error.localizedDescription; return }
         appearance = value
         appearanceTask?.cancel()

@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 private enum WidgetEditorTool: String, CaseIterable, Identifiable {
-    case theme = "主题", text = "文字", marker = "标记", content = "内容"
+    case theme = "主题", header = "标题", text = "文字", marker = "标记", content = "内容"
     var id: String { rawValue }
 }
 private struct TaskMarkerState: Equatable {
@@ -24,11 +25,17 @@ struct WidgetAppearanceEditor: View {
     @State private var selectedTaskID: UUID?
     @State private var preview = WidgetPreviewState()
     @State private var showHelp = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var importingPhoto = false
+    private let photos = WidgetPhotoStore()
     @State private var previousWidgetMarker: TodoMarker?
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var widget: Binding<WidgetAppearance> {
         Binding(get: { store.appearance.widget }, set: { var next = store.appearance; next.widget = $0; store.setAppearance(next) })
+    }
+    private var heading: Binding<WidgetHeaderAppearance> {
+        Binding(get: { store.appearance.widget.heading }, set: { widget.wrappedValue.header = $0 })
     }
     private var scheme: ColorScheme {
         let theme = store.appearance.widget.theme
@@ -60,6 +67,7 @@ struct WidgetAppearanceEditor: View {
                     }
                     switch tool {
                     case .theme: themeControls
+                    case .header: headerControls
                     case .text: textControls
                     case .marker: markerControls
                     case .content: contentControls
@@ -88,12 +96,27 @@ struct WidgetAppearanceEditor: View {
             edits.synchronize(editState)
             #if TODO_UI_CHECKS
             if ProcessInfo.processInfo.arguments.contains("--native-widget-text") { tool = .text }
+            if ProcessInfo.processInfo.arguments.contains("--native-widget-header") { tool = .header }
             #endif
         }
         .onChange(of: editState) { previous, next in
             guard isVisible else { return }
             if previous.markers.map(\.id) != next.markers.map(\.id) { edits.synchronize(next) }
             else { edits.observe(next) }
+        }
+        .onChange(of: selectedPhoto) { _, selection in
+            guard let selection else { return }
+            importingPhoto = true
+            Task {
+                defer { importingPhoto = false; selectedPhoto = nil }
+                do {
+                    guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
+                    let name = try await photos.importPhoto(data)
+                    var next = store.appearance.widget
+                    next.backgroundPhotoName = name; next.backdrop = .photo
+                    widget.wrappedValue = next
+                } catch { self.error = error.localizedDescription }
+            }
         }
         .onChange(of: tool) { _, _ in edits.finish(editState) }
         .onChange(of: advanced) { _, _ in edits.finish(editState) }
@@ -120,11 +143,9 @@ struct WidgetAppearanceEditor: View {
                             throw NSError(domain: "EditorUndo", code: 1, userInfo: [NSLocalizedDescriptionKey: "任务已发生变化，保留当前数据。"])
                         }
                     }
-                    for old in changed {
-                        if let item = store.items.first(where: { $0.id == old.id }) {
-                            try store.edit(id: item.id, title: item.title, marker: old.marker)
-                        }
-                    }
+                    try store.updateMarkers(changed.map { old in
+                        TodoMarkerUpdate(id: old.id, expected: expected.markers.first(where: { $0.id == old.id })?.marker, marker: old.marker)
+                    })
                     if previous.style != expected.style { widget.wrappedValue = previous.style }
                 }
             } catch { self.error = "未能撤销：\(error.localizedDescription)" }
@@ -153,13 +174,10 @@ struct WidgetAppearanceEditor: View {
                 TodoWidgetContent(document: store.hasLoaded && store.loadError == nil ? TodoDocument(items: preview.items(store.items)) : nil,
                     appearance: store.appearance, error: store.loadError, family: family, interactive: false,
                     onPreviewToggle: { id in if let item = store.items.first(where: { $0.id == id }) { preview.toggle(item) } },
-                    onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID)
+                    onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID, onPreviewHeader: { tool = .header })
                     .padding(16)
                     .frame(width: family.width, height: family.height)
-                    .background {
-                        if store.appearance.widget.backdrop == .solid { store.appearance.widget.panelColor.swiftColor }
-                        else { Rectangle().fill(.background) }
-                    }
+                    .background { WidgetBackgroundView(style: store.appearance.widget) }
                     .environment(\.colorScheme, scheme)
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .scaleEffect(scale)
@@ -177,17 +195,53 @@ struct WidgetAppearanceEditor: View {
         Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
+        if store.appearance.widget.backdrop == .photo {
+            PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
+                Label("选择或更换照片", systemImage: "photo")
+            }.buttonStyle(.bordered).disabled(importingPhoto)
+            if importingPhoto { ProgressView("正在处理照片…") }
+            if store.appearance.widget.backgroundPhotoName != nil {
+                Button("移除照片") {
+                    var next = store.appearance.widget; next.backgroundPhotoName = nil; next.backdrop = .system
+                    widget.wrappedValue = next
+                }
+            }
+            Text("照片等比填充，仅保存在本机共享目录。").font(.caption).foregroundStyle(.secondary)
+        }
         if advanced {
             Text("网格不会出现在主屏幕。系统外观会影响实际小组件背景。")
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+    @ViewBuilder private var headerControls: some View {
+        Toggle("显示标题", isOn: heading.showsTitle)
+        if store.appearance.widget.heading.showsTitle {
+            TextField("标题内容", text: Binding(get: { store.appearance.widget.heading.text }, set: { text in
+                heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
+            })).textInputAutocapitalization(.never).submitLabel(.done)
+            Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
+            if !store.appearance.widget.heading.followsTextColor { StyleColorControl(title: "标题颜色", value: heading.color) }
+            Picker("标题位置", selection: Binding(get: { store.appearance.widget.heading.horizontalPosition < 0.25 ? 0 : store.appearance.widget.heading.horizontalPosition > 0.75 ? 2 : 1 }, set: {
+                heading.wrappedValue.horizontalPosition = Double($0) / 2
+            })) {
+                Text("左").tag(0); Text("中").tag(1); Text("右").tag(2)
+            }.pickerStyle(.segmented)
+            Picker("标题字体", selection: heading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            Picker("标题字重", selection: heading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            if advanced {
+                PreciseSlider(title: "标题大小", value: heading.fontSize, range: 12...32, standard: 17)
+                PreciseSlider(title: "标题水平位置", value: heading.horizontalPosition, range: 0...1, standard: 0, precision: 2)
+                PreciseSlider(title: "标题顶部留白", value: heading.topInset, range: 0...24, standard: 0)
+            }
+        }
+        Toggle("显示右上角未完成数量", isOn: heading.showsSummary)
     }
     @ViewBuilder private var textControls: some View {
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
         if advanced {
             PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
-            if hasVisibleMarker { PreciseSlider(title: "与标记间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
+            if hasVisibleMarker { PreciseSlider(title: "标记与文字间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
         } else {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.widgetScale, standard: 1, precision: 2)
         }
@@ -262,7 +316,7 @@ struct WidgetAppearanceEditor: View {
                 }
                 Section("背景与透明度") {
                     Text("不透明度 0 表示不绘制自定义底色，1 表示完全实色。它不控制系统为小组件合成的背景材质。")
-                    Text("实际背景由 iOS 主屏幕外观决定，App 无法保证任意照片完全透出。没有使用截图拼接来模拟透明。")
+                    Text("可选本地照片作为背景；这是组件自己的照片，不是让主屏幕壁纸透过。系统可能在着色模式下调整最终效果。")
                 }
                 Section("标记") { Text("单项标记优先于小组件默认，再到壁纸标记。壁纸标记只作静态装饰，小组件的完成效果独立设置。") }
             }

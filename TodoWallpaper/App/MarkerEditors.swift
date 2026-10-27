@@ -87,6 +87,15 @@ struct PreciseSlider: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.editorInteraction) private var interaction
     @FocusState private var enteringNumber: Bool
+    @State private var detent = StandardDetent()
+    @State private var trackWidth = 300.0
+    private var sliding: Binding<Double> {
+        Binding(get: { bounded.wrappedValue }, set: { proposed in
+            let wasLatched = detent.isLatched
+            bounded.wrappedValue = detent.value(proposed, standard: standard, range: range, trackWidth: trackWidth)
+            if detent.isLatched && !wasLatched { UISelectionFeedbackGenerator().selectionChanged() }
+        })
+    }
     private var bounded: Binding<Double> {
         Binding(get: { min(range.upperBound, max(range.lowerBound, value)) },
                 set: { value = $0.isFinite ? min(range.upperBound, max(range.lowerBound, $0)) : standard })
@@ -110,13 +119,20 @@ struct PreciseSlider: View {
                     .font(.subheadline.monospacedDigit()).frame(width: typeSize.isAccessibilitySize ? 96 : 64).frame(minHeight: 44)
                     .accessibilityLabel("\(title)，精确输入")
             }
-            Slider(value: bounded, in: range, onEditingChanged: { editing in
-                if editing { interaction.begin("slider." + title) } else { interaction.end() }
+            Slider(value: sliding, in: range, onEditingChanged: { editing in
+                if editing { detent.reset(); interaction.begin("slider." + title) }
+                else { detent.reset(); interaction.end() }
             }).accessibilityLabel(title)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.onAppear { trackWidth = proxy.size.width }
+                            .onChange(of: proxy.size.width) { _, width in trackWidth = width }
+                    }
+                }
             GeometryReader { geometry in
                 let fraction = EditorStandards.fraction(standard, in: range)
                 Button { reset() } label: {
-                    Circle().fill(Color.accentColor).frame(width: 5, height: 5)
+                    Circle().fill(Color.accentColor).frame(width: detent.isLatched ? 8 : 5, height: detent.isLatched ? 8 : 5)
                         .frame(width: 28, height: 16).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -187,7 +203,7 @@ struct MarkerStyleEditor: View {
                 if advanced {
                     if controls.emoji { PreciseSlider(title: "Emoji 大小", value: $style.emojiSize, range: 8...48, standard: 22) }
                     else { PreciseSlider(title: "图形大小", value: $style.size, range: 8...48, standard: 18) }
-                    PreciseSlider(title: "与文字间距", value: $style.gap, range: 0...32, standard: 10)
+                    PreciseSlider(title: "标记与文字间距", value: $style.gap, range: 0...32, standard: 10)
                     if controls.stroke { PreciseSlider(title: "描边粗细", value: $style.lineWidth, range: 0.3...6, standard: 1.5) }
                     if kind == .filled { PreciseSlider(title: "边框粗细", value: $style.lineWidth, range: 0.3...6, standard: 1.5) }
                     PreciseSlider(title: "垂直对齐", value: $style.verticalOffset, range: -16...16, standard: 0)

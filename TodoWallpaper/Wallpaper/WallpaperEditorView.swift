@@ -5,8 +5,10 @@ import UIKit
 private struct WallpaperEditState: Equatable {
     var settings: WallpaperSettings
     var photoName: String?
+    var previewScale: Double
     var marker: TodoMarker
     var markerStyle: MarkerStyle
+    var taskMarkers: [UUID: TodoMarker]
     var widgetStyle: WidgetAppearance
 }
 
@@ -15,8 +17,11 @@ struct WallpaperEditorView: View {
     @Binding var navigation: AppNavigationState
     @ObservedObject var model: WallpaperEditorModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(EditorStandards.advancedKey) private var advanced = false
     @StateObject private var edits = EditorUndoState<WallpaperEditState>()
+    @AppStorage(EditorStandards.previewScaleKey) private var previewScale = 1.0
+    @State private var markerTaskID: UUID?
     @State private var fullScreen = false
     @State private var isVisible = false
     @State private var selectedPhoto: PhotosPickerItem?
@@ -31,11 +36,12 @@ struct WallpaperEditorView: View {
     private var dataReady: Bool { store.hasLoaded && store.loadError == nil }
     private var canExport: Bool { dataReady && model.ready && !model.busy && !model.draftBlocked && store.appearanceError == nil && model.previewError == nil }
     private var appearance: Binding<TodoAppearance> {
-        Binding(get: { store.appearance }, set: { store.setAppearance($0) })
+        Binding(get: { store.appearance }, set: { store.setAppearance($0); model.updateAppearance(store.appearance) })
     }
     private var editState: WallpaperEditState {
-        WallpaperEditState(settings: model.settings, photoName: model.photoName,
+        WallpaperEditState(settings: model.settings, photoName: model.photoName, previewScale: previewScale,
             marker: store.appearance.defaultMarker, markerStyle: store.appearance.markerStyle,
+            taskMarkers: Dictionary(uniqueKeysWithValues: store.items.compactMap { item in item.marker.map { (item.id, $0) } }),
             widgetStyle: store.appearance.widget)
     }
     private var layoutScale: Binding<Double> {
@@ -43,7 +49,7 @@ struct WallpaperEditorView: View {
             model.settings = model.settings.withStandardScale(scale)
             var next = store.appearance
             next.markerStyle = EditorStandards.marker(next.markerStyle, scale: scale)
-            store.setAppearance(next)
+            store.setAppearance(next); model.updateAppearance(store.appearance)
         })
     }
     var body: some View {
@@ -52,7 +58,7 @@ struct WallpaperEditorView: View {
                 VStack(spacing: 8) {
                     if dataReady {
                         WallpaperLiveCanvas(model: model, editsBackground: tool == .background,
-                            editable: navigation.isEditing)
+                            editable: navigation.isEditing, previewScale: previewScale)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped().accessibilityIdentifier("wallpaper.canvas")
                     } else {
@@ -61,6 +67,7 @@ struct WallpaperEditorView: View {
                     inspector(height: EditorSizing.panelHeight(available: geometry.size.height,
                         expanded: navigation.inspectorExpanded, advanced: advanced))
                 }
+                .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: navigation.inspectorExpanded)
                 .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 6)
             }
             .background(Color(uiColor: .systemGroupedBackground))
@@ -78,7 +85,7 @@ struct WallpaperEditorView: View {
                     Menu {
                         Button("重新读取待办", systemImage: "arrow.clockwise") { store.flushAppearance(); store.reload() }
                         Button("恢复壁纸默认排版", systemImage: "arrow.counterclockwise") { resetConfirmation = true }
-                        Button(navigation.inspectorExpanded ? "收起设置" : "展开设置", systemImage: "slider.horizontal.3") { navigation.toggleInspector() }
+                        Button(navigation.inspectorExpanded ? "收起设置" : "展开设置", systemImage: "slider.horizontal.3") { toggleInspector() }
                     } label: { Label("更多", systemImage: "ellipsis.circle") }.disabled(model.busy)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -116,6 +123,10 @@ struct WallpaperEditorView: View {
         }
         .environment(\.editorInteraction, edits.context(read: { editState }))
     }
+    private func toggleInspector() {
+        edits.finish(editState)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.toggleInspector() }
+    }
     private func undoEdit() {
         Task {
             do {
@@ -128,7 +139,14 @@ struct WallpaperEditorView: View {
                     if model.settings != previous.settings || model.photoName != previous.photoName {
                         try await model.restoreEditorState(settings: previous.settings, photoName: previous.photoName)
                     }
-                    if next != store.appearance { store.setAppearance(next) }
+                    let ids = Set(previous.taskMarkers.keys).union(expected.taskMarkers.keys)
+                    let changes = ids.filter { previous.taskMarkers[$0] != expected.taskMarkers[$0] }.map {
+                        TodoMarkerUpdate(id: $0, expected: expected.taskMarkers[$0], marker: previous.taskMarkers[$0])
+                    }
+                    try store.updateMarkers(changes)
+                    if previous.previewScale != expected.previewScale { previewScale = previous.previewScale }
+                    if next != store.appearance { store.setAppearance(next); model.updateAppearance(store.appearance) }
+                    model.updateItems(store.items)
                 }
                 syncOutputFields()
             } catch { model.message = "未能撤销：\(error.localizedDescription)" }
@@ -163,10 +181,11 @@ struct WallpaperEditorView: View {
         HStack(spacing: 6) {
             EditorToolPicker(choices: WallpaperTool.allCases,
                 selection: Binding(get: { tool }, set: { next in
-                    edits.finish(editState); navigation.selectTool(next)
+                    edits.finish(editState)
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.selectTool(next) }
                 }), title: { $0.title })
             Button {
-                withAnimation(.snappy(duration: 0.2)) { navigation.toggleInspector() }
+                toggleInspector()
             } label: {
                 Image(systemName: navigation.inspectorExpanded ? "chevron.down" : "chevron.up")
                     .font(.subheadline).frame(width: 36, height: 44)
@@ -243,8 +262,8 @@ struct WallpaperEditorView: View {
         StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
         if advanced {
             PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
-            if store.appearance.defaultMarker.kind != .none || store.items.contains(where: { store.appearance.marker(for: $0).kind != .none }) {
-                PreciseSlider(title: "与标记间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
+            if model.settings.filtered(store.items).contains(where: { model.settings.marker(for: $0, appearance: store.appearance).kind != .none }) {
+                PreciseSlider(title: "标记与文字间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
             }
         } else {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
@@ -253,9 +272,6 @@ struct WallpaperEditorView: View {
         Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
         Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
-        if model.settings.includeCompleted {
-            Picker("完成文字", selection: $model.settings.completionStyle) { ForEach(WallpaperCompletionStyle.allCases) { Text($0.title).tag($0) } }
-        }
         if advanced {
             Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
             PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20, standard: 4)
@@ -263,18 +279,49 @@ struct WallpaperEditorView: View {
             Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8)
         }
     }
+    private var selectedMarkerTask: TodoItem? { store.items.first { $0.id == markerTaskID } }
+    private var wallpaperMarkerChoice: Binding<TodoMarker> {
+        Binding(get: {
+            if let task = selectedMarkerTask { return model.settings.marker(for: task, appearance: store.appearance) }
+            return store.appearance.defaultMarker
+        }, set: { value in
+            if let task = selectedMarkerTask {
+                do { try store.edit(id: task.id, title: task.title, marker: value); model.updateItems(store.items) }
+                catch { model.message = error.localizedDescription }
+            } else {
+                // Choosing a uniform wallpaper marker must visibly change the canvas,
+                // even when every task already owns a Widget/Todo Emoji override.
+                model.settings.usesTaskMarkers = false
+                appearance.defaultMarker.wrappedValue = value
+            }
+        })
+    }
     @ViewBuilder private var markerControls: some View {
-        MarkerChoiceEditor(choice: appearance.defaultMarker)
-        MarkerStyleEditor(style: appearance.markerStyle, kind: store.appearance.defaultMarker.kind, advanced: advanced, showsCompletion: false)
-        if store.appearance.defaultMarker.kind == .none {
-            Text("默认不显示标记；任务单项覆盖仍保留。").font(.caption).foregroundStyle(.secondary)
+        Toggle("使用待办的单项标记", isOn: Binding(get: { model.settings.inheritsTaskMarkers }, set: {
+            model.settings.usesTaskMarkers = $0; markerTaskID = nil
+        }))
+        if model.settings.inheritsTaskMarkers {
+            Menu {
+                Button("未单独设置的待办") { markerTaskID = nil }
+                ForEach(store.items) { item in Button(item.title) { markerTaskID = item.id } }
+            } label: { Label(selectedMarkerTask?.title ?? "默认标记", systemImage: "pencil.circle").lineLimit(2) }
         }
-        if advanced {
-            Button("将壁纸样式应用到小组件") { applyWidgetStyle() }.buttonStyle(.bordered)
-            Text("单项标记在待办编辑页修改。").font(.caption).foregroundStyle(.secondary)
+        MarkerChoiceEditor(choice: wallpaperMarkerChoice)
+        if let task = selectedMarkerTask, task.marker != nil {
+            Button("恢复默认标记") {
+                do { try store.edit(id: task.id, title: task.title, marker: nil); model.updateItems(store.items) }
+                catch { model.message = error.localizedDescription }
+            }
         }
+        MarkerStyleEditor(style: appearance.markerStyle, kind: wallpaperMarkerChoice.wrappedValue.kind, advanced: advanced, showsCompletion: false)
+        if model.settings.inheritsTaskMarkers && selectedMarkerTask == nil {
+            Text("修改默认样式后，壁纸会统一使用该标记；任务原有 Emoji 仍保留。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        if advanced { Button("将壁纸样式应用到小组件") { applyWidgetStyle() }.buttonStyle(.bordered) }
     }
     @ViewBuilder private var outputControls: some View {
+        if advanced { PreciseSlider(title: "编辑预览大小", value: $previewScale, range: 0.55...1, standard: 1, precision: 2) }
         Picker("画布比例", selection: Binding(get: { aspect }, set: { chooseAspect($0) })) {
             ForEach(WallpaperAspect.allCases) { Text($0.title).tag($0) }
         }
@@ -371,6 +418,8 @@ private struct WallpaperFullPreview: View {
                 ToolbarItem(placement: .primaryAction) { Toggle("精确预览", isOn: $exact).font(.caption) }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: exact) { _, value in model.requestExactPreview(value) }
+            .onDisappear { model.requestExactPreview(false) }
         }
     }
 }
