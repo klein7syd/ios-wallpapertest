@@ -1,16 +1,14 @@
-# Todo Wallpaper 0.4.4 / 1022
+# Todo Wallpaper 0.5.0 / 1025
 
-[Changes, data scope and limits](../docs/FEEDBACK-REPAIR-044.md) · [Actual validation](../docs/VALIDATION.json) · [Windows/iPhone checklist](DEVICE-TEST.md).
+[Implementation and limits](../docs/MEDIA-MOTION-050.md) · [Validation](../docs/VALIDATION.json) · [Windows/iPhone checklist](DEVICE-TEST.md).
 
-Actual Actions run **40456422144** passed: unsigned ARM64 App+Widget, production storage/migration/backup/PNG checks, and native iOS Simulator rendering/screenshots. Zero Swift-source warnings. Windows signing, installation and real iPhone acceptance remain pending.
+Actions run 40465212518 passed actual unsigned ARM64 App+Widget compilation, production native Core/PNG tests and iOS Simulator rendering. Physical iPhone performance, signing/install, Photos permissions/album selection and Widget system-material appearance remain separate and pending.
 
-Minimum iOS 17. IDs remain org.todowallpaper.app, org.todowallpaper.app.widget, group.org.todowallpaper.app. Use the existing iPASide/R1 installer to cover-install with the same account; keep the current app installed.
+- Native four tabs with pinned previews; reducing wallpaper preview now grows the inspector.
+- Retained CA photo/panel gestures with one commit at end; small cached blur texture, full target-pixel composition for exact preview/export.
+- Widget photo normalized crop, pinch/pan, opacity; explicit theme contrast, footer switch and labeled text-tap effects.
+- Native PhotoKit album selection, up to 60 local cached photos, daily Widget timeline. Reselect the album after changes. Actual delivery is system scheduled.
+- Optional floating date/time per task; legacy records unchanged until edited; dates survive title/marker/completion operations. Existing Calendar/Reminders import available from create sheet.
+- Experimental public material background request; clear/tinted system rendering retained. No assertion of Batteries-style glass in default/dark modes.
 
-- Four native tabs; fixed previews and independently scrolling controls; advanced controls in About.
-- Wallpaper uniform/task marker selection targets visible rows; real gap adjustments under all alignments; static completion text; preview scale; common expansion animation; snap-to-standard sliders.
-- Widget custom title/count, local photo background, independent marker/text styles and direct App Intent completion/restore.
-- Explicit local Calendar/Reminders selection/import through EventKit. Imported tasks are independent snapshots.
-- Ordinary undo applies live settings without photo decoding or poster bitmap rendering. Exact preview/export runs on demand.
-- Real target-pixel SDR PNG export: 19.5:9 approx 1890×4096, 16:9 2304×4096, custom ratios/pixels. Original drafts/photos/tasks and R1 signing sources preserved.
-
-CI is evidence of compilation and its stated native checks. Touch feel, scrolling, haptics, system Widget appearance/interaction, permissions, signing and installation require real iPhone feedback.
+Minimum iOS17. Stable IDs org.todowallpaper.app / org.todowallpaper.app.widget / group.org.todowallpaper.app. R1 scripts, Intent and shared migration remain unchanged. Use the same account and cover-install; do not uninstall the existing app. No PWA, AI or cloud-sync implementation is introduced.

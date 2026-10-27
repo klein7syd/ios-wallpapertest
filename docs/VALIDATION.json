@@ -739,5 +739,133 @@
         "code_commit": "a4e3e423b92f593ee79dbd796e9a1754d85f3d69"
       }
     ]
+  },
+  "media_motion_050": {
+    "version": "0.5.0",
+    "build": "1025",
+    "code_commit": "78228c653a0608d6d3cacac14dc0d3760f94cdfe",
+    "actions_run": 40465212518,
+    "job": 122058833608,
+    "conclusion": "success",
+    "artifact_id": 12716750545,
+    "artifact_zip_sha256": "1ac3d6029570f218ef9da149327b58c635ca1771c98c374d30c3635c595ac434",
+    "IPA": {
+      "sha256": "df2f4dcd86a7723fe781bb9e6ac54c6209e122fd2752e883951a80b2c8e5cca6",
+      "bundles": [
+        {
+          "bundle_id": "org.todowallpaper.app",
+          "version": "0.5.0",
+          "build": "1025",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        },
+        {
+          "bundle_id": "org.todowallpaper.app.widget",
+          "version": "0.5.0",
+          "build": "1025",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        }
+      ],
+      "structural_verification": "passed",
+      "cryptographic_signature_verification": "not_performed",
+      "iphone_installation": "not_verified",
+      "device_capabilities": "not_verified"
+    },
+    "Swift_source_warnings": 0,
+    "architecture_and_reviewed_source_guards": 118,
+    "Core_native_checks": "all-family crop, preview-to-inspector allocation, floating task schedule/legacy/CRUD preservation, DST-safe daily album timeline, optional-field compatibility and old data regression passed",
+    "macOS_production_PNG_regression": "passed; 4K, font weights, colored/combined Emoji, marker/text gap and drafts",
+    "iOS_Simulator": {
+      "device_signing_installation_and_acceptance": "not_verified",
+      "environment": "iOS Simulator; not a real iPhone",
+      "gesture_display_frame_commits": 0,
+      "gesture_end_commits": 1,
+      "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",
+      "live_wallpaper_marker_ownership": "passed",
+      "ordinary_undo_40_steps_milliseconds_on_Simulator": 0.4780292510986328,
+      "ordinary_undo_photo_loading_and_full_bitmap_work": "none",
+      "performance_scope": "layer/model CPU callbacks, not real iPhone touch FPS",
+      "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",
+      "result": "passed",
+      "retained_photo_layer_600_updates_ms_on_Simulator": 0.26404857635498047,
+      "small_heart_pixel_widths": {
+        "8": 20,
+        "10": 26,
+        "12": 31,
+        "16": 41,
+        "19": 50,
+        "20": 53,
+        "24": 65,
+        "32": 88,
+        "48": 132
+      },
+      "system": "26.5",
+      "text_effect_pixel_hashes": {
+        "color": "57223c67efbb15acda2bf455701f2d8c14f4199dcce20df518d3281545106cca",
+        "fade": "49cc3294ec3113033f2af73b8becba7c096624016d397405babe7e22d74e4fb5",
+        "fadeStrike": "85dc9b5df92fcd883124325c882534e480627de5d6ca8f0dc4002dddc8287de9",
+        "keep": "428f6233624a2c9d81f4b99bedbdd708b972ecec42f16757f0f6ae5dd319657b",
+        "strike": "054164dcff66274588331b07e211bb80c61fc6080fffb4649cf9eaa57648d0e3"
+      },
+      "UIFontMetrics_point_sizes": {
+        "a11y": 32.666666666666664,
+        "a11y-max": 42.333333333333336,
+        "large": 19.666666666666668,
+        "small": 13,
+        "standard": 15
+      },
+      "widget_crop_opacity_and_mismatched_system_theme_pixels": "passed",
+      "widget_header_summary_and_photo_pixels": "passed",
+      "widget_type_size_matrix_images": 30
+    },
+    "physical_performance": "not_measured; layer callback timing does not establish iPhone touch FPS",
+    "PhotoKit_permission_real_album_import_and_daily_system_delivery": "pending_iPhone",
+    "material_in_default_dark_icon_mode": "experimental_public_material_request; not_verified_on_Home_Screen; no_first_party_Batteries_equivalence_claim",
+    "clear_tinted_mode": "existing_container_removal_and_system_rendering_preserved; retest_on_iPhone",
+    "R1_and_Intent_and_shared_migration": "original_bytes_unchanged",
+    "protected_changes": "TodoItem optional schedule; repository validate/save; TodoStore save wrapper; PhotoKit purpose string. Existing identity/locks/backups unchanged.",
+    "Windows_signing": "not_performed_for_1025",
+    "iPhone_installation_and_acceptance": "pending",
+    "known_limits": [
+      "Album uses up to 60 newest cached still photos; reselect to sync source changes",
+      "System may delay daily timeline; no midnight-second guarantee",
+      "One normalized crop applies to all rotation photos and adapts per Widget ratio",
+      "Photo alpha blends against theme base; does not grant wallpaper access",
+      "Live blur is cached/approximate during zoom; exact PNG still rendered from original source",
+      "Task dates are display/management metadata, no notification or calendar back-write"
+    ],
+    "build_attempts": [
+      {
+        "run": 40464472629,
+        "build": 1023,
+        "result": "failed",
+        "reason": "UIKit gesture admission override keyword; fixed; native Core/render passed"
+      },
+      {
+        "run": 40464845906,
+        "build": 1024,
+        "result": "failed",
+        "reason": "UIKit CGPoint translated to crop CGSize, panel x/y; fixed; native Core/render passed"
+      },
+      {
+        "run": 40465212518,
+        "build": "1025",
+        "result": "success",
+        "commit": "78228c653a0608d6d3cacac14dc0d3760f94cdfe"
+      }
+    ]
   }
 }

@@ -1,6 +1,6 @@
 # 0.5.0 — photo motion, dates and daily rotation
 
-Implementation candidate. Record CI and artifact evidence after an actual run. Windows signing, install, iPhone gesture frame rate, PhotoKit permissions and Home Screen material remain unverified.
+Final test candidate 0.5.0 / 1025, code `78228c653a0608d6d3cacac14dc0d3760f94cdfe`. [Actions 40465212518](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40465212518) passed. Windows signing, install, iPhone gesture frame rate, PhotoKit permissions and Home Screen material remain unverified.
 
 - Wallpaper uses a retained UIKit/Core Animation layer tree. Pan/pinch move existing photo/blur textures and panel layers without publishing model changes or saving on each frame. One finished gesture commits one undo state. A small blurred source texture (maximum 768px edge) is prepared off the main actor only after source/blur/zoom/ratio settles. Full target-pixel wallpaper composition remains in exact preview/export. Live blur while zooming is approximate until settled.
 - Widget photos share normalized zoom/pan geometry between the native gesture editor and Widget background. Alpha blends the photo with its theme background; it does not grant arbitrary access to the Home Screen wallpaper. Crop applies to all photos in a rotation, and each Widget size uses aspect fill without stretching.
@@ -17,3 +17,7 @@ IDs and R1 installer remain unchanged. Intent and App Group migration remain byt
 Verification: local source guards; native Core crop/layout/DST/legacy/data tests; iOS Simulator production CA layer-update callbacks with zero per-frame commits, photo pan/alpha pixel output, dark-Widget/light-system contrast, existing glyph/export/undo regression. Callback timing does not establish real iPhone FPS. PhotoKit access/album copying, real time passage, default-mode material and install/signing require iPhone feedback.
 
 Primary references: [Apple WidgetKit foundations](https://developer.apple.com/videos/play/wwdc2026/277/), [Liquid Glass and accented rendering](https://developer.apple.com/documentation/widgetkit/optimizing-your-widget-for-accented-rendering-mode-and-liquid-glass), [keeping widgets up to date](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date), [PhotoKit access](https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app).
+
+## Actual evidence
+
+118 source/review guards, native Core compatibility/geometry/DST/data tests, production PNG regression and both device/Simulator compilation passed. Simulator pixel checks cover crop direction, opacity, dark Widget on light host, and prior glyph/header output. CA update callbacks perform zero per-frame state commits and one end commit; timing is not hardware FPS. Detailed report and previous failed compiler attempts are recorded in VALIDATION.json. Physical acceptance remains pending.
