@@ -36,7 +36,8 @@ struct WidgetLayoutMetrics: Equatable {
         let rowSpace = max(0, afterHeader - (footerFits ? footer + spacing : 0))
         let proposedLines = style.maximumTitleLines ?? (family == .large && !style.compact && spacing > 2 && fontLineHeight < 30 ? 2 : 1)
         let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2 + dateHeight) + padding ? 2 : 1
-        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight) + padding
+        // 负行距同时压缩行高，否则只是把行间空隙挪走，看起来几乎没变。
+        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight + min(0, spacing)) + padding
         let pitch = max(1, row + spacing + separator)
         let raw = row > 0 ? Int(max(0, (rowSpace + spacing + separator) / pitch).rounded(.down)) : 0
         return WidgetLayoutMetrics(rowHeight: row, markerWidth: marker, gap: gap, lineHeight: fontLineHeight,

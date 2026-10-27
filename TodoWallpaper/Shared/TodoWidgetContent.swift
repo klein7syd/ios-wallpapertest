@@ -42,7 +42,9 @@ struct TodoWidgetContent: View {
         let resolved = TextLegibility.readable(requested, on: background)
         // 浅字配深影、深字配浅影，两边都压低不透明度：
         // 原来只给浅字加黑影，黄色这类高亮色会出硬边，深绿这类低亮色又完全没有景深。
-        return TextLegibility.luminance(resolved) > 0.5 ? .black.opacity(0.38) : .white.opacity(0.28)
+        // 只用黑色投影，强度跟文字亮度挂钩：亮字（黄、白）重一点，暗字几乎不加。
+        let l = TextLegibility.luminance(resolved)
+        return .black.opacity(0.10 + 0.32 * l)
     }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
