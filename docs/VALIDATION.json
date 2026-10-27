@@ -598,5 +598,146 @@
         "source_warnings": 0
       }
     ]
+  },
+  "feedback_repairs_044": {
+    "version": "0.4.4",
+    "build": "1022",
+    "code_commit": "a4e3e423b92f593ee79dbd796e9a1754d85f3d69",
+    "actions_run": 40456422144,
+    "job": 122030703179,
+    "conclusion": "success",
+    "artifact_id": 12713041685,
+    "artifact_zip_sha256": "9278e433a5f6b628de109c74f797924368b9c6fcb061bc237c4a45b9024925fe",
+    "IPA": {
+      "sha256": "56ff3a55972461b38c12eab251e2f73e7b2a2b431740e674a4cdea8dc1e762aa",
+      "bundles": [
+        {
+          "bundle_id": "org.todowallpaper.app",
+          "version": "0.4.4",
+          "build": "1022",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        },
+        {
+          "bundle_id": "org.todowallpaper.app.widget",
+          "version": "0.4.4",
+          "build": "1022",
+          "app_group": "group.org.todowallpaper.app",
+          "embedded_profile": false,
+          "architecture": "arm64",
+          "platform": "iOS device",
+          "signature_present": false,
+          "entitlements": null,
+          "intent_metadata_present": true,
+          "intent_open_app_when_run": false
+        }
+      ],
+      "structural_verification": "passed",
+      "cryptographic_signature_verification": "not_performed",
+      "iphone_installation": "not_verified",
+      "device_capabilities": "not_verified"
+    },
+    "Swift_source_warnings": 0,
+    "ui_architecture_and_reviewed_source_guards": 104,
+    "unchanged_R1_installer_task_schema_Intent_and_migration": "byte_exact_against_pre_task_baseline",
+    "reviewed_protected_source_changes": [
+      "App/Info.plist: EventKit purpose strings",
+      "App/TodoStore.swift: import and atomic marker undo wrappers, equal-appearance guard",
+      "Core/TodoRepository.swift: local idempotent import and compare/write marker transaction",
+      "Wallpaper/WallpaperGeometry.swift: retired completion policy excluded from glyph key"
+    ],
+    "macOS_production_regression": "CRUD/migration/concurrency/backup/legacy JSON; import idempotence/whitespace; visible marker target; detents/header bounds; static text; three actual PNG gap deltas; five marker PNGs; 4K and colored Emoji/font-weight outputs passed",
+    "iOS_Simulator": {
+      "device_signing_installation_and_acceptance": "not_verified",
+      "environment": "iOS Simulator; not a real iPhone",
+      "grouped_edit_undo_retry_and_photo_draft_restore": "passed_on_iOS_Simulator",
+      "live_wallpaper_marker_ownership": "passed",
+      "ordinary_undo_40_steps_milliseconds_on_Simulator": 0.5369186401367188,
+      "ordinary_undo_photo_loading_and_full_bitmap_work": "none",
+      "reduced_space_scope": "85% logical-size stress test; not an actual iPhone Display Zoom setting",
+      "result": "passed",
+      "small_heart_pixel_widths": {
+        "8": 20,
+        "10": 26,
+        "12": 31,
+        "16": 41,
+        "19": 50,
+        "20": 53,
+        "24": 65,
+        "32": 88,
+        "48": 132
+      },
+      "system": "26.5",
+      "text_effect_pixel_hashes": {
+        "color": "57223c67efbb15acda2bf455701f2d8c14f4199dcce20df518d3281545106cca",
+        "fade": "49cc3294ec3113033f2af73b8becba7c096624016d397405babe7e22d74e4fb5",
+        "fadeStrike": "85dc9b5df92fcd883124325c882534e480627de5d6ca8f0dc4002dddc8287de9",
+        "keep": "428f6233624a2c9d81f4b99bedbdd708b972ecec42f16757f0f6ae5dd319657b",
+        "strike": "054164dcff66274588331b07e211bb80c61fc6080fffb4649cf9eaa57648d0e3"
+      },
+      "UIFontMetrics_point_sizes": {
+        "a11y": 32.666666666666664,
+        "a11y-max": 42.333333333333336,
+        "large": 19.666666666666668,
+        "small": 13,
+        "standard": 15
+      },
+      "widget_header_summary_and_photo_pixels": "passed",
+      "widget_type_size_matrix_images": 30
+    },
+    "actual_screenshot_review": "wallpaper marker page targets visible task; native four tabs and fixed previews; full custom title and top-right count visible after width fix; synthetic blue photo output checked",
+    "UI_touch_animation_haptics_and_undo_button_latency": "pending_real_iPhone; Simulator timing measures model restore only",
+    "calendar_Reminders_permissions_and_actual_import_on_iPhone": "pending_real_iPhone; no permissions requested in CI",
+    "Windows_signing_and_iPhone_installation": "not_performed_for_1022",
+    "real_Widget_photos_title_Intents_and_upgrade_retention": "pending_user_device_feedback",
+    "stage_acceptance": "pending_user_iPhone_feedback",
+    "known_limits": [
+      "Calendar/Reminders are selected local snapshots, no ongoing sync/back-write",
+      "Widget photo uses centered aspect fill up to 1536px; iOS tint may adjust colors",
+      "Old Widget photo files retained for undo/backups",
+      "Photo undo can require asynchronous decode; ordinary undo defers persistence",
+      "Maximum title length 40 graphemes; Widget space may truncate long content"
+    ],
+    "build_attempts": [
+      {
+        "run": 40452648012,
+        "build": 1018,
+        "conclusion": "failure",
+        "device_compile": "success",
+        "issue": "new fixture compared subsecond Date to existing second-precision persisted Date; fixed; no IPA"
+      },
+      {
+        "run": 40452928968,
+        "build": 1019,
+        "conclusion": "failure",
+        "device_and_Simulator_compile": "success",
+        "native_PNG_checks": "passed",
+        "issue": "new 40x60-point fixture became 120x180 pixels at default 3x; set fixture scale1; no IPA"
+      },
+      {
+        "run": 40453923998,
+        "build": 1020,
+        "conclusion": "success",
+        "delivery": "withheld after screenshot showed custom-header intrinsic-width clipping; fixed width and added complete-glyph/count pixel assertions"
+      },
+      {
+        "run": 40455425338,
+        "build": 1021,
+        "conclusion": "success",
+        "follow_up": "restrict automatic wallpaper marker editing to rows visible after completion filtering/overflow"
+      },
+      {
+        "run": 40456422144,
+        "build": 1022,
+        "conclusion": "success",
+        "code_commit": "a4e3e423b92f593ee79dbd796e9a1754d85f3d69"
+      }
+    ]
   }
 }

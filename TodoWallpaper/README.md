@@ -1,21 +1,16 @@
-# Todo Wallpaper 0.4.3 · Standard navigation and editing refinement
+# Todo Wallpaper 0.4.4 / 1022
 
-[Changes and validation scope](../docs/EDITOR-REFINEMENT.md). Ordinary native tabs, shared tool selection, About advanced-controls switch, standard slider nodes and grouped editor undo. Build **1017 passed CI**: device App+Widget, regression and native iOS Simulator checks; zero Swift-source warnings. Windows signing/install and physical iPhone acceptance remain separate.
+[Changes, data scope and limits](../docs/FEEDBACK-REPAIR-044.md) · [Actual validation](../docs/VALIDATION.json) · [Windows/iPhone checklist](DEVICE-TEST.md).
 
-# Previous native UI revision
+Actual Actions run **40456422144** passed: unsigned ARM64 App+Widget, production storage/migration/backup/PNG checks, and native iOS Simulator rendering/screenshots. Zero Swift-source warnings. Windows signing, installation and real iPhone acceptance remain pending.
 
-Final UI-revision build **1013**: [actual Actions success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40187675187). Both ARM64 device bundles and unsigned IPA inspected. Native regression/state and 47 architecture guards passed. Windows signing, installation and iPhone visual acceptance remain pending.
+Minimum iOS 17. IDs remain org.todowallpaper.app, org.todowallpaper.app.widget, group.org.todowallpaper.app. Use the existing iPASide/R1 installer to cover-install with the same account; keep the current app installed.
 
-Minimum iOS17. Stable IDs and native navigation preserved. CI build number = 1000 + product workflow run number.
+- Four native tabs; fixed previews and independently scrolling controls; advanced controls in About.
+- Wallpaper uniform/task marker selection targets visible rows; real gap adjustments under all alignments; static completion text; preview scale; common expansion animation; snap-to-standard sliders.
+- Widget custom title/count, local photo background, independent marker/text styles and direct App Intent completion/restore.
+- Explicit local Calendar/Reminders selection/import through EventKit. Imported tasks are independent snapshots.
+- Ordinary undo applies live settings without photo decoding or poster bitmap rendering. Exact preview/export runs on demand.
+- Real target-pixel SDR PNG export: 19.5:9 approx 1890×4096, 16:9 2304×4096, custom ratios/pixels. Original drafts/photos/tasks and R1 signing sources preserved.
 
-- Core: backward-compatible optional task marker, original repository lock/backup/migration; shared appearance lock+backup and weighted native typography.
-- Shared: unchanged completion App Intent, native marker view and the same Widget content used by both extension and fixed preview.
-- Widget: interactive small/medium/large widgets with task Emoji and independent App Groups appearance.
-- App: existing CRUD; four native root tabs, task marker override cards, full independent Widget page with pinned preview. Wallpaper editing uses an explicit navigation Dock and conditional common/advanced controls.
-- Wallpaper: large live canvas, cached photo textures, GPU transformations/backdrop, small shared Core Text vector layer; stable native bitmap preview and full target-pixel PNG export. Ratio is independent of resolution; 19.5:9 modern, 16:9 classic and custom. Old draft/photo stays compatible.
-- Tests: production repository, migration, marker/appearance compatibility and actual font/colored-Emoji/4K/geometry image output. Synthetic content stays in tests only.
-- native-tools: deterministic Xcode generator, one product workflow, unsigned packaging/IPA checks and unchanged R1 Windows installer.
-
-[UI architecture and limits](../docs/UI-REVISION.md) · [Rendering implementation](../docs/STAGE-D3-D4.md) · [Validation evidence](../docs/VALIDATION.json) · [Windows and iPhone checklist](DEVICE-TEST.md). No iPhone success is inferred from CI.
-
-Previous build **1010**: [actual Actions success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40180955157). Both unsigned ARM64 bundles independently inspected. Native PNG/compatibility checks passed; actual iPhone live interaction and Widget regression await feedback. See full evidence and limitations above.
+CI is evidence of compilation and its stated native checks. Touch feel, scrolling, haptics, system Widget appearance/interaction, permissions, signing and installation require real iPhone feedback.

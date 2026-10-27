@@ -1,6 +1,6 @@
 # 0.4.4 — iPhone feedback repairs
 
-Implementation candidate. Real CI/run/artifact results are appended after completion. Windows signing, installation and physical iPhone acceptance remain pending.
+Final candidate **0.4.4 / 1022**, code `a4e3e423b92f593ee79dbd796e9a1754d85f3d69`. [Actions run 40456422144](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40456422144) succeeded. Windows signing, installation and physical iPhone acceptance remain pending.
 
 - Static wallpaper has no completed-text strike/dim controls or rendering. Legacy draft fields remain decodable.
 - Wallpaper marker source is explicit. Old drafts retain per-task markers. Choosing a uniform marker changes the wallpaper immediately while retaining original task Emoji. Individual markers can also be edited; automatic selection and its menu include only rows visible on the current canvas, excluding hidden completed/overflow tasks. Widget styles stay independent.
@@ -32,3 +32,7 @@ iOS Simulator CI: production live-model marker ownership, ordinary undo fast-pat
 Physical iPhone permissions, touch animation, haptics, undo responsiveness, signing, installation and system Widget functionality remain pending real feedback. CI does not establish them.
 
 EventKit references: [Apple access-level sample](https://developer.apple.com/documentation/eventkit/accessing-calendar-using-eventkit-and-eventkitui), [Reminders permission](https://developer.apple.com/documentation/eventkit/ekeventstore/requestfullaccesstoreminders(completion:)), [fetchReminders](https://developer.apple.com/documentation/eventkit/ekeventstore/fetchreminders(matching:completion:)). Design references, not device evidence.
+
+## Actual result
+
+Device App+Widget and Simulator compiled successfully; 104 architecture/reviewed-source guards and all native regression checks passed. Custom title glyph completeness, right-count on/off pixels and shared photo readback passed; actual screenshots reviewed. Full evidence and prior attempts are recorded in VALIDATION.json. No real iPhone success is inferred.
