@@ -57,6 +57,16 @@ enum FeedbackRepairChecks {
         let repository = TodoRepository(directoryURL: root)
         _ = try repository.add(title: "原来的待办", marker: TodoMarker(kind: .emoji, emoji: "❤️"))
         let original = try repository.load().items[0]
+        let visibleTask = TodoItem(id: UUID(), title: "画布中的任务", marker: TodoMarker(kind: .emoji, emoji: "📚"),
+            isCompleted: false, createdAt: .now, updatedAt: .now)
+        let overflowTask = TodoItem(id: UUID(), title: "面板以外的任务", isCompleted: false, createdAt: .now, updatedAt: .now)
+        var hidden = original; hidden.isCompleted = true
+        for preferred in [nil, hidden.id, overflowTask.id, visibleTask.id] {
+            try require(MarkerEditorTarget.selected(items: [hidden, visibleTask, overflowTask], visibleIDs: [visibleTask.id],
+                preferredID: preferred)?.id == visibleTask.id, "Wallpaper edits the actual visible row, never a hidden completed/overflow task")
+        }
+        try require(MarkerEditorTarget.selected(items: [hidden, overflowTask], visibleIDs: [visibleTask.id], preferredID: visibleTask.id) == nil,
+            "Missing/empty canvas never resurrects a task as an editing target")
         let sourceID = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-27")
         let repeatID = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-27")
         let nextOccurrence = TodoImportIdentity.make(source: "event", calendar: "fixture-calendar", item: "fixture-event", occurrence: "2026-10-28")

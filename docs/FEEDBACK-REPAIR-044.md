@@ -3,7 +3,7 @@
 Implementation candidate. Real CI/run/artifact results are appended after completion. Windows signing, installation and physical iPhone acceptance remain pending.
 
 - Static wallpaper has no completed-text strike/dim controls or rendering. Legacy draft fields remain decodable.
-- Wallpaper marker source is explicit. Old drafts retain per-task markers. Choosing a uniform marker changes the wallpaper immediately while retaining original task Emoji. Individual markers can also be edited. Widget styles stay independent.
+- Wallpaper marker source is explicit. Old drafts retain per-task markers. Choosing a uniform marker changes the wallpaper immediately while retaining original task Emoji. Individual markers can also be edited; automatic selection and its menu include only rows visible on the current canvas, excluding hidden completed/overflow tasks. Widget styles stay independent.
 - Marker and text align as a group, fixing gap cancellation for center/trailing alignment. Both gap controls use 标记与文字间距.
 - Menu/arrow/tool expansion share a Reduce Motion-aware animation. Gestures suppress only their own animations.
 - Advanced export controls include an editor-only preview-size preference, 0.55–1.0, with undo. It never changes canvas/export coordinates.

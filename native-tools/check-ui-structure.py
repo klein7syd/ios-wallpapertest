@@ -69,6 +69,7 @@ require('func importItems(' in read('TodoWallpaper/Core/TodoRepository.swift') a
 model = read('TodoWallpaper/Wallpaper/WallpaperEditorModel.swift')
 require('guard wantsExactPreview else' in model and model.index('if name == photoName {') < model.index('saveTask?.cancel()', model.index('func restoreEditorState')), 'Ordinary undo applies live settings before any photo I/O; whole bitmap previews are on demand')
 require('.frame(maxWidth: .infinity, alignment: .topLeading)\n        .frame(height: layout.height)' in shared, 'Custom Widget header fills its position coordinate space before clipping')
+require('MarkerEditorTarget.selected' in wallpaper and 'ForEach(markerTasks)' in wallpaper, 'Wallpaper marker editor targets only actually visible canvas rows')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

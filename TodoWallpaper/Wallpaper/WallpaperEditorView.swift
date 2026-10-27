@@ -280,12 +280,14 @@ struct WallpaperEditorView: View {
             Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8)
         }
     }
+    private var markerTasks: [TodoItem] {
+        let ids = model.layout?.rows.map { $0.item.id } ??
+            Array(model.settings.filtered(store.items).prefix(model.settings.maximumItems)).map(\.id)
+        return ids.compactMap { id in store.items.first { $0.id == id } }
+    }
     private var selectedMarkerTask: TodoItem? {
         guard model.settings.inheritsTaskMarkers else { return nil }
-        if let markerTaskID { return store.items.first { $0.id == markerTaskID } }
-        // Show parameters for an actual visible task, not a default circle that
-        // cannot affect its Emoji override. Uniform editing remains explicit.
-        return store.items.first(where: { $0.marker != nil }) ?? store.items.first
+        return MarkerEditorTarget.selected(items: store.items, visibleIDs: markerTasks.map(\.id), preferredID: markerTaskID)
     }
     private var wallpaperMarkerChoice: Binding<TodoMarker> {
         Binding(get: {
@@ -310,10 +312,14 @@ struct WallpaperEditorView: View {
         if model.settings.inheritsTaskMarkers {
             Menu {
                 Button("壁纸统一标记") { markerTaskID = nil; model.settings.usesTaskMarkers = false }
-                ForEach(store.items) { item in Button(item.title) { markerTaskID = item.id } }
+                ForEach(markerTasks) { item in Button(item.title) { markerTaskID = item.id } }
             } label: { Label(selectedMarkerTask?.title ?? "默认标记", systemImage: "pencil.circle").lineLimit(2) }
         }
         MarkerChoiceEditor(choice: wallpaperMarkerChoice)
+        if markerTasks.isEmpty {
+            Text("当前没有可显示的事项。可添加待办，或在文字设置中包含已完成事项。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
         if let task = selectedMarkerTask, task.marker != nil {
             Button("恢复默认标记") {
                 do { try store.edit(id: task.id, title: task.title, marker: nil); model.updateItems(store.items) }

@@ -56,6 +56,16 @@ struct MarkerControlVisibility: Equatable {
     func completionEmoji(_ completion: MarkerCompletion) -> Bool { visible && completion == .replace }
 }
 
+enum MarkerEditorTarget {
+    /// Selection follows actual visible rows. Hidden completed tasks or rows that
+    /// do not fit the panel must never silently become the automatic edit target.
+    static func selected(items: [TodoItem], visibleIDs: [UUID], preferredID: UUID?) -> TodoItem? {
+        let visible = visibleIDs.compactMap { id in items.first { $0.id == id } }
+        if let preferredID, let preferred = visible.first(where: { $0.id == preferredID }) { return preferred }
+        return visible.first
+    }
+}
+
 enum EditorSizing {
     /// Leave a real canvas above the Dock, including when the keyboard reduces height.
     static func panelHeight(available: Double, expanded: Bool, advanced: Bool = false) -> Double {
