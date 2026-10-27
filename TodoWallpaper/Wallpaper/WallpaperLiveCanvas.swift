@@ -92,8 +92,8 @@ private final class WallpaperLayerView: PhotoMotionView {
             let delta = gesture.translation(in: self)
             let rect = template.positioned(using: settings).panel
             settings.customPosition = true
-            var x = rect.midX / 390 + delta.width / max(1, bounds.width)
-            var y = rect.midY / template.canvas.height + delta.height / max(1, bounds.height)
+            var x = Double(rect.midX / 390 + delta.x / max(1, bounds.width))
+            var y = Double(rect.midY / template.canvas.height + delta.y / max(1, bounds.height))
             if abs(x - 0.5) * bounds.width < 3 { x = 0.5 }
             if abs(y - 0.5) * bounds.height < 3 { y = 0.5 }
             settings.panelX = min(1, max(0, x)); settings.panelY = min(1, max(0, y))

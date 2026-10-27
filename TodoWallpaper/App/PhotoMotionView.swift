@@ -55,7 +55,8 @@ class PhotoMotionView: UIView, UIGestureRecognizerDelegate {
     @objc func panGesture(_ gesture: UIPanGestureRecognizer) {
         if gesture.state == .began { begin(gesture) }
         if gesture.state == .changed || gesture.state == .began, let image {
-            crop.pan(by: gesture.translation(in: self), source: CGSize(width: image.width, height: image.height), canvas: bounds.size)
+            let translation = gesture.translation(in: self)
+            crop.pan(by: CGSize(width: translation.x, height: translation.y), source: CGSize(width: image.width, height: image.height), canvas: bounds.size)
             gesture.setTranslation(.zero, in: self); updateLayers()
         }
         if [.ended, .cancelled, .failed].contains(gesture.state) { finish(gesture) }
@@ -63,7 +64,7 @@ class PhotoMotionView: UIView, UIGestureRecognizerDelegate {
     @objc func pinchGesture(_ gesture: UIPinchGestureRecognizer) {
         if gesture.state == .began { begin(gesture) }
         if gesture.state == .changed || gesture.state == .began {
-            crop.zoom = min(4, max(1, crop.zoom * gesture.scale)); gesture.scale = 1; updateLayers()
+            crop.zoom = min(4, max(1, crop.zoom * Double(gesture.scale))); gesture.scale = 1; updateLayers()
         }
         if [.ended, .cancelled, .failed].contains(gesture.state) { finish(gesture) }
     }
