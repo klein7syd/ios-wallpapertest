@@ -80,6 +80,11 @@ enum FeedbackRepairChecks {
         let restored = try repository.load()
         try require(restored.items.map(\.id) == after.items.map(\.id) && restored.items[0].marker == nil && restored.items[1].marker?.emoji == "📚",
             "Multiple marker undos share one atomic transaction")
+        let trimmedID = TodoImportIdentity.make(source: "reminder", calendar: "fixture", item: "trimmed")
+        let padded = TodoItem(id: trimmedID, title: "  来源末尾空白  ", isCompleted: false,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000), updatedAt: Date(timeIntervalSince1970: 1_700_000_000))
+        let normalized = try repository.importItems([padded])
+        try require(normalized.items.last?.title == "来源末尾空白", "Source title boundary whitespace normalizes just like manual add")
         var invalid = imported; invalid.title = ""
         let beforeInvalid = try Data(contentsOf: repository.fileURL)
         do { _ = try repository.importItems([invalid]); throw NSError(domain: "ExpectedInvalidImport", code: 1) }

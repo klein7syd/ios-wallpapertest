@@ -58,10 +58,12 @@ struct TodoRepository {
     /// make repeated imports idempotent; existing tasks are never rewritten.
     func importItems(_ candidates: [TodoItem]) throws -> TodoDocument {
         guard candidates.count <= 500 else { throw TodoDataError.invalidDocument }
-        for item in candidates { _ = try validatedTitle(item.title); try item.marker?.validate() }
+        let validated = try candidates.map { item in
+            var copy = item; copy.title = try validatedTitle(item.title); try copy.marker?.validate(); return copy
+        }
         return try update { document in
             var known = Set(document.items.map(\.id))
-            for item in candidates where known.insert(item.id).inserted { document.items.append(item) }
+            for item in validated where known.insert(item.id).inserted { document.items.append(item) }
         }
     }
 

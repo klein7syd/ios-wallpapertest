@@ -69,7 +69,8 @@ enum NativeUIProbe {
             await editor.start(items: [], appearance: TodoAppearance())
             try require(editor.ready && !editor.draftBlocked, "CI draft is readable")
             let initialSettings = editor.settings, initialName = editor.photoName
-            let sample = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 60)).pngData { drawing in
+            let sampleFormat = UIGraphicsImageRendererFormat(); sampleFormat.scale = 1
+            let sample = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 60), format: sampleFormat).pngData { drawing in
                 UIColor.systemBlue.setFill(); drawing.fill(CGRect(x: 0, y: 0, width: 40, height: 60))
             }
             let localFiles = WallpaperDraftStore()

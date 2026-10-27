@@ -9,7 +9,7 @@ Implementation candidate. Real CI/run/artifact results are appended after comple
 - Advanced export controls include an editor-only preview-size preference, 0.55–1.0, with undo. It never changes canvas/export coordinates.
 - Every slider has standard-point capture, hysteresis and selection haptics. Numeric input bypasses snapping.
 - Widget title has independent text, visibility, color, font/weight, horizontal alignment; advanced size and precise horizontal/top position. Top-right unfinished count has a switch. Header space is bounded and follows system text scaling.
-- Widget photos: native PhotosPicker, orientation-normalized JPEG up to 2048 px long edge, local App Group storage, bounded decode cache. Preview and extension use the same background view. No album/network writes; system tint can change colors.
+- Widget photos: native PhotosPicker, orientation-normalized JPEG up to 1536 px long edge, local App Group storage, bounded decode cache. Preview and extension use the same background view. No album/network writes; system tint can change colors.
 - Explicit EventKit import for Calendar events (at most 90 days per query) and Reminders, separately authorized and selected. Local snapshots, no automatic/bidirectional sync. Event date/time is included in task text. Source-derived UUIDs make repeat imports idempotent while Apple identifiers stay stable; account resync can change them.
 - Ordinary undo immediately applies live state with deferred persistence, no photo loading overlay. Poster bitmap rendering is on demand for exact preview/export. Widget-only changes no longer invalidate wallpaper. Multi-task marker undo uses one compare-and-write repository transaction. Changing the photo still needs asynchronous image loading.
 

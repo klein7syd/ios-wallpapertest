@@ -9,7 +9,7 @@ actor WidgetPhotoStore {
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: 2048,
+                kCGImageSourceThumbnailMaxPixelSize: 1536,
                 kCGImageSourceShouldCacheImmediately: true
               ] as CFDictionary) else { throw WallpaperError.unreadablePhoto }
         let shared = try sharedDirectory ?? TodoSharedStorage.sharedDirectory()

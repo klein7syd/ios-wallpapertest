@@ -30,7 +30,7 @@ enum WidgetPhotoCache {
         if let cached = cache.object(forKey: key) { return cached }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
-        cache.totalCostLimit = 32 * 1024 * 1024
+        cache.totalCostLimit = 12 * 1024 * 1024
         cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
         return image
     }

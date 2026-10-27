@@ -156,7 +156,8 @@ struct WallpaperEditorView: View {
         VStack(spacing: 8) {
             toolSelector.frame(height: 44)
             if navigation.inspectorExpanded {
-                InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic")) {
+                InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +
+                    (tool == .marker ? (selectedMarkerTask?.id.uuidString ?? ".uniform") : "")) {
                     if model.draftBlocked { Text("草稿已保留，请用右上角菜单确认恢复默认。").font(.caption).foregroundStyle(.red) }
                     if let error = store.appearanceError { Text(error).font(.caption).foregroundStyle(.red) }
                     switch tool {
@@ -279,7 +280,13 @@ struct WallpaperEditorView: View {
             Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8)
         }
     }
-    private var selectedMarkerTask: TodoItem? { store.items.first { $0.id == markerTaskID } }
+    private var selectedMarkerTask: TodoItem? {
+        guard model.settings.inheritsTaskMarkers else { return nil }
+        if let markerTaskID { return store.items.first { $0.id == markerTaskID } }
+        // Show parameters for an actual visible task, not a default circle that
+        // cannot affect its Emoji override. Uniform editing remains explicit.
+        return store.items.first(where: { $0.marker != nil }) ?? store.items.first
+    }
     private var wallpaperMarkerChoice: Binding<TodoMarker> {
         Binding(get: {
             if let task = selectedMarkerTask { return model.settings.marker(for: task, appearance: store.appearance) }
@@ -302,7 +309,7 @@ struct WallpaperEditorView: View {
         }))
         if model.settings.inheritsTaskMarkers {
             Menu {
-                Button("未单独设置的待办") { markerTaskID = nil }
+                Button("壁纸统一标记") { markerTaskID = nil; model.settings.usesTaskMarkers = false }
                 ForEach(store.items) { item in Button(item.title) { markerTaskID = item.id } }
             } label: { Label(selectedMarkerTask?.title ?? "默认标记", systemImage: "pencil.circle").lineLimit(2) }
         }

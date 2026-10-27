@@ -217,6 +217,7 @@ struct WidgetAppearanceEditor: View {
         Toggle("显示标题", isOn: heading.showsTitle)
         if store.appearance.widget.heading.showsTitle {
             TextField("标题内容", text: Binding(get: { store.appearance.widget.heading.text }, set: { text in
+                edits.context(read: { editState }).pulse("widget.title")
                 heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
             })).textInputAutocapitalization(.never).submitLabel(.done)
             Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
