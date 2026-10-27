@@ -307,7 +307,8 @@ struct WidgetAppearanceEditor: View {
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("单行").tag(1); Text("最多两行").tag(2)
         }.pickerStyle(.menu)
-        Toggle("文字描边", isOn: Binding(get: { store.appearance.widget.textOutline ?? false }, set: { widget.wrappedValue.textOutline = $0 }))`n        Text("点按后效果").font(.subheadline)
+        Toggle("文字描边", isOn: Binding(get: { store.appearance.widget.textOutline ?? false }, set: { widget.wrappedValue.textOutline = $0 }))
+        Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.menu)
