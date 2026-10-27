@@ -12,6 +12,8 @@ final class TodoStore: ObservableObject {
     @Published private(set) var appearanceError: String?
     private var repository: TodoRepository?
     private var appearanceTask: Task<Void, Never>?
+    private var appearanceDirty = false
+    private var defersAppearanceSave = false
     private let usesSharedStorage: Bool
 
     init(repository: TodoRepository? = nil) {
@@ -44,10 +46,24 @@ final class TodoStore: ObservableObject {
         guard value != appearance else { return }
         do { try value.validate() } catch { appearanceError = error.localizedDescription; return }
         appearance = value
+        appearanceDirty = true
         appearanceTask?.cancel()
+        if !defersAppearanceSave { scheduleAppearanceSave() }
+    }
+    func beginAppearanceInteraction() {
+        defersAppearanceSave = true
+        appearanceTask?.cancel(); appearanceTask = nil
+    }
+    func endAppearanceInteraction() {
+        defersAppearanceSave = false
+        if appearanceDirty { scheduleAppearanceSave() }
+    }
+    private func scheduleAppearanceSave() {
+        appearanceTask?.cancel()
+        let value = appearance
         appearanceTask = Task {
             do {
-                try await Task.sleep(for: .milliseconds(250))
+                try await Task.sleep(for: .milliseconds(800))
                 try Task.checkCancellation()
                 try saveAppearance(value)
             } catch is CancellationError { }
@@ -55,13 +71,14 @@ final class TodoStore: ObservableObject {
         }
     }
     func flushAppearance() {
-        guard appearanceTask != nil else { return }
+        defersAppearanceSave = false
+        guard appearanceDirty else { return }
         appearanceTask?.cancel(); appearanceTask = nil
         do { try saveAppearance(appearance) } catch { appearanceError = error.localizedDescription }
     }
     func saveAppearance(_ value: TodoAppearance) throws {
         try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).save(value)
-        appearance = value; appearanceError = nil
+        appearance = value; appearanceDirty = false; appearanceError = nil
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
     }
     func reloadAppearance() {

@@ -56,6 +56,11 @@ struct WidgetAppearanceEditor: View {
         Binding(get: { store.appearance.widget.fontSize / 15 },
             set: { widget.wrappedValue = EditorStandards.widget(store.appearance.widget, scale: $0) })
     }
+    private var editorInteraction: EditorInteractionContext {
+        let base = edits.context(read: { editState })
+        return EditorInteractionContext(begin: { key in store.beginAppearanceInteraction(); base.begin(key) },
+            end: { base.end(); store.endAppearanceInteraction() }, pulse: base.pulse)
+    }
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
@@ -120,8 +125,8 @@ struct WidgetAppearanceEditor: View {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
                     var next = store.appearance.widget
-                    next.backgroundPhotoName = name; next.backdrop = .photo; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
-                    widget.wrappedValue = next
+                    next.backgroundPhotoName = name; next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
+                    widget.wrappedValue = next; store.flushAppearance()
                 } catch { self.error = error.localizedDescription }
             }
         }
@@ -142,7 +147,7 @@ struct WidgetAppearanceEditor: View {
         .alert("样式", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("好", role: .cancel) { }
         } message: { Text(error ?? "") }
-        .environment(\.editorInteraction, edits.context(read: { editState }))
+        .environment(\.editorInteraction, editorInteraction)
     }
     private func undoEdit() {
         Task {
@@ -214,12 +219,12 @@ struct WidgetAppearanceEditor: View {
         .accessibilityIdentifier("widget.fixedPreview")
     }
     @ViewBuilder private var themeControls: some View {
-        Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        Toggle("系统材质背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
+        Toggle("玻璃背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
             widget.wrappedValue.systemMaterial = $0; cropPhoto = false
         }))
+        Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if store.appearance.widget.materialEnabled {
-            Text("使用系统材质请求。桌面默认/深色模式的实际合成由 iOS 决定；透明图标模式仍交给系统处理。")
+            Text("请求原生 Liquid Glass。默认图标模式能否透出桌面壁纸，仍需实机确认；系统透明模式由 iOS 控制。")
                 .font(.caption).foregroundStyle(.secondary)
         } else {
             Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
@@ -283,7 +288,6 @@ struct WidgetAppearanceEditor: View {
                 PreciseSlider(title: "标题顶部留白", value: heading.topInset, range: 0...24, standard: 0)
             }
         }
-        Toggle("显示右上角未完成数量", isOn: heading.showsSummary)
     }
     @ViewBuilder private var textControls: some View {
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
@@ -296,6 +300,13 @@ struct WidgetAppearanceEditor: View {
         }
         Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        if advanced {
+            PreciseSlider(title: "行距", value: widget.spacing, range: 0...40, standard: 5)
+        }
+        Toggle("紧凑布局", isOn: widget.compact)
+        Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
+            Text("自动").tag(0); Text("单行").tag(1); Text("最多两行").tag(2)
+        }.pickerStyle(.menu)
         Text("文字点按后效果").font(.subheadline)
         Picker("文字点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
@@ -349,8 +360,7 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var contentControls: some View {
         Toggle("显示左下角说明", isOn: Binding(get: { store.appearance.widget.footerVisible }, set: { widget.wrappedValue.showsFooter = $0 }))
-        Toggle("紧凑布局", isOn: widget.compact)
-        if advanced { PreciseSlider(title: "行距", value: widget.spacing, range: 0...12, standard: 5) }
+        Toggle("显示未完成数量", isOn: heading.showsSummary)
         Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
         Stepper("最多 \(store.appearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
         Picker("完成事项", selection: widget.completed) { ForEach(WidgetCompleted.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu)

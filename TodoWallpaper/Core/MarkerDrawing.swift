@@ -16,11 +16,23 @@ enum MarkerDrawing {
         return CTLineCreateWithAttributedString(text as CFAttributedString)
     }
     static func draw(marker: TodoMarker, completed: Bool, style: MarkerStyle, textColor: WallpaperColor,
-                     rect: CGRect, context: CGContext) {
+                     rect: CGRect, context: CGContext, assetDirectory: URL? = nil) {
         let result = style.resolved(marker, completed: completed)
         guard result.marker.kind != .none else { return }
         context.saveGState(); defer { context.restoreGState() }
         context.setAlpha(result.opacity)
+        if result.marker.kind == .image {
+            if let image = MarkerImageReference.image(named: result.marker.imageName, sharedDirectory: assetDirectory) {
+                let scale = min(rect.width / CGFloat(image.width), rect.height / CGFloat(image.height))
+                let size = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
+                context.interpolationQuality = .high
+                context.draw(image, in: CGRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            } else {
+                context.setStrokeColor(cgColor(textColor)); context.setLineWidth(1)
+                context.stroke(rect.insetBy(dx: 2, dy: 2))
+            }
+            return
+        }
         if result.marker.kind == .emoji {
             let line = emojiLine(result.marker.emoji, size: rect.height)
             var ascent: CGFloat = 0, descent: CGFloat = 0

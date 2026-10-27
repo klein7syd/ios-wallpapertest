@@ -1,11 +1,13 @@
 import SwiftUI
 import WidgetKit
+import CoreGraphics
 
 struct TodoWidgetEntry: TimelineEntry {
     let date: Date
     let document: TodoDocument?
     var appearance = TodoAppearance()
     let error: String?
+    var background: CGImage?
 }
 struct TodoWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> TodoWidgetEntry {
@@ -15,15 +17,21 @@ struct TodoWidgetProvider: TimelineProvider {
         ]), error: nil)
     }
     func getSnapshot(in context: Context, completion: @escaping (TodoWidgetEntry) -> Void) {
-        completion(context.isPreview ? placeholder(in: context) : read())
+        var entry = context.isPreview ? placeholder(in: context) : read()
+        entry.background = WidgetPhotoCache.prepared(style: entry.appearance.widget, size: context.displaySize, date: entry.date)
+        completion(entry)
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoWidgetEntry>) -> Void) {
         let initial = read()
-        let dates = WidgetDayTimeline.dates(now: initial.date)
+        // Keep only today/tomorrow bitmap resources alive. Request the next pair
+        // at the next day boundary; the second entry is a scheduling fallback.
+        let rotating = initial.appearance.widget.photoRotation?.enabled == true
+        let dates = WidgetDayTimeline.dates(now: initial.date, count: rotating ? 2 : 1)
         let entries = dates.map { date in
-            TodoWidgetEntry(date: date, document: initial.document, appearance: initial.appearance, error: initial.error)
+            TodoWidgetEntry(date: date, document: initial.document, appearance: initial.appearance, error: initial.error,
+                background: WidgetPhotoCache.prepared(style: initial.appearance.widget, size: context.displaySize, date: date))
         }
-        completion(Timeline(entries: entries, policy: .atEnd))
+        completion(Timeline(entries: entries, policy: dates.count > 1 ? .after(dates[1]) : .never))
     }
     private func read() -> TodoWidgetEntry {
         do {
@@ -44,7 +52,7 @@ struct TodoWidgetView: View {
         TodoWidgetContent(document: entry.document, appearance: entry.appearance,
             error: entry.error, family: previewFamily)
             .containerBackground(for: .widget) {
-                WidgetBackgroundView(style: style, date: entry.date)
+                WidgetBackgroundView(style: style, date: entry.date, preparedPhoto: entry.background, preparedOnly: true)
             }
             .environment(\.colorScheme, scheme)
     }

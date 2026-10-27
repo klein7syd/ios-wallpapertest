@@ -1,8 +1,12 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct MarkerChoiceEditor: View {
     @Binding var choice: TodoMarker
+    @State private var selection: PhotosPickerItem?
+    @State private var importing = false
+    @State private var error: String?
     @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -12,7 +16,9 @@ struct MarkerChoiceEditor: View {
                         Button { choice.kind = kind } label: {
                             VStack(spacing: 6) {
                                 ZStack {
-                                    if kind == .none {
+                                    if kind == .image {
+                                        Image(systemName: "photo").font(.title2)
+                                    } else if kind == .none {
                                         Image(systemName: "nosign").font(.title3).foregroundStyle(.secondary)
                                     } else {
                                         TodoMarkerView(marker: TodoMarker(kind: kind, emoji: choice.emoji), completed: false,
@@ -40,6 +46,26 @@ struct MarkerChoiceEditor: View {
             if choice.kind == .emoji {
                 EmojiEntry(value: $choice.emoji)
                 Button("清除标记", role: .destructive) { choice.kind = .none }
+            }
+            if choice.kind == .image {
+                PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
+                    Label(choice.imageName == nil ? "选择标记图片" : "更换标记图片", systemImage: "photo")
+                }.disabled(importing)
+                if importing { ProgressView("正在处理图片…") }
+                if choice.imageName != nil { Button("清除图片") { choice.imageName = nil } }
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            }
+        }
+        .onChange(of: selection) { _, item in
+            guard let item else { return }
+            importing = true; error = nil
+            Task {
+                defer { importing = false; selection = nil }
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
+                    let name = try await WidgetPhotoStore().importMarker(data)
+                    var next = choice; next.kind = .image; next.imageName = name; choice = next
+                } catch { self.error = error.localizedDescription }
             }
         }
     }
@@ -119,7 +145,7 @@ struct PreciseSlider: View {
                     .font(.subheadline.monospacedDigit()).frame(width: typeSize.isAccessibilitySize ? 96 : 64).frame(minHeight: 44)
                     .accessibilityLabel("\(title)，精确输入")
             }
-            Slider(value: sliding, in: range, onEditingChanged: { editing in
+            SmoothValueSlider(value: sliding, range: range, onEditingChanged: { editing in
                 if editing { detent.reset(); interaction.begin("slider." + title) }
                 else { detent.reset(); interaction.end() }
             }).accessibilityLabel(title)
@@ -194,7 +220,7 @@ struct MarkerStyleEditor: View {
     var showsCompletion = true
     private var controls: MarkerControlVisibility { MarkerControlVisibility(kind: kind) }
     private var completion: Binding<MarkerCompletion> {
-        Binding(get: { kind == .emoji && style.completion == .checkShapes ? .keep : style.completion },
+        Binding(get: { (kind == .emoji || kind == .image) && style.completion == .checkShapes ? .keep : style.completion },
                 set: { style.completion = $0 })
     }
     var body: some View {
@@ -202,7 +228,7 @@ struct MarkerStyleEditor: View {
             VStack(alignment: .leading, spacing: 18) {
                 if advanced {
                     if controls.emoji { PreciseSlider(title: "Emoji 大小", value: $style.emojiSize, range: 8...48, standard: 22) }
-                    else { PreciseSlider(title: "图形大小", value: $style.size, range: 8...48, standard: 18) }
+                    else { PreciseSlider(title: controls.image ? "图片大小" : "图形大小", value: $style.size, range: 8...48, standard: 18) }
                     PreciseSlider(title: "标记与文字间距", value: $style.gap, range: 0...32, standard: 10)
                     if controls.stroke { PreciseSlider(title: "描边粗细", value: $style.lineWidth, range: 0.3...6, standard: 1.5) }
                     if kind == .filled { PreciseSlider(title: "边框粗细", value: $style.lineWidth, range: 0.3...6, standard: 1.5) }
@@ -215,8 +241,9 @@ struct MarkerStyleEditor: View {
                     if kind == .filled && advanced { StyleColorControl(title: "边框色", value: $style.stroke) }
                 }
                 if showsCompletion {
-                    Picker("完成时", selection: completion) {
-                        ForEach(MarkerCompletion.allCases.filter { kind != .emoji || $0 != .checkShapes }) {
+                    Text("标记点按后效果").font(.subheadline)
+                    Picker("标记点按后效果", selection: completion) {
+                        ForEach(MarkerCompletion.allCases.filter { !(controls.emoji || controls.image) || $0 != .checkShapes }) {
                             Text($0.title).tag($0)
                         }
                     }.pickerStyle(.menu)

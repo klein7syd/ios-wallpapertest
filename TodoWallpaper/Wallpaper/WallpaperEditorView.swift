@@ -52,6 +52,11 @@ struct WallpaperEditorView: View {
             store.setAppearance(next); model.updateAppearance(store.appearance)
         })
     }
+    private var editorInteraction: EditorInteractionContext {
+        let base = edits.context(read: { editState })
+        return EditorInteractionContext(begin: { key in store.beginAppearanceInteraction(); base.begin(key) },
+            end: { base.end(); store.endAppearanceInteraction() }, pulse: base.pulse)
+    }
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
@@ -121,7 +126,7 @@ struct WallpaperEditorView: View {
                 Button("恢复默认") { Task { await model.resetLayout() } }
             } message: { Text("保留照片、画布比例和输出尺寸。待办与单项 Emoji 不变。") }
         }
-        .environment(\.editorInteraction, edits.context(read: { editState }))
+        .environment(\.editorInteraction, editorInteraction)
     }
     private func toggleInspector() {
         edits.finish(editState)

@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 #if canImport(UIKit)
 import UIKit
 #else
@@ -29,21 +30,50 @@ struct TodoMarkerView: View {
     var style = MarkerStyle()
     var textColor: Color = .primary
     var maximumSize: Double = 48
+    var assetDirectory: URL?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.displayScale) private var displayScale
     private var extent: Double { min(maximumSize, MarkerDrawing.extent(marker: marker, style: style, completed: completed)) }
     var body: some View {
         if extent > 0 {
-            Canvas { graphics, size in
+            Group {
+                if [.emoji, .image].contains(style.resolved(marker, completed: completed).marker.kind),
+                   let bitmap = MarkerBitmapCache.image(marker: marker, completed: completed, style: style,
+                       extent: extent, scale: displayScale, directory: assetDirectory) {
+                    if #available(iOS 18.0, macOS 15.0, *) {
+                        Image(decorative: bitmap, scale: displayScale).resizable().widgetAccentedRenderingMode(.fullColor)
+                    } else { Image(decorative: bitmap, scale: displayScale).resizable() }
+                } else { Canvas { graphics, size in
                 graphics.withCGContext { context in
                     context.translateBy(x: 0, y: size.height); context.scaleBy(x: 1, y: -1)
                     MarkerDrawing.draw(marker: marker, completed: completed, style: style,
                         textColor: WallpaperColor.resolved(textColor, dark: scheme == .dark),
-                        rect: CGRect(origin: .zero, size: size), context: context)
+                        rect: CGRect(origin: .zero, size: size), context: context, assetDirectory: assetDirectory)
                 }
+            } }
             }
             .frame(width: extent, height: extent)
             .offset(y: style.verticalOffset)
             .accessibilityHidden(true)
         }
+    }
+}
+
+private enum MarkerBitmapCache {
+    private static let cache = NSCache<NSString, CGImage>()
+    static func image(marker: TodoMarker, completed: Bool, style: MarkerStyle, extent: Double, scale: Double, directory: URL?) -> CGImage? {
+        let result = style.resolved(marker, completed: completed)
+        let pixels = max(1, Int(ceil(extent * min(3, max(1, scale)))))
+        let key = "\(result.marker.kind):\(result.marker.emoji):\(result.marker.imageName ?? ""):\(result.opacity):\(pixels):\(directory?.path ?? "shared")" as NSString
+        if let image = cache.object(forKey: key) { return image }
+        guard let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: pixels * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.scaleBy(x: CGFloat(pixels) / extent, y: CGFloat(pixels) / extent)
+        MarkerDrawing.draw(marker: marker, completed: completed, style: style, textColor: WallpaperColor(),
+            rect: CGRect(x: 0, y: 0, width: extent, height: extent), context: context, assetDirectory: directory)
+        guard let image = context.makeImage() else { return nil }
+        cache.totalCostLimit = 2 * 1024 * 1024
+        cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        return image
     }
 }

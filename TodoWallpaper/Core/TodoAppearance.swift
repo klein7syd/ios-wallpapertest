@@ -1,20 +1,22 @@
 import Foundation
 
 enum MarkerKind: String, Codable, CaseIterable, Identifiable {
-    case hollow, filled, thin, bordered, square, emoji, none
+    case hollow, filled, thin, bordered, square, emoji, image, none
     var id: String { rawValue }
     var title: String {
         switch self {
         case .hollow: return "空心圆"; case .filled: return "实心圆"; case .thin: return "细线圆"
-        case .bordered: return "带边框圆"; case .square: return "方框"; case .emoji: return "自定义 Emoji"; case .none: return "不显示"
+        case .bordered: return "带边框圆"; case .square: return "方框"; case .emoji: return "自定义 Emoji"; case .image: return "自定义图片"; case .none: return "不显示"
         }
     }
 }
 struct TodoMarker: Codable, Equatable, Sendable {
     var kind = MarkerKind.hollow
     var emoji = "⭐"
+    var imageName: String?
     func validate() throws {
         if kind == .emoji, !EmojiInput.isValid(emoji) { throw AppearanceError.invalidEmoji }
+        if let imageName, !MarkerImageReference.isValid(imageName) { throw AppearanceError.invalidStyle }
     }
 }
 enum EmojiInput {
@@ -59,7 +61,7 @@ struct MarkerStyle: Codable, Equatable, Sendable {
         if completed && completion == .replace { return (TodoMarker(kind: .emoji, emoji: completionEmoji), 1, false) }
         if completed && completion == .thinCircle { return (TodoMarker(kind: .thin), 1, true) }
         return (marker, completed && completion == .dim ? 0.4 : 1,
-                completed && completion == .checkShapes && marker.kind != .emoji && marker.kind != .none)
+                completed && completion == .checkShapes && marker.kind != .emoji && marker.kind != .image && marker.kind != .none)
     }
 }
 extension WallpaperColor {
@@ -135,6 +137,9 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var photoRotation: WidgetAlbumRotation?
     var systemMaterial: Bool?
     var showsFooter: Bool?
+    /// Extra inter-row padding; the separate line-count policy avoids forcing
+    /// two text lines into every large Widget row when tight spacing is selected.
+    var maximumTitleLines: Int?
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
@@ -145,7 +150,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         try backgroundCrop?.validate(); try photoRotation?.validate()
         if let backgroundPhotoOpacity, !backgroundPhotoOpacity.isFinite || !(0...1).contains(backgroundPhotoOpacity) { throw AppearanceError.invalidStyle }
         if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }
-        guard (12...20).contains(fontSize), (0...12).contains(spacing), (1...10).contains(maximumItems),
+        guard (12...20).contains(fontSize), (0...40).contains(spacing), (1...10).contains(maximumItems),
+              maximumTitleLines == nil || (1...2).contains(maximumTitleLines!),
               textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }
     }
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {

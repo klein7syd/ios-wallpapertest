@@ -18,16 +18,18 @@ extension EnvironmentValues {
 /// Each editor owns a small session. Applying an undo uses its existing save path.
 @MainActor
 final class EditorUndoState<Value: Equatable>: ObservableObject {
-    @Published private var history = EditorHistory<Value>()
+    private var history = EditorHistory<Value>()
+    @Published private var hasUndo = false
     @Published private(set) var isRestoring = false
     private var activeKey: String?
     private var settle: Task<Void, Never>?
-    var canUndo: Bool { history.canUndo && !isRestoring }
+    var canUndo: Bool { hasUndo && !isRestoring }
+    private func updateAvailability() { if hasUndo != history.canUndo { hasUndo = history.canUndo } }
     func synchronize(_ value: Value) {
         settle?.cancel(); settle = nil; activeKey = nil
-        history.endInteraction(); history.synchronize(value)
+        history.endInteraction(); history.synchronize(value); updateAvailability()
     }
-    func observe(_ value: Value) { if !isRestoring { history.observe(value) } }
+    func observe(_ value: Value) { if !isRestoring { history.observe(value); updateAvailability() } }
     func finish(_ value: Value) {
         settle?.cancel(); settle = nil
         observe(value); history.endInteraction(); activeKey = nil
@@ -58,6 +60,6 @@ final class EditorUndoState<Value: Equatable>: ObservableObject {
         try await apply(step.before, step.after)
         history.acceptUndo(step)
         // Any external changes during the asynchronous restore form a new baseline.
-        history.synchronize(read())
+        history.synchronize(read()); updateAvailability()
     }
 }

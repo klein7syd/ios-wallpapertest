@@ -34,8 +34,12 @@ extension WallpaperSettings {
         copy.size = WallpaperSize(); copy.canvasAspect = aspectRatio
         copy.customPosition = false; copy.panelX = 0.5; copy.panelY = 0.5
         copy.backgroundZoom = 1; copy.backgroundPanX = 0; copy.backgroundPanY = 0
-        copy.glassOpacity = 0; copy.blurRadius = 0; copy.borderOpacity = 0; copy.highlight = 0
-        copy.cornerRadius = 0; copy.darkGlass = false
+        // Contrast protection and shadow change only at the opaque-panel boundary.
+        // Preserve that category so cached CTLine colors match the exported PNG,
+        // without reshaping text for every opacity sample.
+        copy.glassOpacity = glassOpacity >= 0.75 ? 0.85 : 0
+        copy.blurRadius = 0; copy.borderOpacity = 0; copy.highlight = 0
+        copy.cornerRadius = 0; copy.darkGlass = glassOpacity >= 0.75 && darkGlass
         // Legacy completion effects are retained in JSON but never affect static wallpaper.
         copy.completionStyle = .check
         return copy

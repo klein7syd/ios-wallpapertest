@@ -7,7 +7,16 @@ import AppKit
 #endif
 
 enum NativeTypography {
+    private final class FontBox: NSObject { let font: CTFont; init(_ font: CTFont) { self.font = font } }
+    private static let cache = NSCache<NSString, FontBox>()
     static func font(family: WallpaperFont, weight: WallpaperWeight, size: CGFloat) -> CTFont {
+        let key = "\(family.rawValue):\(weight.rawValue):\(size)" as NSString
+        if let font = cache.object(forKey: key) { return font.font }
+        let font = makeFont(family: family, weight: weight, size: size)
+        cache.countLimit = 96; cache.setObject(FontBox(font), forKey: key)
+        return font
+    }
+    private static func makeFont(family: WallpaperFont, weight: WallpaperWeight, size: CGFloat) -> CTFont {
         let native: CTFont
         #if canImport(UIKit)
         let w = UIFont.Weight(rawValue: CGFloat(weight.trait))

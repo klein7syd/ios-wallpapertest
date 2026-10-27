@@ -22,13 +22,25 @@ struct TodoWidgetContent: View {
     @Environment(\.colorScheme) private var hostScheme
     private var foreground: Color {
         if renderingMode != .fullColor { return .primary }
-        return style.followsSystemText ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? .white : .black) : style.textColor.swiftColor
+        let requested = style.followsSystemText ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0)) : style.textColor
+        return safeColor(requested)
+    }
+    private var background: WallpaperColor { TextLegibility.widgetBase(style, dark: style.isExplicitlyDark ?? (hostScheme == .dark)) }
+    private var textNeedsShadow: Bool { renderingMode == .fullColor && (style.backdrop == .photo || style.materialEnabled || style.backdrop == .solid && style.panelColor.alpha < 0.9) }
+    private func safeColor(_ color: WallpaperColor) -> Color {
+        if renderingMode != .fullColor { return .primary }
+        return TextLegibility.readable(color, on: background).swiftColor
+    }
+    private var textShadow: Color {
+        TextLegibility.luminance(TextLegibility.readable(style.followsSystemText ? WallpaperColor() : style.textColor, on: background)) > 0.5 ? .black.opacity(0.75) : .white.opacity(0.85)
     }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
     private var fontSize: Double { style.fontSize * bodyUnit / 15 }
     private var titleFont: CTFont { NativeTypography.font(family: style.font, weight: style.weight, size: fontSize) }
     private var lineHeight: Double {
+        let key = "\(style.font.rawValue):\(style.weight.rawValue):\(fontSize):\((document?.items.prefix(10).map(\.title) ?? []).joined(separator: "\u{1f}"))" as NSString
+        if let cached = WidgetMeasureCache.heights.object(forKey: key) { return cached.doubleValue }
         let font = titleFont
         var height = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
         // Include CJK/Emoji fallback metrics, not just the Latin font's ascender.
@@ -39,7 +51,10 @@ struct TodoWidgetContent: View {
             CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
             height = max(height, ascent + descent + leading)
         }
-        return ceil(height) + 1
+        let result = ceil(height) + 1
+        WidgetMeasureCache.heights.countLimit = 96
+        WidgetMeasureCache.heights.setObject(NSNumber(value: result), forKey: key)
+        return result
     }
     var body: some View {
         GeometryReader { geometry in
@@ -104,10 +119,12 @@ struct TodoWidgetContent: View {
         ZStack(alignment: .topLeading) {
             if heading.visibleTitle {
                 Text(heading.text).font(Font(headingFont))
-                    .foregroundStyle(heading.followsTextColor ? foreground : heading.color.swiftColor)
+                    .foregroundStyle(heading.followsTextColor ? foreground : safeColor(heading.color))
+                    .shadow(color: textNeedsShadow ? textShadow : .clear, radius: 1.5, y: 0.5)
                     .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
-                    .offset(x: layout.titleX, y: heading.topInset)
+                    .offset(x: layout.titleX, y: layout.titleY)
                     .onTapGesture { if !interactive { onPreviewHeader?() } }
                     .accessibilityLabel("小组件标题：\(heading.text)")
             }
@@ -157,7 +174,8 @@ struct TodoWidgetContent: View {
             Text(item.title).font(Font(titleFont))
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? style.completionColor.swiftColor : foreground)
+                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
+                .shadow(color: textNeedsShadow ? textShadow : .clear, radius: 1.5, y: 0.5)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
@@ -167,3 +185,5 @@ struct TodoWidgetContent: View {
 
     }
 }
+
+private enum WidgetMeasureCache { static let heights = NSCache<NSString, NSNumber>() }

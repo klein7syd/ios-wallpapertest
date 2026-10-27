@@ -76,10 +76,20 @@ require('WidgetPhotoMotionSurface' in widget and '照片不透明度' in widget,
 require('显示左下角说明' in widget and 'style.footerVisible' in read('TodoWallpaper/Core/WidgetLayout.swift'), 'Footer switch changes both content and space budget')
 require('Text("文字点按后效果")' in widget, 'Text completion menu has a visible label')
 require('isExplicitlyDark' in shared and 'systemScheme' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Widget colors resolve explicit theme instead of inheriting system-light background')
-require('WidgetDayTimeline.dates' in extension and 'entry.date' in extension and '.atEnd' in extension, 'Daily image uses actual Widget timeline entries')
+require('WidgetDayTimeline.dates' in extension and 'entry.date' in extension and '.after(dates[1])' in extension, 'Daily image uses actual Widget timeline entries')
 require('WidgetAlbumPicker' in widget and 'PHAssetCollection.fetchAssetCollections' in read('TodoWallpaper/App/WidgetAlbumPicker.swift'), 'Album selector uses native PhotoKit with explicit access')
 require('指定日期' in app and '指定时间' in app and 'schedule' in read('TodoWallpaper/Core/TodoItem.swift'), 'Optional schedule has real shared task persistence')
-require('systemMaterial' in widget and '.ultraThinMaterial' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Experimental material uses a public system material request')
+require('systemMaterial' in widget and '.ultraThinMaterial' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Experimental glass requests public Liquid Glass with material fallback')
+require('Text("标记点按后效果")' in marker and 'case hollow, filled, thin, bordered, square, emoji, image, none' in read('TodoWallpaper/Core/TodoAppearance.swift'), 'Visible marker-effect heading and image marker kind')
+require('PhotosPicker(selection: $selection' in marker and 'importMarker(' in marker, 'Every reused marker chooser supports real native photo input')
+require('preparedOnly: true' in extension and 'count: rotating ? 2 : 1' in extension and 'kCGImageSourceThumbnailMaxPixelSize: 1024' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Extension archives bounded prepared photos and limits future image entries')
+require('SmoothValueSlider(value: sliding' in marker and 'CADisplayLink' in read('TodoWallpaper/App/SmoothValueSlider.swift'), 'Native slider tracks immediately with frame-coalesced model publication')
+require('@Published private var history' not in read('TodoWallpaper/App/EditorUndoState.swift'), 'History does not republish the entire editor for every grouped sample')
+text_section = widget[widget.index('@ViewBuilder private var textControls'):widget.index('@ViewBuilder private var markerControls')]
+content_section = widget[widget.index('@ViewBuilder private var contentControls'):widget.index('private var help:')]
+require('title: "行距"' in text_section and 'range: 0...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
+require(widget.index('Toggle("玻璃背景') < widget.index('Picker("明暗"'), 'Glass switch is the first theme setting')
+require('TextLegibility.readable' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

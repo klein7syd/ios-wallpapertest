@@ -7,6 +7,7 @@ import CoreText
 /// Compiled only into the CI Simulator Debug app, never the delivered device IPA.
 @MainActor
 enum NativeUIProbe {
+    private final class ProbeTrackingSlider: UISlider { override var isTracking: Bool { true } }
     static func makeStore() -> TodoStore {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("native-ui-fixture")
         let repository = TodoRepository(directoryURL: directory)
@@ -48,6 +49,16 @@ enum NativeUIProbe {
             try await Task.sleep(for: .milliseconds(200))
             // Execute the production editing-session coordinator on iOS, including
             // gesture coalescing, retry after failure, and the draft/photo restore path.
+            var sliderValue = 0.0, sliderPublications = 0, sliderBegins = 0, sliderEnds = 0
+            let slider = ProbeTrackingSlider()
+            let sliderDriver = SmoothValueSlider.Coordinator(value: Binding(get: { sliderValue }, set: { sliderValue = $0; sliderPublications += 1 }),
+                editing: { editing in if editing { sliderBegins += 1 } else { sliderEnds += 1 } })
+            sliderDriver.begin()
+            for index in 0..<600 { slider.value = Float(index) / 600; sliderDriver.changed(slider) }
+            try require(sliderPublications == 0, "Touch sampling does not publish model state before a display frame")
+            sliderDriver.flush(); sliderDriver.end()
+            try require(sliderPublications == 1 && sliderBegins == 1 && sliderEnds == 1, "600 native slider samples coalesce into one test frame and one undo group")
+            report["native_slider_600_samples_one_forced_frame_model_publications"] = sliderPublications
             var position = 0
             let session = EditorUndoState<Int>()
             session.synchronize(position)
@@ -121,6 +132,56 @@ enum NativeUIProbe {
             let photoBytes = [UInt8](try pixels(photoImage))
             let center = ((photoImage.height / 2) * photoImage.width + photoImage.width / 2) * 4
             try require(Int(photoBytes[center+2]) > Int(photoBytes[center]) + 50, "Actual Widget background pixels contain the selected blue photo")
+            // Exercise the exact pre-staged image path used by the extension,
+            // not just the app preview's file-loading path.
+            var preparedSizes: [String: [Int]] = [:]
+            for family in WidgetPreviewFamily.allCases {
+                guard let prepared = WidgetPhotoCache.prepared(style: photoStyle,
+                    size: CGSize(width: family.width, height: family.height), date: .now, sharedDirectory: sharedPhotoFixture) else {
+                    throw NSError(domain: "WidgetPreparedPhoto", code: 1)
+                }
+                try require(max(prepared.width, prepared.height) <= 768 && prepared.bytesPerRow * prepared.height <= 768 * 768 * 4,
+                    "Actual timeline bitmap stays within its pixel/memory bound")
+                preparedSizes[family.id] = [prepared.width, prepared.height, prepared.bytesPerRow * prepared.height]
+                // Prove that the archived view can render after its source file is
+                // unavailable. This catches accidental extension-body file reads.
+                let source = try WidgetPhotoReference.url(for: widgetPhoto, in: sharedPhotoFixture)
+                let hidden = source.appendingPathExtension("held")
+                try FileManager.default.moveItem(at: source, to: hidden)
+                defer { try? FileManager.default.moveItem(at: hidden, to: source) }
+                let image = try render(WidgetBackgroundView(style: photoStyle, preparedPhoto: prepared, preparedOnly: true)
+                    .frame(width: family.width, height: family.height), name: "widget-prepared-photo-\(family.id)", directory: output, scale: 2)
+                let bytes = [UInt8](try pixels(image)); let offset = ((image.height / 2) * image.width + image.width / 2) * 4
+                try require(Int(bytes[offset+2]) > Int(bytes[offset]) + 50, "Prepared photo survives source-file absence in all families")
+            }
+            let markerName = try await WidgetPhotoStore().importMarker(sample, sharedDirectory: sharedPhotoFixture)
+            let customMarker = TodoMarker(kind: .image, imageName: markerName)
+            let markerImage = try render(TodoMarkerView(marker: customMarker, completed: false, assetDirectory: sharedPhotoFixture)
+                .padding(4).background(.white), name: "widget-custom-image-marker", directory: output)
+            let markerPixels = [UInt8](try pixels(markerImage)); var blueMarkerPixels = 0
+            for index in stride(from: 0, to: markerPixels.count, by: 4) {
+                if Int(markerPixels[index+2]) > Int(markerPixels[index]) + 50 { blueMarkerPixels += 1 }
+            }
+            try require(blueMarkerPixels > 100, "Custom image marker renders real colored pixels in native UI")
+            var photoLook = TodoAppearance(); photoLook.widget = photoStyle
+            let photoTask = TodoItem(id: UUID(), title: "照片模式修改文字与完成状态", isCompleted: false, createdAt: .now, updatedAt: .now)
+            let prepped = WidgetPhotoCache.prepared(style: photoStyle, size: CGSize(width: 364, height: 170), date: .now, sharedDirectory: sharedPhotoFixture)
+            var photoContentHashes = Set<String>()
+            for index in 0..<4 {
+                var variant = photoLook
+                if index == 1 { variant.widget.weight = .bold }
+                if index == 2 { variant.widget.header?.text = "不同标题"; variant.widget.header = WidgetHeaderAppearance(text: "不同标题") }
+                var task = photoTask; task.isCompleted = index == 3
+                let image = try render(TodoWidgetContent(document: TodoDocument(items: [task]), appearance: variant, error: nil, family: .medium, interactive: false)
+                    .padding(16).frame(width: 364, height: 170)
+                    .background { WidgetBackgroundView(style: variant.widget, preparedPhoto: prepped, preparedOnly: true) },
+                    name: "widget-photo-live-setting-\(index)", directory: output, scale: 2)
+                photoContentHashes.insert(SHA256.hash(data: try pixels(image)).map { String(format: "%02x", $0) }.joined())
+            }
+            try require(photoContentHashes.count == 4, "Font/title/completion continue changing actual pixels while photo backdrop stays selected")
+            report["prepared_widget_photo_sizes_and_bytes"] = preparedSizes
+            report["photo_background_settings_and_completion_pixel_variants"] = photoContentHashes.count
+            report["custom_image_marker_native_color_pixels"] = blueMarkerPixels
             var headingLook = TodoAppearance(); headingLook.widget.completed = .all
             headingLook.widget.header = WidgetHeaderAppearance(text: "今天的计划", followsTextColor: false,
                 color: WallpaperColor(red: 1, green: 0, blue: 0), fontSize: 24, horizontalPosition: 0.5)
@@ -156,6 +217,29 @@ enum NativeUIProbe {
                     "Top-right count pixels actually follow the summary switch")
             }
             try require(headingHashes.count == 2, "Summary toggle changes native Widget output")
+            var insetInk: [String: Int] = [:]
+            for inset in [0.0, 12, 24] {
+                headingLook.widget.header?.topInset = inset
+                let image = try render(TodoWidgetContent(document: TodoDocument(items: []), appearance: headingLook,
+                    error: nil, family: .medium, interactive: false).padding(16).frame(width: 364, height: 170)
+                    .background(.white).environment(\.colorScheme, .light), name: "widget-title-inset-\(Int(inset))", directory: output)
+                let ink = try redInk(image); insetInk[String(Int(inset))] = ink
+                try require(Double(ink) >= Double(referenceInk) * 0.85, "Top whitespace never cuts title glyphs")
+            }
+            report["full_title_ink_at_insets"] = insetInk
+            var blackLook = TodoAppearance(); blackLook.widget.theme = .light; blackLook.widget.backdrop = .solid
+            blackLook.widget.panelColor = WallpaperColor(red: 0, green: 0, blue: 0)
+            blackLook.widget.followsSystemText = false; blackLook.widget.textColor = WallpaperColor(red: 0, green: 0, blue: 0)
+            let blackImage = try render(TodoWidgetContent(document: TodoDocument(items: []), appearance: blackLook, error: nil, family: .medium, interactive: false)
+                .padding(16).frame(width: 364, height: 170).background { WidgetBackgroundView(style: blackLook.widget) }
+                .environment(\.colorScheme, .light), name: "widget-black-text-black-panel-light-system", directory: output)
+            let blackBytes = [UInt8](try pixels(blackImage)); var protectedInk = 0
+            for index in stride(from: 0, to: blackBytes.count, by: 4) {
+                if min(blackBytes[index], min(blackBytes[index+1], blackBytes[index+2])) > 200 { protectedInk += 1 }
+            }
+            try require(blackBytes[0] < 10 && protectedInk > 100, "Black custom text is visibly corrected on a black panel in light mode")
+            report["black_on_black_light_mode_visible_ink"] = protectedInk
+
             // The production gesture display path updates retained CA layers only.
             let motion = PhotoMotionView(frame: CGRect(x: 0, y: 0, width: 170, height: 170))
             motion.setPhoto(decodedPhoto)

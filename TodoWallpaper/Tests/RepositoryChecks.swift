@@ -66,6 +66,7 @@ enum RepositoryChecks {
         try EditorRefinementChecks.run()
         try FeedbackRepairChecks.run()
         try MediaInteractionChecks.run()
+        try PhotoRepairChecks.run()
     }
 
     private static func tryData(_ url: URL) -> Data? { try? Data(contentsOf: url) }
