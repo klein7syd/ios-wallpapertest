@@ -5,7 +5,7 @@
 ## 版本
 
 - 交付版本 **0.5.1 / build 1029**，代码提交 `9210e85`，CI run `40481159418`。
-- 仓库 HEAD `d63dd87`：0.5.1 的证据记录提交，只改文档，`[skip ci]`。
+- 仓库 HEAD `540e02a`（接棒记忆文件提交）；它之前是 `d63dd87`，即 0.5.1 的证据记录提交（只改文档，`[skip ci]`）。
 - 近期链路：0.4.2(1015) → 0.4.3(1017) → 0.4.4(1022) → 0.5.0(1025) → 0.5.1(1027/1028/1029)。
 
 ## CI 已通过（0.5.1）
@@ -30,6 +30,13 @@
 - `C:\Users\32077\Downloads\TodoWallpaper-0.5.1-build1029-Windows\`
   含未签名 IPA（`TodoWallpaper-unsigned.ipa`，1.33 MB）、签名脚本、安装脚本、校验报告。
 - 更早的安装包：同目录下 0.4.x / 0.5.0 各一份，作回滚备份。
+
+## 回退点（改坏了从这里回去）
+
+- 标签 `codex-final-0.5.1` → `d63dd87`：Codex 交付的最后一版，冻结不动。
+- 标签 `checkpoint-handoff-2026-10-27` → `d63dd87`：接棒基线。
+- 离线快照：`..\backups\todo-wallpaper-codex-final-0.5.1.bundle`（可用 git clone 还原）。
+- 回退命令示例：`git checkout codex-final-0.5.1`，或 `git reset --hard codex-final-0.5.1`（会丢弃之后的提交，谨慎）。
 
 ## 下一步候选
 
