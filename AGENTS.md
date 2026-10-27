@@ -37,6 +37,8 @@ $env:HTTPS_PROXY="http://127.0.0.1:7897"; $env:HTTP_PROXY="http://127.0.0.1:7897
 git -c http.sslBackend=openssl pull --ff-only
 ```
 
+- 如果 clone / push 卡住或报 `RPC failed`，再加 `-c http.version=HTTP/1.1`。当初 Codex 在这台机器上就是这样克隆成功的（它的放行规则里记着）。
+
 ## 入口脚本（都在 `native-tools/`）
 
 - `build-product.sh` —— CI 里的正式构建入口，只能在 macOS 跑。
