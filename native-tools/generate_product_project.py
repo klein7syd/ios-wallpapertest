@@ -1,10 +1,12 @@
 """Deterministic Xcode project; no external generator/dependency is required."""
 from pathlib import Path
 import hashlib
+import json
 import os
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1] / 'TodoWallpaper'
+PRODUCT_METADATA = json.loads(Path(__file__).with_name('product-version.json').read_text())
 objects = {}
 
 def identifier(value):
@@ -58,7 +60,7 @@ for name in ['Debug','Release']:
     target_configs.append(obj('target:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)','PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app',
         'SWIFT_ACTIVE_COMPILATION_CONDITIONS':['DEBUG','TODO_UI_CHECKS'] if ui_probe and name=='Debug' else ['DEBUG'] if name=='Debug' else [],
-        'CURRENT_PROJECT_VERSION':'1027','MARKETING_VERSION':'0.5.1',
+        'CURRENT_PROJECT_VERSION':str(PRODUCT_METADATA['fallback_build']),'MARKETING_VERSION':PRODUCT_METADATA['version'],
         'CODE_SIGN_ENTITLEMENTS':'App/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'App/Info.plist',
         'INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES',
@@ -67,7 +69,7 @@ for name in ['Debug','Release']:
     widget_configs.append(obj('widget:'+name,'XCBuildConfiguration',name=name,buildSettings={
         'CODE_SIGN_STYLE':'Automatic','PRODUCT_NAME':'$(TARGET_NAME)',
         'PRODUCT_BUNDLE_IDENTIFIER':'org.todowallpaper.app.widget',
-        'CURRENT_PROJECT_VERSION':'1027','MARKETING_VERSION':'0.5.1',
+        'CURRENT_PROJECT_VERSION':str(PRODUCT_METADATA['fallback_build']),'MARKETING_VERSION':PRODUCT_METADATA['version'],
         'CODE_SIGN_ENTITLEMENTS':'Widget/TodoWallpaper.entitlements',
         'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_FILE':'Widget/Info.plist',
         'APPLICATION_EXTENSION_API_ONLY':'YES','SKIP_INSTALL':'YES',

@@ -33,6 +33,7 @@ struct WidgetBackgroundView: View {
 }
 enum WidgetPhotoCache {
     private static let cache = NSCache<NSString, CGImage>()
+    static func releaseDecodedSources() { cache.removeAllObjects() }
     static func image(named name: String?, sharedDirectory: URL? = nil) -> CGImage? {
         guard let name, WidgetPhotoReference.isValid(name) else { return nil }
         guard let directory = sharedDirectory ?? (try? TodoSharedStorage.sharedDirectory()),

@@ -48,6 +48,8 @@ enum PhotoRepairChecks {
         let background = TextLegibility.widgetBase(widget, dark: false)
         let visible = TextLegibility.readable(black, on: background)
         try require(TextLegibility.contrast(visible, background) >= 7 && visible != black, "A custom black panel cannot hide black text even in system light mode")
+        var intentionalAlpha = black; intentionalAlpha.alpha = 0.2
+        try require(TextLegibility.readable(intentionalAlpha, on: background).alpha == 0.2, "Contrast protection preserves the user opacity slider")
         let red = WallpaperColor(red: 0.8, green: 0.1, blue: 0.2)
         try require(TextLegibility.readable(red, on: WallpaperColor()) == red, "Adequately contrasting custom colors remain unchanged")
         print("PASS: legacy/image marker data, path validation, image completion policies, Intent preservation, shared appearance, tighter rows, full title inset and light-mode contrast.")

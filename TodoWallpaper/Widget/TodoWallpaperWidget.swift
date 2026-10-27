@@ -17,11 +17,13 @@ struct TodoWidgetProvider: TimelineProvider {
         ]), error: nil)
     }
     func getSnapshot(in context: Context, completion: @escaping (TodoWidgetEntry) -> Void) {
+        defer { WidgetPhotoCache.releaseDecodedSources() }
         var entry = context.isPreview ? placeholder(in: context) : read()
         entry.background = WidgetPhotoCache.prepared(style: entry.appearance.widget, size: context.displaySize, date: entry.date)
         completion(entry)
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoWidgetEntry>) -> Void) {
+        defer { WidgetPhotoCache.releaseDecodedSources() }
         let initial = read()
         // Keep only today/tomorrow bitmap resources alive. Request the next pair
         // at the next day boundary; the second entry is a scheduling fallback.

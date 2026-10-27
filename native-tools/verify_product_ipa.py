@@ -5,9 +5,10 @@ sys.path.insert(0,str(Path(__file__).resolve().parent/'windows'))
 from verify_ipa import verify,require,ROOT,EXT
 path=Path(sys.argv[1])
 report=verify(path,unsigned=True)
+expected_version=json.loads(Path(__file__).with_name('product-version.json').read_text())['version']
 with zipfile.ZipFile(path) as z:
     for prefix,bundle in zip([ROOT,EXT],report['bundles']):
-        require(bundle['version']=='0.5.0','Version mismatch')
+        require(bundle['version']==expected_version,'Version mismatch')
         if prefix==ROOT:
             require(b'--native-ui-probe' not in z.read(prefix+'TodoWallpaper'), 'CI probe must not be in device IPA')
             import plistlib

@@ -17,7 +17,9 @@ enum TextLegibility {
     static func readable(_ requested: WallpaperColor, on background: WallpaperColor) -> WallpaperColor {
         if contrast(composite(requested, over: background), background) >= 3 { return requested }
         let black = WallpaperColor(red: 0, green: 0, blue: 0), white = WallpaperColor()
-        return contrast(black, background) > contrast(white, background) ? black : white
+        var safe = contrast(black, background) > contrast(white, background) ? black : white
+        safe.alpha = requested.alpha // Keep intentional opacity; correct color only.
+        return safe
     }
     static func widgetBase(_ style: WidgetAppearance, dark: Bool) -> WallpaperColor {
         let base = dark ? WallpaperColor(red: 0.09, green: 0.09, blue: 0.09) : WallpaperColor()
