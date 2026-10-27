@@ -32,7 +32,15 @@ struct TodoWidgetContent: View {
         return TextLegibility.readable(color, on: background).swiftColor
     }
     private var textShadow: Color {
-        TextLegibility.luminance(TextLegibility.readable(style.followsSystemText ? WallpaperColor() : style.textColor, on: background)) > 0.5 ? .black.opacity(0.75) : .white.opacity(0.85)
+        // Only light text gets a drop shadow. Giving dark text a white shadow
+        // smears a halo around the glyphs on light backgrounds - that is the
+        // "shadow turned white and blurrier" regression reported after 1029.
+        guard renderingMode == .fullColor, textNeedsShadow else { return .clear }
+        let requested = style.followsSystemText
+            ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            : style.textColor
+        let resolved = TextLegibility.readable(requested, on: background)
+        return TextLegibility.luminance(resolved) > 0.5 ? .black.opacity(0.55) : .clear
     }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
@@ -82,7 +90,11 @@ struct TodoWidgetContent: View {
                             VStack(spacing: 0) {
                                 task(item, metrics: metrics)
                                 if style.separatesRows && index < shown.count - 1 {
-                                    Divider().padding(.leading, metrics.markerWidth + metrics.gap)
+                                    // System Divider stays black on a black panel and disappears.
+                                    // Tint it from the readable text colour so it shows on both.
+                                    Rectangle().fill(foreground.opacity(0.18))
+                                        .frame(height: 0.5)
+                                        .padding(.leading, metrics.markerWidth + metrics.gap)
                                         .padding(.vertical, 4).frame(height: metrics.separatorHeight)
                                 }
                             }
@@ -120,7 +132,7 @@ struct TodoWidgetContent: View {
             if heading.visibleTitle {
                 Text(heading.text).font(Font(headingFont))
                     .foregroundStyle(heading.followsTextColor ? foreground : safeColor(heading.color))
-                    .shadow(color: textNeedsShadow ? textShadow : .clear, radius: 1.5, y: 0.5)
+                    .shadow(color: textShadow, radius: 1.2, y: 0.6)
                     .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
@@ -175,7 +187,7 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                .shadow(color: textNeedsShadow ? textShadow : .clear, radius: 1.5, y: 0.5)
+                .shadow(color: textShadow, radius: 1.2, y: 0.6)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
