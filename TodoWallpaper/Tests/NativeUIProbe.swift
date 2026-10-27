@@ -224,7 +224,11 @@ enum NativeUIProbe {
                     error: nil, family: .medium, interactive: false).padding(16).frame(width: 364, height: 170)
                     .background(.white).environment(\.colorScheme, .light), name: "widget-title-inset-\(Int(inset))", directory: output)
                 let ink = try redInk(image); insetInk[String(Int(inset))] = ink
-                try require(Double(ink) >= Double(referenceInk) * 0.85, "Top whitespace never cuts title glyphs")
+                try require(Double(ink) >= Double(referenceInk) * 0.95, "Top whitespace never cuts title glyphs")
+                if let baselineInk = insetInk["0"] {
+                    try require(abs(ink - baselineInk) <= max(10, baselineInk / 100),
+                        "Moving title down preserves at least 99 percent of its original ink; no centered-frame clipping")
+                }
             }
             report["full_title_ink_at_insets"] = insetInk
             var blackLook = TodoAppearance(); blackLook.widget.theme = .light; blackLook.widget.backdrop = .solid
