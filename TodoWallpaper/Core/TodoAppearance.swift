@@ -164,7 +164,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
         let limit = max(1, min(capacity, maximumItems))
         let pending = items.filter { !$0.isCompleted }
-        if widget.hidesCompletedTasks == true { return Array(pending.prefix(limit)) }
+        if hidesCompletedTasks == true { return Array(pending.prefix(limit)) }
         if textCompletion.hidesCompleted { return Array(pending.prefix(limit)) }
         if completed == .all { return Array(items.prefix(limit)) }
         if completed == .hidden { return Array(pending.prefix(limit)) }
