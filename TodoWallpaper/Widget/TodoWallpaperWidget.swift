@@ -51,10 +51,13 @@ struct TodoWidgetView: View {
     private var scheme: ColorScheme { style.theme == .system ? defaultScheme : style.theme == .dark ? .dark : .light }
     private var previewFamily: WidgetPreviewFamily { family == .systemLarge ? .large : family == .systemMedium ? .medium : .small }
     var body: some View {
+        let readable = ReadableResolver.scrim(style: style, date: entry.date, scheme: scheme)
         TodoWidgetContent(document: entry.document, appearance: entry.appearance,
             error: entry.error, family: previewFamily)
             .containerBackground(for: .widget) {
-                WidgetBackgroundView(style: style, date: entry.date, preparedPhoto: entry.background, preparedOnly: true)
+                WidgetBackgroundView(style: style, date: entry.date, preparedPhoto: entry.background, preparedOnly: true,
+                                     scrim: readable.value, scrimAnchor: style.readable.anchor,
+                                     scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color)
             }
             .environment(\.colorScheme, scheme)
     }

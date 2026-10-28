@@ -27,31 +27,22 @@ struct TodoWidgetContent: View {
         return safeColor(requested)
     }
     private var background: WallpaperColor { TextLegibility.widgetBase(style, dark: style.isExplicitlyDark ?? (hostScheme == .dark)) }
-    private var textNeedsShadow: Bool { renderingMode == .fullColor && (style.backdrop == .photo || style.materialEnabled || style.backdrop == .solid && style.panelColor.alpha < 0.9) }
-    private func safeColor(_ color: WallpaperColor) -> Color {
-        if renderingMode != .fullColor { return .primary }
-        return TextLegibility.readable(color, on: background).swiftColor
-    }
-    private var textShadow: Color {
-        // Only light text gets a drop shadow. Giving dark text a white shadow
-        // smears a halo around the glyphs on light backgrounds - that is the
-        // "shadow turned white and blurrier" regression reported after 1029.
-        guard renderingMode == .fullColor, textNeedsShadow else { return .clear }
+    private var settings: ReadableSettings { style.readable }
+    /// 浅色文字才加黑色阴影；深色文字不加，避免发白发糊
+    private var textIsLight: Bool {
+        guard renderingMode == .fullColor else { return false }
         let requested = style.followsSystemText
             ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
-        let resolved = TextLegibility.readable(requested, on: background)
-        // 浅字配深影、深字配浅影，两边都压低不透明度：
-        // 原来只给浅字加黑影，黄色这类高亮色会出硬边，深绿这类低亮色又完全没有景深。
-        // 只用黑色投影，强度跟文字亮度挂钩：亮字（黄、白）重一点，暗字几乎不加。
-        let l = TextLegibility.luminance(resolved)
-        return .black.opacity(0.10 + 0.32 * l)
+        return TextLegibility.luminance(TextLegibility.readable(requested, on: background)) > 0.5
     }
-    private var readable: AppearanceStore { AppearanceStore.shared }
-    private var readableAnchor: TextAnchor { readable.anchor }
-    private var readableScrim: Double { readable.effectiveScrim(imageID: style.backgroundPhotoName) }
-    private var readableHeightRatio: CGFloat { CGFloat(readable.scrimHeightRatio) }
-    private var readablePreset: ShadowPreset { readable.shadowPreset }
+    private var contentAlignment: Alignment {
+        switch settings.anchor {
+        case .top: return .topLeading
+        case .center: return .center
+        case .bottom: return .bottomLeading
+        }
+    }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
     private var fontSize: Double { style.fontSize * bodyUnit / 15 }
@@ -82,9 +73,7 @@ struct TodoWidgetContent: View {
                 appearance: appearance, family: family, width: geometry.size.width, height: geometry.size.height,
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
-            ReadableLayer(anchor: readableAnchor, scrim: readableScrim,
-                          scrimHeightRatio: readableHeightRatio,
-                          shadowPreset: readablePreset) {
+            ReadableLayer(shadowPreset: settings.shadowPreset, enabled: textIsLight) {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)
@@ -114,17 +103,16 @@ struct TodoWidgetContent: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
                 if metrics.showsFooter {
                     Text(items.count > shown.count ? "另有 \(items.count - shown.count) 项" : "点任务可完成或恢复")
                         .font(.system(size: footerUnit)).opacity(0.7).lineLimit(1)
                         .frame(height: metrics.footerHeight).padding(.top, metrics.spacing)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
             .foregroundStyle(foreground).clipped()
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: contentAlignment)
         }
     }
     private func measure(_ text: String, font: CTFont) -> (width: Double, height: Double) {

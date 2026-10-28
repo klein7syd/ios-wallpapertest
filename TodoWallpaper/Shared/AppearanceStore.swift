@@ -1,21 +1,10 @@
 import Foundation
 
-/// App Group 常量集中在这里
-enum AppGroup {
-    static let identifier = TodoWidgetConstants.originalGroupID
-    static var defaults: UserDefaults { UserDefaults(suiteName: identifier) ?? .standard }
-}
-
-/// 主 App 与 Widget 共用的轻量存储（可读性层专用）
+/// 只负责图片分析结果的读写；可读性设置本身存在 WidgetAppearance 里。
 final class AppearanceStore {
     static let shared = AppearanceStore()
 
     private enum Key {
-        static let anchor = "readable.anchor"
-        static let intensity = "readable.intensity"
-        static let scrimOverride = "readable.scrimOverride"
-        static let shadowPreset = "readable.shadowPreset"
-        static let scrimHeightRatio = "readable.scrimHeightRatio"
         static let analysisPrefix = "readable.analysis."
     }
 
@@ -23,84 +12,70 @@ final class AppearanceStore {
 
     init(defaults: UserDefaults = AppGroup.defaults) {
         self.defaults = defaults
-        // 旧描边实现的残留 key，启动时清理
-        for key in ["textOutline", "readable.outline", "widget.textOutline"] {
-            defaults.removeObject(forKey: key)
-            UserDefaults.standard.removeObject(forKey: key)
-        }
     }
 
-    var anchor: TextAnchor {
-        get { defaults.string(forKey: Key.anchor).flatMap(TextAnchor.init(rawValue:)) ?? ReadableDefaults.anchor }
-        set { defaults.set(newValue.rawValue, forKey: Key.anchor) }
+    private func key(_ imageID: String, _ anchor: TextAnchor) -> String {
+        Key.analysisPrefix + imageID + "." + anchor.rawValue
     }
 
-    var intensity: ReadabilityIntensity {
-        get { defaults.string(forKey: Key.intensity).flatMap(ReadabilityIntensity.init(rawValue:)) ?? .automatic }
-        set { defaults.set(newValue.rawValue, forKey: Key.intensity) }
-    }
-
-    var shadowPreset: ShadowPreset {
-        get { defaults.string(forKey: Key.shadowPreset).flatMap(ShadowPreset.init(rawValue:)) ?? ReadableDefaults.shadowPreset }
-        set { defaults.set(newValue.rawValue, forKey: Key.shadowPreset) }
-    }
-
-    var scrimHeightRatio: Double {
-        get {
-            let value = defaults.double(forKey: Key.scrimHeightRatio)
-            return value <= 0 ? ReadableDefaults.scrimHeightRatio : value
-        }
-        set { defaults.set(newValue, forKey: Key.scrimHeightRatio) }
-    }
-
-    /// nil 表示没有手动覆盖
-    var scrimOverride: Double? {
-        get { defaults.object(forKey: Key.scrimOverride) as? Double }
-        set {
-            if let newValue {
-                defaults.set(newValue, forKey: Key.scrimOverride)
-            } else {
-                defaults.removeObject(forKey: Key.scrimOverride)
-            }
-        }
-    }
-
-    func analysis(for imageID: String) -> ImageAnalysis? {
-        guard let data = defaults.data(forKey: Key.analysisPrefix + imageID) else { return nil }
+    func analysis(for imageID: String, anchor: TextAnchor) -> ImageAnalysis? {
+        guard let data = defaults.data(forKey: key(imageID, anchor)) else { return nil }
         return try? JSONDecoder().decode(ImageAnalysis.self, from: data)
     }
 
-    func setAnalysis(_ analysis: ImageAnalysis, for imageID: String) {
+    func setAnalysis(_ analysis: ImageAnalysis, for imageID: String, anchor: TextAnchor) {
         guard let data = try? JSONEncoder().encode(analysis) else { return }
-        defaults.set(data, forKey: Key.analysisPrefix + imageID)
+        defaults.set(data, forKey: key(imageID, anchor))
+    }
+
+    /// 三个锚点一次写好，切换锚点不用重算
+    func setAnalysis(_ analyses: [TextAnchor: ImageAnalysis], for imageID: String) {
+        for (anchor, analysis) in analyses {
+            setAnalysis(analysis, for: imageID, anchor: anchor)
+        }
     }
 
     func removeAnalysis(for imageID: String) {
-        defaults.removeObject(forKey: Key.analysisPrefix + imageID)
-    }
-
-    /// 当前背景图按自动规则算出的 scrim（不含手动覆盖）
-    func autoScrim(imageID: String?) -> Double {
-        let base = imageID.flatMap { analysis(for: $0)?.suggestedScrim } ?? ReadableDefaults.scrim
-        return min(ReadableDefaults.scrimRange.upperBound,
-                   max(ReadableDefaults.scrimRange.lowerBound, base * intensity.multiplier))
-    }
-
-    /// 小组件与预览统一走这里：手动值 > 图片分析 > 标准值
-    func effectiveScrim(imageID: String?) -> Double {
-        if let scrimOverride {
-            return min(ReadableDefaults.scrimRange.upperBound,
-                       max(ReadableDefaults.scrimRange.lowerBound, scrimOverride))
+        for anchor in TextAnchor.allCases {
+            defaults.removeObject(forKey: key(imageID, anchor))
         }
-        return autoScrim(imageID: imageID)
+    }
+}
+
+/// App Group 常量集中在这里
+enum AppGroup {
+    static let identifier = TodoWidgetConstants.originalGroupID
+    static var defaults: UserDefaults { UserDefaults(suiteName: identifier) ?? .standard }
+}
+
+/// 旧版本把可读性设置存在 UserDefaults，这里做一次性迁移
+enum ReadableSettingsMigration {
+    private enum Key {
+        static let anchor = "readable.anchor"
+        static let intensity = "readable.intensity"
+        static let scrimOverride = "readable.scrimOverride"
+        static let shadowPreset = "readable.shadowPreset"
+        static let scrimHeightRatio = "readable.scrimHeightRatio"
     }
 
-    /// 是否偏离了标准值，用于普通模式下提示"已使用自定义参数"
-    var hasCustomValues: Bool {
-        scrimOverride != nil
-            || anchor != ReadableDefaults.anchor
-            || intensity != .automatic
-            || shadowPreset != ReadableDefaults.shadowPreset
-            || abs(scrimHeightRatio - ReadableDefaults.scrimHeightRatio) > 0.001
+    static func take() -> ReadableSettings? {
+        let defaults = AppGroup.defaults
+        let hasLegacy = defaults.string(forKey: Key.anchor) != nil
+            || defaults.string(forKey: Key.intensity) != nil
+            || defaults.object(forKey: Key.scrimOverride) != nil
+        guard hasLegacy else { return nil }
+
+        var settings = ReadableSettings()
+        if let raw = defaults.string(forKey: Key.anchor), let value = TextAnchor(rawValue: raw) { settings.anchor = value }
+        if let raw = defaults.string(forKey: Key.intensity), let value = ReadabilityIntensity(rawValue: raw) { settings.intensity = value }
+        if let raw = defaults.string(forKey: Key.shadowPreset), let value = ShadowPreset(rawValue: raw) { settings.shadowPreset = value }
+        if let value = defaults.object(forKey: Key.scrimOverride) as? Double { settings.scrimOverride = value }
+        let ratio = defaults.double(forKey: Key.scrimHeightRatio)
+        if ratio > 0 { settings.heightRatio = ratio }
+
+        for key in [Key.anchor, Key.intensity, Key.scrimOverride, Key.shadowPreset, Key.scrimHeightRatio] {
+            defaults.removeObject(forKey: key)
+        }
+        return settings
     }
 }

@@ -1,12 +1,13 @@
 import SwiftUI
 
-// MARK: - 蒙层
+// MARK: - 蒙层（铺满全幅，画在背景层）
 
-/// 只压暗文字所在区域，不碰整张图
+/// 只压暗文字所在区域，不碰整张图。由 WidgetBackgroundView 调用，铺满整块背景。
 struct ScrimView: View {
     let anchor: TextAnchor
     let strength: Double
-    let heightRatio: CGFloat
+    let heightRatio: Double
+    var color: Color = .black
 
     var body: some View {
         GeometryReader { proxy in
@@ -22,12 +23,10 @@ struct ScrimView: View {
                     .frame(maxHeight: .infinity, alignment: .top)
 
             case .center:
-                RadialGradient(
-                    colors: [.black.opacity(strength * 0.55), .clear],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: proxy.size.height * 0.55
-                )
+                RadialGradient(colors: [color.opacity(strength * 0.55), .clear],
+                               center: .center,
+                               startRadius: 0,
+                               endRadius: proxy.size.height * 0.55)
             }
         }
         .allowsHitTesting(false)
@@ -36,14 +35,14 @@ struct ScrimView: View {
     /// 三个 stop 避免出现明显的一条带
     private var stops: [Gradient.Stop] {
         [
-            .init(color: .black.opacity(strength), location: 0),
-            .init(color: .black.opacity(strength * 0.45), location: 0.5),
+            .init(color: color.opacity(strength), location: 0),
+            .init(color: color.opacity(strength * 0.45), location: 0.5),
             .init(color: .clear, location: 1)
         ]
     }
 }
 
-// MARK: - 文字样式
+// MARK: - 文字阴影
 
 struct TextStyleModifier: ViewModifier {
     let preset: ShadowPreset
@@ -66,46 +65,23 @@ extension View {
     }
 }
 
-// MARK: - 核心容器
+// MARK: - 只负责文字阴影
 
+/// 蒙层已经移到背景层，这里不再加 padding，也不再画蒙层。
 struct ReadableLayer<Content: View>: View {
-    var anchor: TextAnchor = .bottom
-    var scrim: Double = 0.4
-    var scrimHeightRatio: CGFloat = 0.45
     var shadowPreset: ShadowPreset = .standard
-    var padding: CGFloat = 14
+    var enabled: Bool = true
     @ViewBuilder var content: () -> Content
 
     @Environment(\.widgetRenderingMode) private var renderingMode
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        if isAccessory {
+        if isAccessory || renderingMode != .fullColor {
             content()
         } else {
-            ZStack(alignment: alignment) {
-                if showsEffects && scrim > 0 {
-                    ScrimView(anchor: anchor, strength: scrim, heightRatio: scrimHeightRatio)
-                }
-                content()
-                    .modifier(TextStyleModifier(preset: shadowPreset, enabled: showsEffects))
-                    .frame(maxWidth: .infinity, alignment: alignment)
-                    .padding(paddingForFamily)
-            }
+            content().modifier(TextStyleModifier(preset: shadowPreset, enabled: enabled))
         }
-    }
-
-    private var alignment: Alignment {
-        switch anchor {
-        case .top: return .topLeading
-        case .center: return .center
-        case .bottom: return .bottomLeading
-        }
-    }
-
-    /// accented / vibrant 由系统着色，额外阴影会脏
-    private var showsEffects: Bool {
-        renderingMode == .fullColor
     }
 
     private var isAccessory: Bool {
@@ -116,13 +92,24 @@ struct ReadableLayer<Content: View>: View {
             return false
         }
     }
+}
 
-    private var paddingForFamily: CGFloat {
-        switch family {
-        case .systemSmall: return 12
-        case .systemMedium: return 14
-        case .systemLarge: return 16
-        default: return padding
-        }
+// MARK: - 蒙层取值
+
+enum ReadableResolver {
+    /// 蒙层只在照片背景下出现；颜色跟文字亮度联动
+    static func scrim(style: WidgetAppearance, date: Date, scheme: ColorScheme) -> (value: Double, color: Color) {
+        guard style.backdrop == .photo, !style.materialEnabled else { return (0, .black) }
+        let settings = style.readable
+        let imageID = style.photoName(at: date)
+        let analysis = imageID.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
+        let value = settings.scrim(auto: settings.autoScrim(analysis: analysis))
+        let dark = style.isExplicitlyDark ?? (scheme == .dark)
+        let requested = style.followsSystemText
+            ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            : style.textColor
+        let base = TextLegibility.widgetBase(style, dark: dark)
+        let light = TextLegibility.luminance(TextLegibility.readable(requested, on: base)) > 0.5
+        return (value, light ? .black : .white)
     }
 }

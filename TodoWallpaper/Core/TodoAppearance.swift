@@ -147,6 +147,20 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var unifiedMarkers: Bool?
     /// Completed tasks leave the widget immediately after a tap.
     var hidesCompletedTasks: Bool?
+    // 可读性层设置（随撤销与预览实时生效）
+    var readableAnchor: TextAnchor?
+    var readableIntensity: ReadabilityIntensity?
+    var readableScrimOverride: Double?
+    var readableHeightRatio: Double?
+    var readableShadowPreset: ShadowPreset?
+
+    var readable: ReadableSettings {
+        ReadableSettings(anchor: readableAnchor ?? ReadableDefaults.anchor,
+                         intensity: readableIntensity ?? .automatic,
+                         scrimOverride: readableScrimOverride,
+                         heightRatio: readableHeightRatio ?? ReadableDefaults.scrimHeightRatio,
+                         shadowPreset: readableShadowPreset ?? ReadableDefaults.shadowPreset)
+    }
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
     var textCompletion: WidgetTextCompletion { completedTextStyle ?? .fadeStrike }
     var completionColor: WallpaperColor { completedTextColor ?? markerStyle.completedColor }
@@ -154,6 +168,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func validate() throws {
         try markerOverride?.validate(); try markerStyle.validate()
         try header?.validate()
+        if let readableScrimOverride, !(0...0.8).contains(readableScrimOverride) { throw AppearanceError.invalidStyle }
+        if let readableHeightRatio, !(0.25...0.7).contains(readableHeightRatio) { throw AppearanceError.invalidStyle }
         try backgroundCrop?.validate(); try photoRotation?.validate()
         if let backgroundPhotoOpacity, !backgroundPhotoOpacity.isFinite || !(0...1).contains(backgroundPhotoOpacity) { throw AppearanceError.invalidStyle }
         if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }

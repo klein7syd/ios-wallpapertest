@@ -1,8 +1,27 @@
 import UIKit
 
 enum ImageAnalyzer {
-    /// 缩到 32×32 再算，几毫秒出结果
+    /// 直接分析一张已经合成好的图
     static func analyzeImage(_ image: UIImage, anchor: TextAnchor) -> ImageAnalysis {
+        analyze(rendered: image, anchor: anchor)
+    }
+
+    /// 按裁剪、缩放、透明度合成后的结果分析（选图/裁剪后调用）
+    static func analyzePhoto(_ image: UIImage, crop: PhotoCrop, opacity: Double,
+                             darkBackground: Bool, anchor: TextAnchor) -> ImageAnalysis {
+        let canvas = CGSize(width: 48, height: 48)
+        let rendered = UIGraphicsImageRenderer(size: canvas).image { context in
+            (darkBackground ? UIColor.black : UIColor.white).setFill()
+            context.fill(CGRect(origin: .zero, size: canvas))
+            let source = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+            let frame = crop.frame(source: source, canvas: canvas)
+            // UIKit 渲染上下文原点在左上角，裁剪框是左上角坐标系，直接用
+            image.draw(in: frame, blendMode: .normal, alpha: max(0, min(1, opacity)))
+        }
+        return analyze(rendered: rendered, anchor: anchor)
+    }
+
+    static func analyze(rendered image: UIImage, anchor: TextAnchor) -> ImageAnalysis {
         let side = 32
         let size = CGSize(width: side, height: side)
 
@@ -43,7 +62,7 @@ enum ImageAnalyzer {
                 let r = Double(pixels[index]) / 255
                 let g = Double(pixels[index + 1]) / 255
                 let b = Double(pixels[index + 2]) / 255
-                // 直接用 sRGB 近似，不转线性：判断"要不要压暗"足够
+                // sRGB 近似，不转线性
                 lumas.append(0.2126 * r + 0.7152 * g + 0.0722 * b)
             }
         }
@@ -54,8 +73,7 @@ enum ImageAnalyzer {
         let variance = lumas.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(lumas.count)
         let contrast = min(1, variance.squareRoot() / 0.35)
 
-        return ImageAnalysis(meanLuma: mean,
-                             contrast: contrast,
+        return ImageAnalysis(meanLuma: mean, contrast: contrast,
                              suggestedScrim: suggestedScrim(meanLuma: mean, contrast: contrast))
     }
 
@@ -68,5 +86,20 @@ enum ImageAnalyzer {
             value = min(value, 0.15)
         }
         return min(0.55, max(0.2, value))
+    }
+
+    /// 三个锚点一次算完
+    static func analyzeAllAnchors(_ image: UIImage, crop: PhotoCrop?, opacity: Double,
+                                  darkBackground: Bool) -> [TextAnchor: ImageAnalysis] {
+        var result: [TextAnchor: ImageAnalysis] = [:]
+        for anchor in TextAnchor.allCases {
+            if let crop {
+                result[anchor] = analyzePhoto(image, crop: crop, opacity: opacity,
+                                              darkBackground: darkBackground, anchor: anchor)
+            } else {
+                result[anchor] = analyzeImage(image, anchor: anchor)
+            }
+        }
+        return result
     }
 }

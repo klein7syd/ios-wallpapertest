@@ -125,15 +125,29 @@ struct WidgetAppearanceEditor: View {
                 do {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
-                    // 选图后立刻算一次亮度，写进 App Group 供小组件读取
+                    // 选图后按三个锚点各算一次（含透明度合成），写进 App Group
                     if let uiImage = UIImage(data: data) {
-                        let analysis = ImageAnalyzer.analyzeImage(uiImage, anchor: readable.anchor)
-                        readable.setAnalysis(analysis, for: name)
+                        let analyses = ImageAnalyzer.analyzeAllAnchors(
+                            uiImage, crop: nil, opacity: 1,
+                            darkBackground: store.appearance.widget.isExplicitlyDark ?? (systemScheme == .dark))
+                        AppearanceStore.shared.setAnalysis(analyses, for: name)
                     }
                     var next = store.appearance.widget
                     next.backgroundPhotoName = name; next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
                     widget.wrappedValue = next; store.flushAppearance()
                 } catch { self.error = error.localizedDescription }
+            }
+        }
+        .task {
+            if let legacy = ReadableSettingsMigration.take() {
+                var next = store.appearance.widget
+                if next.readableAnchor == nil { next.readableAnchor = legacy.anchor }
+                if next.readableIntensity == nil { next.readableIntensity = legacy.intensity }
+                if next.readableShadowPreset == nil { next.readableShadowPreset = legacy.shadowPreset }
+                if next.readableHeightRatio == nil { next.readableHeightRatio = legacy.heightRatio }
+                if next.readableScrimOverride == nil { next.readableScrimOverride = legacy.scrimOverride }
+                widget.wrappedValue = next
+                store.flushAppearance()
             }
         }
         .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
@@ -209,7 +223,13 @@ struct WidgetAppearanceEditor: View {
                         if cropPhoto && store.appearance.widget.backdrop == .photo && !store.appearance.widget.materialEnabled, let image = WidgetPhotoCache.image(named: store.appearance.widget.photoName(at: photoDate)) {
                             WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: store.appearance.widget.photoOpacity,
                                 background: scheme == .dark ? UIColor(white: 0.09, alpha: 1) : .white)
-                        } else { WidgetBackgroundView(style: store.appearance.widget, date: photoDate) }
+                        } else {
+                            let readable = ReadableResolver.scrim(style: store.appearance.widget, date: photoDate, scheme: scheme)
+                            WidgetBackgroundView(style: store.appearance.widget, date: photoDate,
+                                                 scrim: readable.value, scrimAnchor: store.appearance.widget.readable.anchor,
+                                                 scrimHeightRatio: store.appearance.widget.readable.heightRatio,
+                                                 scrimColor: readable.color)
+                        }
                     }
                     .environment(\.colorScheme, scheme)
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -261,6 +281,9 @@ struct WidgetAppearanceEditor: View {
                     }
                     Button("恢复照片构图") { photoCrop.wrappedValue = PhotoCrop() }
                     Button("移除照片") {
+                        if let photos = store.appearance.widget.photoRotation?.photos {
+                            photos.forEach { AppearanceStore.shared.removeAnalysis(for: $0) }
+                        }
                         var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation?.enabled = false; next.backdrop = .system
                         widget.wrappedValue = next; cropPhoto = false
                     }
@@ -302,6 +325,10 @@ struct WidgetAppearanceEditor: View {
         Picker("可读性强度", selection: readableIntensity) {
             ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.segmented)
+        .disabled(settings.scrimOverride != nil)
+        if settings.scrimOverride != nil {
+            Text("手动值优先").font(.caption).foregroundStyle(.secondary)
+        }
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
         if advanced {
@@ -335,59 +362,59 @@ struct WidgetAppearanceEditor: View {
             StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
         if advanced {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Scrim 强度").font(.subheadline)
-                    Spacer(minLength: 6)
-                    Text(String(format: "自动：%.2f", readable.autoScrim(imageID: store.appearance.widget.backgroundPhotoName)))
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    Button("标准") { readable.scrimOverride = nil; reloadWidget() }.font(.caption)
-                }
-                Slider(value: readableScrim, in: 0...0.8, step: 0.05) { editing in
-                    if !editing { reloadWidget() }
-                }
-                HStack {
-                    Text("渐变范围").font(.subheadline)
-                    Spacer(minLength: 6)
-                    Button("标准") { readable.scrimHeightRatio = ReadableDefaults.scrimHeightRatio; reloadWidget() }.font(.caption)
-                }
-                Slider(value: readableHeightRatio, in: 0.25...0.7, step: 0.05) { editing in
-                    if !editing { reloadWidget() }
-                }
-                Picker("阴影强度", selection: readablePreset) {
-                    ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
-                }.pickerStyle(.segmented)
-                Button("全部恢复标准") { resetReadable() }
-            }
-        } else if readable.hasCustomValues {
+            PreciseSlider(title: "Scrim 强度", value: scrimBinding, range: 0...0.8, standard: autoScrim, precision: 2)
+            Text(settings.scrimOverride == nil
+                 ? String(format: "自动：%.2f", autoScrim)
+                 : String(format: "手动：%.2f", settings.scrimOverride ?? 0))
+                .font(.caption).foregroundStyle(.secondary)
+            PreciseSlider(title: "渐变范围", value: heightBinding, range: 0.25...0.7, standard: ReadableDefaults.scrimHeightRatio, precision: 2)
+            Picker("阴影强度", selection: readablePreset) {
+                ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented)
+            Button("全部恢复标准") { resetReadable() }
+        } else if settings != ReadableSettings() {
             Text("已使用自定义参数").font(.caption).foregroundStyle(.secondary)
         }
     }
-    private var readable: AppearanceStore { AppearanceStore.shared }
+    private var settings: ReadableSettings { store.appearance.widget.readable }
+    /// 当前图片在当前锚点上的自动值，滑条的蓝点
+    private var autoScrim: Double {
+        let id = store.appearance.widget.photoName(at: photoDate)
+        let analysis = id.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
+        return settings.autoScrim(analysis: analysis)
+    }
     private var readableAnchor: Binding<TextAnchor> {
-        Binding(get: { readable.anchor }, set: { readable.anchor = $0; reloadWidget() })
+        Binding(get: { settings.anchor }, set: { widget.wrappedValue.readableAnchor = $0 })
     }
     private var readableIntensity: Binding<ReadabilityIntensity> {
-        Binding(get: { readable.intensity }, set: { readable.intensity = $0; reloadWidget() })
+        Binding(get: { settings.intensity }, set: { widget.wrappedValue.readableIntensity = $0 })
     }
     private var readablePreset: Binding<ShadowPreset> {
-        Binding(get: { readable.shadowPreset }, set: { readable.shadowPreset = $0; reloadWidget() })
+        Binding(get: { settings.shadowPreset }, set: { widget.wrappedValue.readableShadowPreset = $0 })
     }
-    private var readableScrim: Binding<Double> {
-        Binding(get: { readable.scrimOverride ?? readable.autoScrim(imageID: store.appearance.widget.backgroundPhotoName) }, set: { readable.scrimOverride = $0 })
+    /// 拖到蓝点附近 = 清除手动覆盖，回到自动
+    private var scrimBinding: Binding<Double> {
+        Binding(get: { settings.scrim(auto: autoScrim) },
+                set: { newValue in
+                    if abs(newValue - autoScrim) < 0.02 {
+                        widget.wrappedValue.readableScrimOverride = nil
+                    } else {
+                        widget.wrappedValue.readableScrimOverride = newValue
+                    }
+                })
     }
-    private var readableHeightRatio: Binding<Double> {
-        Binding(get: { readable.scrimHeightRatio }, set: { readable.scrimHeightRatio = $0 })
+    private var heightBinding: Binding<Double> {
+        Binding(get: { settings.heightRatio }, set: { widget.wrappedValue.readableHeightRatio = $0 })
     }
     private func reloadWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
     }
     private func resetReadable() {
-        readable.anchor = ReadableDefaults.anchor
-        readable.intensity = .automatic
-        readable.scrimOverride = nil
-        readable.scrimHeightRatio = ReadableDefaults.scrimHeightRatio
-        readable.shadowPreset = ReadableDefaults.shadowPreset
+        widget.wrappedValue.readableAnchor = nil
+        widget.wrappedValue.readableIntensity = nil
+        widget.wrappedValue.readableScrimOverride = nil
+        widget.wrappedValue.readableHeightRatio = nil
+        widget.wrappedValue.readableShadowPreset = nil
         reloadWidget()
     }
     @ViewBuilder private var markerControls: some View {

@@ -9,6 +9,11 @@ struct WidgetBackgroundView: View {
     var date: Date = .now
     var preparedPhoto: CGImage?
     var preparedOnly = false
+    /// 蒙层画在背景层，铺满全幅，不受内容 padding 影响
+    var scrim: Double = 0
+    var scrimAnchor: TextAnchor = .bottom
+    var scrimHeightRatio: Double = ReadableDefaults.scrimHeightRatio
+    var scrimColor: Color = .black
     @Environment(\.colorScheme) private var systemScheme
     var body: some View {
         GeometryReader { geometry in
@@ -25,6 +30,9 @@ struct WidgetBackgroundView: View {
                             .frame(width: frame.width, height: frame.height)
                             .position(x: frame.midX, y: frame.midY).opacity(style.photoOpacity)
                     }
+                }
+                if scrim > 0 {
+                    ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor)
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
 

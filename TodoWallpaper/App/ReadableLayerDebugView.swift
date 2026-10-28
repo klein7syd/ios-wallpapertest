@@ -19,6 +19,13 @@ enum TestImageFactory {
         ]
     }
 
+    private static func solid(_ color: UIColor, size: CGSize) -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
     /// 上半纯白、下半纯黑：验证采样方向
     private static func split(size: CGSize) -> UIImage {
         UIGraphicsImageRenderer(size: size).image { context in
@@ -26,13 +33,6 @@ enum TestImageFactory {
             context.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height / 2))
             UIColor.black.setFill()
             context.fill(CGRect(x: 0, y: size.height / 2, width: size.width, height: size.height / 2))
-        }
-    }
-
-    private static func solid(_ color: UIColor, size: CGSize) -> UIImage {
-        UIGraphicsImageRenderer(size: size).image { context in
-            color.setFill()
-            context.fill(CGRect(origin: .zero, size: size))
         }
     }
 
@@ -78,7 +78,8 @@ struct ReadableLayerDebugView: View {
     @State private var scrim: Double = 0.4
     @State private var anchor: TextAnchor = .bottom
     @State private var preset: ShadowPreset = .standard
-    @State private var heightRatio: Double = 0.45
+    @State private var heightRatio: Double = ReadableDefaults.scrimHeightRatio
+    @State private var lightText = true
 
     private let samples = TestImageFactory.all()
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
@@ -96,17 +97,16 @@ struct ReadableLayerDebugView: View {
                         ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
                     }.pickerStyle(.segmented)
                 }
+                Toggle("深色文字（验证白蒙层）", isOn: $lightText.invertedLabel)
                 control(String(format: "Scrim %.2f", scrim)) {
                     Slider(value: $scrim, in: 0...0.8, step: 0.05)
                 }
                 control(String(format: "覆盖范围 %.2f", heightRatio)) {
-                    Slider(value: $heightRatio, in: 0.2...0.9, step: 0.05)
+                    Slider(value: $heightRatio, in: 0.25...0.7, step: 0.05)
                 }
 
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(samples) { sample in
-                        cell(sample: sample)
-                    }
+                    ForEach(samples) { sample in cell(sample: sample) }
                 }
             }
             .padding()
@@ -127,25 +127,48 @@ struct ReadableLayerDebugView: View {
         let analysis = ImageAnalyzer.analyzeImage(sample.image, anchor: anchor)
 
         VStack(alignment: .leading, spacing: 6) {
-            ReadableLayer(anchor: anchor,
-                          scrim: scrim,
-                          scrimHeightRatio: heightRatio,
-                          shadowPreset: preset) {
+            ZStack {
+                Image(uiImage: sample.image).resizable().scaledToFill()
+                ScrimView(anchor: anchor, strength: scrim, heightRatio: heightRatio,
+                          color: lightText ? .black : .white)
                 VStack(alignment: anchor == .center ? .center : .leading, spacing: 2) {
                     Text("占位标题").font(.system(size: 16, weight: .semibold))
                     Text("这里是占位副标题").font(.system(size: 12, weight: .medium)).opacity(0.85)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(lightText ? Color.white : Color.black)
+                .readableText(style: preset, enabled: lightText)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: anchor == .center ? .center : anchor == .top ? .topLeading : .bottomLeading)
+                .padding(14)
             }
             .frame(height: 150)
-            .environment(\.widgetRenderingMode, .fullColor)
-            .background { Image(uiImage: sample.image).resizable().scaledToFill() }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            // 红色描边框，用来看蒙层边缘有没有硬边
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.red.opacity(0.8), lineWidth: 1))
 
             Text(sample.name).font(.caption2).foregroundStyle(.secondary)
             Text(String(format: "L %.2f  C %.2f  → %.2f",
                         analysis.meanLuma, analysis.contrast, analysis.suggestedScrim))
                 .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            Text(anchorSummary(sample: sample))
+                .font(.system(size: 9).monospacedDigit()).foregroundStyle(.secondary)
+                .lineLimit(2)
         }
+    }
+
+    /// 三个锚点各自的 meanLuma 与 suggestedScrim
+    private func anchorSummary(sample: TestImageFactory.Sample) -> String {
+        TextAnchor.allCases.map { value in
+            let result = ImageAnalyzer.analyzeImage(sample.image, anchor: value)
+            return String(format: "%@ L%.2f/%.2f", value.title, result.meanLuma, result.suggestedScrim)
+        }.joined(separator: "  ")
+    }
+}
+
+private extension Binding where Value == Bool {
+    /// 反相绑定，方便用"深色文字"表达
+    var invertedLabel: Binding<Bool> {
+        Binding(get: { !wrappedValue }, set: { wrappedValue = !$0 })
     }
 }
