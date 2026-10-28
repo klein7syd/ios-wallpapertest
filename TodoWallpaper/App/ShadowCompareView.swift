@@ -71,7 +71,7 @@ struct ShadowCompareView: View {
                           color: lightText ? .black : .white)
             }
             // 走真实的 ReadableLayer / TextStyleModifier 路径
-            ReadableLayer(isLightText: lightText, intensity: 1.0, recipe: recipe) {
+            ReadableLayer(isLightText: lightText, intensity: .standard, recipe: recipe) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("占位标题").font(.system(size: 13, weight: .semibold))
                     Text("这里是副标题").font(.system(size: 9, weight: .medium)).opacity(0.85)
