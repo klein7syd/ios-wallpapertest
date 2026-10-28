@@ -187,9 +187,18 @@ struct TodoWidgetContent: View {
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Image(uiImage: titleImage(item))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
+            if style.textOutline == true {
+                // 描边只能走位图；关闭描边时仍用 Text，保留换行和省略号。
+                Image(uiImage: titleImage(item))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
+            } else {
+                Text(item.title).font(Font(titleFont))
+                    .strikethrough(item.isCompleted && style.textCompletion.strikes)
+                    .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
+                    .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
+                    .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+            }
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
