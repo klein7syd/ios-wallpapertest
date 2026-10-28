@@ -297,6 +297,9 @@ struct AboutView: View {
                 } header: { Text("编辑器") } footer: {
                     Text("开启后可单独调整字号、间距、尺寸、线宽和精确位置。关闭仅隐藏这些控件，保留已有设置。排版缩放会按标准排版成套调整。")
                 }
+                Section("调试") {
+                    NavigationLink("文字可读性测试") { ReadableLayerDebugView() }
+                }
                 Section("本次测试") {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")
                     Text("支持主屏幕小组件直接完成或恢复待办，以及本地壁纸编辑与 PNG 导出。")
