@@ -43,7 +43,9 @@ enum ShadowRecipes {
                                                 ShadowLayer(radius: 3, y: 1, opacity: 0.25)], usesWhite: false),
         ShadowRecipe(id: "C", name: "宽柔", layers: [ShadowLayer(radius: 2, y: 1, opacity: 0.40),
                                                 ShadowLayer(radius: 8, y: 2, opacity: 0.25)], usesWhite: false),
-        ShadowRecipe(id: "D", name: "无阴影", layers: [], usesWhite: false)
+        ShadowRecipe(id: "D", name: "无阴影", layers: [], usesWhite: false),
+        ShadowRecipe(id: "I", name: "当前默认", layers: [ShadowLayer(radius: 0.8, y: 0.5, opacity: 0.30),
+                                                 ShadowLayer(radius: 2.0, y: 1.0, opacity: 0.18)], usesWhite: false)
     ]
 
     /// 深色文字（白阴影）
@@ -53,7 +55,8 @@ enum ShadowRecipes {
                                                  ShadowLayer(radius: 4, y: 1, opacity: 0.35)], usesWhite: true),
         ShadowRecipe(id: "G", name: "宽光晕", layers: [ShadowLayer(radius: 2, y: 1, opacity: 0.50),
                                                  ShadowLayer(radius: 8, y: 2, opacity: 0.40)], usesWhite: true),
-        ShadowRecipe(id: "H", name: "无阴影", layers: [], usesWhite: true)
+        ShadowRecipe(id: "H", name: "无阴影", layers: [], usesWhite: true),
+        ShadowRecipe(id: "J", name: "当前默认", layers: [ShadowLayer(radius: 1.0, y: 0.5, opacity: 0.40)], usesWhite: true)
     ]
 }
 
@@ -68,8 +71,8 @@ enum ReadableDefaults {
     static let edgeInsetRange: ClosedRange<Double> = -40...40
 
     /// 当前选中的阴影配方；选定字母后只改这两行
-    static let lightTextRecipe: ShadowRecipe = ShadowRecipes.light[1]   // B
-    static let darkTextRecipe: ShadowRecipe = ShadowRecipes.dark[0]     // E
+    static let lightTextRecipe: ShadowRecipe = ShadowRecipes.light[4]   // I
+    static let darkTextRecipe: ShadowRecipe = ShadowRecipes.dark[4]     // J
 }
 
 /// 可读性强度：同时作用于蒙层与阴影
@@ -86,11 +89,30 @@ enum ReadabilityIntensity: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// 蒙层倍率
     var multiplier: Double {
         switch self {
         case .subtle: return 0.7
         case .standard: return 1.0
         case .strong: return 1.3
+        }
+    }
+
+    /// 阴影不透明度倍率，独立于蒙层
+    var shadowOpacityMultiplier: Double {
+        switch self {
+        case .subtle: return 0.5
+        case .standard: return 0.8
+        case .strong: return 1.1
+        }
+    }
+
+    /// 阴影半径缩放
+    var shadowRadiusScale: Double {
+        switch self {
+        case .subtle: return 0.7
+        case .standard: return 0.85
+        case .strong: return 1.0
         }
     }
 }

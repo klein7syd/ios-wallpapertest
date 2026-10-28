@@ -411,7 +411,7 @@ struct WidgetAppearanceEditor: View {
         }
     }
     private var edgeRange: ClosedRange<Double> {
-        settings.anchor == .center ? -40...40 : 0...40
+        settings.anchor == .center ? -40...40 : -12...40
     }
     private var edgeBinding: Binding<Double> {
         Binding(get: { settings.edgeInset }, set: { widget.wrappedValue.readableEdgeInset = $0 })

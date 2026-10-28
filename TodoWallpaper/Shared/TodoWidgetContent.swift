@@ -28,17 +28,20 @@ struct TodoWidgetContent: View {
     }
     private var background: WallpaperColor { TextLegibility.widgetBase(style, dark: style.isExplicitlyDark ?? (hostScheme == .dark)) }
     private var settings: ReadableSettings { style.readable }
+    /// 用户选什么颜色就渲染什么颜色，不再按底色改写
     private func safeColor(_ color: WallpaperColor) -> Color {
         if renderingMode != .fullColor { return .primary }
-        return TextLegibility.readable(color, on: background).swiftColor
+        return color.swiftColor
     }
     /// 浅色文字才加黑色阴影；深色文字不加，避免发白发糊
+    /// 由主文字的最终颜色决定深浅，不再参考系统模式或底色
     private var textIsLight: Bool {
         guard renderingMode == .fullColor else { return false }
+        let dark = style.isExplicitlyDark ?? (hostScheme == .dark)
         let requested = style.followsSystemText
-            ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
-        return TextLegibility.luminance(TextLegibility.readable(requested, on: background)) > 0.5
+        return TextLegibility.luminance(requested) > 0.5
     }
     private var contentAlignment: Alignment {
         switch settings.anchor {
@@ -77,7 +80,6 @@ struct TodoWidgetContent: View {
                 appearance: appearance, family: family, width: geometry.size.width, height: max(0, geometry.size.height - abs(settings.edgeInset)),
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
-            ReadableLayer(isLightText: textIsLight, intensity: settings.intensity.multiplier) {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)
@@ -115,9 +117,8 @@ struct TodoWidgetContent: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
             .foregroundStyle(foreground).clipped()
-            }
-            .padding(.top, settings.anchor == .top ? max(0, settings.edgeInset) : 0)
-            .padding(.bottom, settings.anchor == .bottom ? max(0, settings.edgeInset) : 0)
+            .padding(.top, settings.anchor == .top ? settings.edgeInset : 0)
+            .padding(.bottom, settings.anchor == .bottom ? settings.edgeInset : 0)
             .offset(y: settings.anchor == .center ? settings.edgeInset : 0)
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: contentAlignment)
         }
@@ -143,6 +144,7 @@ struct TodoWidgetContent: View {
                 Text(heading.text).font(Font(headingFont))
                     .foregroundStyle(heading.followsTextColor ? foreground : safeColor(heading.color))
                     .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
+                    .readableText(isLightText: textIsLight)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
                     .offset(x: layout.titleX, y: layout.titleY)
@@ -197,8 +199,10 @@ struct TodoWidgetContent: View {
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+                .readableText(isLightText: textIsLight)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
+                    .readableText(isLightText: textIsLight)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()

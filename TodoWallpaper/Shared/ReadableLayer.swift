@@ -52,41 +52,42 @@ struct TextStyleModifier: ViewModifier {
     /// 这一层用的是哪套配方；nil 表示按文字亮度取默认配方
     var recipe: ShadowRecipe?
     var isLightText: Bool
-    /// 强度倍率，同时作用于蒙层（由调用方传入）
-    var intensity: Double = 1.0
+    var intensity: ReadabilityIntensity = .standard
 
     func body(content: Content) -> some View {
         let chosen = recipe ?? (isLightText ? ReadableDefaults.lightTextRecipe : ReadableDefaults.darkTextRecipe)
         let tint = chosen.usesWhite ? Color.white : Color.black
         let layers = chosen.layers
+        let opacityScale = intensity.shadowOpacityMultiplier
+        let radiusScale = intensity.shadowRadiusScale
 
         return Group {
             switch layers.count {
             case 0:
                 content
             case 1:
-                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
-                               radius: layers[0].radius, x: 0, y: layers[0].y)
+                content.shadow(color: tint.opacity(layers[0].opacity * opacityScale),
+                               radius: layers[0].radius * radiusScale, x: 0, y: layers[0].y)
             case 2:
-                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
-                               radius: layers[0].radius, x: 0, y: layers[0].y)
-                       .shadow(color: tint.opacity(layers[1].opacity * intensity),
-                               radius: layers[1].radius, x: 0, y: layers[1].y)
+                content.shadow(color: tint.opacity(layers[0].opacity * opacityScale),
+                               radius: layers[0].radius * radiusScale, x: 0, y: layers[0].y)
+                       .shadow(color: tint.opacity(layers[1].opacity * opacityScale),
+                               radius: layers[1].radius * radiusScale, x: 0, y: layers[1].y)
             default:
-                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
-                               radius: layers[0].radius, x: 0, y: layers[0].y)
-                       .shadow(color: tint.opacity(layers[1].opacity * intensity),
-                               radius: layers[1].radius, x: 0, y: layers[1].y)
-                       .shadow(color: tint.opacity(layers[2].opacity * intensity),
-                               radius: layers[2].radius, x: 0, y: layers[2].y)
+                content.shadow(color: tint.opacity(layers[0].opacity * opacityScale),
+                               radius: layers[0].radius * radiusScale, x: 0, y: layers[0].y)
+                       .shadow(color: tint.opacity(layers[1].opacity * opacityScale),
+                               radius: layers[1].radius * radiusScale, x: 0, y: layers[1].y)
+                       .shadow(color: tint.opacity(layers[2].opacity * opacityScale),
+                               radius: layers[2].radius * radiusScale, x: 0, y: layers[2].y)
             }
         }
     }
 }
 
 extension View {
-    func readableText(recipe: ShadowRecipe? = nil, isLightText: Bool = true, intensity: Double = 1.0) -> some View {
-        modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText, intensity: intensity))
+    func readableText(recipe: ShadowRecipe? = nil, isLightText: Bool = true) -> some View {
+        modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText))
     }
 }
 
@@ -94,7 +95,7 @@ extension View {
 
 struct ReadableLayer<Content: View>: View {
     var isLightText: Bool = true
-    var intensity: Double = 1.0
+    var intensity: ReadabilityIntensity = .standard
     /// 调试对比页用它指定配方
     var recipe: ShadowRecipe?
     @ViewBuilder var content: () -> Content
@@ -134,8 +135,7 @@ enum ReadableResolver {
         let requested = style.followsSystemText
             ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
-        let base = TextLegibility.widgetBase(style, dark: dark)
-        let light = TextLegibility.luminance(TextLegibility.readable(requested, on: base)) > 0.5
+        let light = TextLegibility.luminance(requested) > 0.5
         return (value, light ? .black : .white)
     }
 }
