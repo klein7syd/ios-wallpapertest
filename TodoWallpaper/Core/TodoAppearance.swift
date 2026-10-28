@@ -157,10 +157,10 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
 
     var readable: ReadableSettings {
         ReadableSettings(anchor: readableAnchor ?? ReadableDefaults.anchor,
-                         intensity: readableIntensity ?? .automatic,
+                         intensity: readableIntensity ?? .standard,
                          scrimOverride: readableScrimOverride,
                          heightRatio: readableHeightRatio ?? ReadableDefaults.scrimHeightRatio,
-                         shadowPreset: readableShadowPreset ?? ReadableDefaults.shadowPreset,
+                         shadowPreset: readableShadowPreset ?? .standard,
                          edgeInset: readableEdgeInset ?? 0)
     }
     var heading: WidgetHeaderAppearance { header ?? WidgetHeaderAppearance() }
