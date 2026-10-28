@@ -144,7 +144,8 @@ struct TodoWidgetContent: View {
                 Text(heading.text).font(Font(headingFont))
                     .foregroundStyle(heading.followsTextColor ? foreground : safeColor(heading.color))
                     .lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.leading)
-                    .readableText(isLightText: textIsLight)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                                  enabled: renderingMode == .fullColor)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: layout.titleWidth, height: layout.titleHeight, alignment: .topLeading)
                     .offset(x: layout.titleX, y: layout.titleY)
@@ -199,10 +200,12 @@ struct TodoWidgetContent: View {
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
                 .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
-                .readableText(isLightText: textIsLight)
+                .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                              enabled: renderingMode == .fullColor)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
-                    .readableText(isLightText: textIsLight)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                                  enabled: renderingMode == .fullColor)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()

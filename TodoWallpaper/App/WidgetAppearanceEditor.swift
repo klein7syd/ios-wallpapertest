@@ -425,6 +425,7 @@ struct WidgetAppearanceEditor: View {
         widget.wrappedValue.readableScrimOverride = nil
         widget.wrappedValue.readableHeightRatio = nil
         widget.wrappedValue.readableShadowPreset = nil
+        widget.wrappedValue.readableEdgeInset = nil
         reloadWidget()
     }
     @ViewBuilder private var markerControls: some View {

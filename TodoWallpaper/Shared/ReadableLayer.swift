@@ -53,15 +53,17 @@ struct TextStyleModifier: ViewModifier {
     var recipe: ShadowRecipe?
     var isLightText: Bool
     var intensity: ReadabilityIntensity = .standard
+    var enabled: Bool = true
 
     func body(content: Content) -> some View {
+        guard enabled else { return AnyView(content) }
         let chosen = recipe ?? (isLightText ? ReadableDefaults.lightTextRecipe : ReadableDefaults.darkTextRecipe)
         let tint = chosen.usesWhite ? Color.white : Color.black
         let layers = chosen.layers
         let opacityScale = intensity.shadowOpacityMultiplier
         let radiusScale = intensity.shadowRadiusScale
 
-        return Group {
+        return AnyView(Group {
             switch layers.count {
             case 0:
                 content
@@ -81,13 +83,15 @@ struct TextStyleModifier: ViewModifier {
                        .shadow(color: tint.opacity(layers[2].opacity * opacityScale),
                                radius: layers[2].radius * radiusScale, x: 0, y: layers[2].y)
             }
-        }
+        })
     }
 }
 
 extension View {
-    func readableText(recipe: ShadowRecipe? = nil, isLightText: Bool = true) -> some View {
-        modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText))
+    func readableText(recipe: ShadowRecipe? = nil, isLightText: Bool = true,
+                      intensity: ReadabilityIntensity = .standard, enabled: Bool = true) -> some View {
+        modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText,
+                                   intensity: intensity, enabled: enabled))
     }
 }
 
