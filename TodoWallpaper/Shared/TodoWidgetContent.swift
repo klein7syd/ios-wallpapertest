@@ -187,11 +187,12 @@ struct TodoWidgetContent: View {
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(outlined(item.title))
-                .strikethrough(item.isCompleted && style.textCompletion.strikes)
+            StrokedText(text: item.title, font: titleFont,
+                        fill: UIColor(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground),
+                        stroke: style.textOutline == true ? strokeColor : nil,
+                        strike: item.isCompleted && style.textCompletion.strikes,
+                        lineLimit: metrics.lineLimit)
                 .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
@@ -199,22 +200,46 @@ struct TodoWidgetContent: View {
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 
     }
-    /// 真描边：负 strokeWidth 表示描边+填充，按字号的百分比给细边。
-    private func outlined(_ text: String) -> AttributedString {
-        var a = AttributedString(text)
-        a.font = Font(titleFont)
-        if style.textOutline == true {
-            a.uiKit.strokeWidth = -4
-            a.uiKit.strokeColor = strokeColor
-        }
-        return a
-    }
     private var strokeColor: UIColor {
         let requested = style.followsSystemText
             ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
         let resolved = TextLegibility.readable(requested, on: background)
         return TextLegibility.luminance(resolved) > 0.5 ? .black : .white
+    }
+}
+
+/// SwiftUI Text 会忽略 strokeWidth 属性，描边必须交给 UILabel 渲染。
+struct StrokedText: UIViewRepresentable {
+    let text: String
+    let font: CTFont
+    let fill: UIColor
+    let stroke: UIColor?
+    let strike: Bool
+    let lineLimit: Int
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.textAlignment = .left
+        label.lineBreakMode = .byTruncatingTail
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return label
+    }
+    func updateUIView(_ label: UILabel, context: Context) {
+        let attrs = NSMutableAttributedString(string: text)
+        let full = NSRange(location: 0, length: attrs.length)
+        attrs.addAttribute(.font, value: font as UIFont, range: full)
+        attrs.addAttribute(.foregroundColor, value: fill, range: full)
+        if let stroke {
+            attrs.addAttribute(.strokeWidth, value: -4.0, range: full)
+            attrs.addAttribute(.strokeColor, value: stroke, range: full)
+        }
+        if strike {
+            attrs.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: full)
+        }
+        label.numberOfLines = lineLimit
+        label.attributedText = attrs
     }
 }
 
