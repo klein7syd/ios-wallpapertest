@@ -211,7 +211,7 @@ struct TodoWidgetContent: View {
         if item.isCompleted && style.textCompletion.strikes {
             attrs.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: full)
         }
-        let bounds = attrs.boundingRect(with: CGSize(width: 2000, height: .greatestFiniteMagnitude),
+        let bounds = attrs.boundingRect(with: CGSize(width: 2000, height: CGFloat.greatestFiniteMagnitude),
                                         options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
         let size = CGSize(width: ceil(bounds.width) + 8, height: ceil(bounds.height) + 2)
         let format = UIGraphicsImageRendererFormat.default()
