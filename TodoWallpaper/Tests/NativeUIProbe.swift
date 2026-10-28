@@ -198,6 +198,7 @@ enum NativeUIProbe {
                 name: "header-complete-glyph-reference", directory: output)
             let referenceInk = try redInk(headerReference)
             var headingHashes = Set<String>()
+            headingLook.widget.readableAnchor = .top
             for summary in [true, false] {
                 headingLook.widget.header?.showsSummary = summary
                 let image = try render(TodoWidgetContent(document: TodoDocument(items: []), appearance: headingLook,
