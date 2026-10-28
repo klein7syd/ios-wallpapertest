@@ -199,15 +199,15 @@ struct TodoWidgetContent: View {
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 
     }
-    /// 真描边：strokeWidth 负值表示描边+填充，按字号的百分比给出细边。
+    /// 真描边：负 strokeWidth 表示描边+填充，按字号的百分比给细边。
     private func outlined(_ text: String) -> AttributedString {
-        let ns = NSMutableAttributedString(string: text)
-        ns.addAttribute(.font, value: titleFont, range: NSRange(location: 0, length: ns.length))
+        var a = AttributedString(text)
+        a.font = Font(titleFont)
         if style.textOutline == true {
-            ns.addAttribute(.strokeWidth, value: -2.5, range: NSRange(location: 0, length: ns.length))
-            ns.addAttribute(.strokeColor, value: strokeColor, range: NSRange(location: 0, length: ns.length))
+            a.uiKit.strokeWidth = -4
+            a.uiKit.strokeColor = strokeColor
         }
-        return AttributedString(ns)
+        return a
     }
     private var strokeColor: UIColor {
         let requested = style.followsSystemText

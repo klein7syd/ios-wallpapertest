@@ -23,8 +23,10 @@ struct WidgetLayoutMetrics: Equatable {
         let marker = marks.max() ?? 0
         let gap = marker > 0 ? style.markerStyle.gap : 0
         let vertical = marker > 0 ? abs(style.markerStyle.verticalOffset) * 2 : 0
-        // 负值真正收紧行距：允许最多 5pt 重叠。
-        let spacing = max(-5, style.spacing)
+        // 负行距改为压缩行高而不是让行重叠：每 1 个刻度收紧 0.2pt，最多 2pt，
+        // 行与行永不重叠，分隔线也不会被下一行盖住。
+        let shrink = max(-2, min(0, style.spacing) * 0.2)
+        let spacing = max(0, style.spacing)
         // 分隔线画在行的 overlay 上，不占布局高度，否则每行间距会被它撑得不均匀。
         let separator = 0.0
         let header = min(max(0, height), max(0, headerHeight))
@@ -37,8 +39,8 @@ struct WidgetLayoutMetrics: Equatable {
         let rowSpace = max(0, afterHeader - (footerFits ? footer + spacing : 0))
         let proposedLines = style.maximumTitleLines ?? (family == .large && !style.compact && spacing > 2 && fontLineHeight < 30 ? 2 : 1)
         let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2 + dateHeight) + padding ? 2 : 1
-        // 负行距同时压缩行高，否则只是把行间空隙挪走，看起来几乎没变。
-        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight) + padding
+        // 行高只随负行距轻微压缩，且不小于文字自身高度。
+        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight) + padding + shrink
         let pitch = max(1, row + spacing + separator)
         let raw = row > 0 ? Int(max(0, (rowSpace + spacing + separator) / pitch).rounded(.down)) : 0
         return WidgetLayoutMetrics(rowHeight: row, markerWidth: marker, gap: gap, lineHeight: fontLineHeight,
