@@ -24,13 +24,13 @@ enum ImageAnalyzer {
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return .fallback }
 
-        // CGContext 原点在左下角：y = 0 是图片底部
         context.draw(cgImage, in: CGRect(origin: .zero, size: size))
 
+        // 像素缓冲区第 0 行是图片顶部：bottom 取最后 40%，top 取前 40%
         let rows: Range<Int>
         switch anchor {
-        case .bottom: rows = 0..<Int(Double(side) * 0.4)
-        case .top:    rows = Int(Double(side) * 0.6)..<side
+        case .bottom: rows = Int(Double(side) * 0.6)..<side
+        case .top:    rows = 0..<Int(Double(side) * 0.4)
         case .center: rows = Int(Double(side) * 0.3)..<Int(Double(side) * 0.7)
         }
 

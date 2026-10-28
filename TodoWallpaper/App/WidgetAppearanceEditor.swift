@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import PhotosUI
+import WidgetKit
 
 private enum WidgetEditorTool: String, CaseIterable, Identifiable {
     case theme = "主题", header = "标题", text = "文字", marker = "标记", content = "内容"
@@ -124,6 +125,11 @@ struct WidgetAppearanceEditor: View {
                 do {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
+                    // 选图后立刻算一次亮度，写进 App Group 供小组件读取
+                    if let uiImage = UIImage(data: data) {
+                        let analysis = ImageAnalyzer.analyzeImage(uiImage, anchor: readable.anchor)
+                        readable.setAnalysis(analysis, for: name)
+                    }
                     var next = store.appearance.widget
                     next.backgroundPhotoName = name; next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
                     widget.wrappedValue = next; store.flushAppearance()
@@ -290,6 +296,12 @@ struct WidgetAppearanceEditor: View {
         }
     }
     @ViewBuilder private var textControls: some View {
+        Picker("文字位置", selection: readableAnchor) {
+            ForEach(TextAnchor.allCases) { Text($0.title).tag($0) }
+        }.pickerStyle(.segmented)
+        Picker("可读性强度", selection: readableIntensity) {
+            ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
+        }.pickerStyle(.segmented)
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
         if advanced {
@@ -315,7 +327,6 @@ struct WidgetAppearanceEditor: View {
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("单行").tag(1); Text("最多两行").tag(2)
         }.pickerStyle(.menu)
-        Toggle("文字描边", isOn: Binding(get: { store.appearance.widget.textOutline ?? false }, set: { widget.wrappedValue.textOutline = $0 }))
         Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
@@ -323,6 +334,62 @@ struct WidgetAppearanceEditor: View {
         if store.appearance.widget.textCompletion == .color {
             StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
+    }
+        if advanced {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Scrim 强度").font(.subheadline)
+                    Spacer(minLength: 6)
+                    Text(String(format: "自动：%.2f", readable.autoScrim(imageID: store.appearance.widget.backgroundPhotoName)))
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Button("标准") { readable.scrimOverride = nil; reloadWidget() }.font(.caption)
+                }
+                Slider(value: readableScrim, in: 0...0.8, step: 0.05) { editing in
+                    if !editing { reloadWidget() }
+                }
+                HStack {
+                    Text("渐变范围").font(.subheadline)
+                    Spacer(minLength: 6)
+                    Button("标准") { readable.scrimHeightRatio = ReadableDefaults.scrimHeightRatio; reloadWidget() }.font(.caption)
+                }
+                Slider(value: readableHeightRatio, in: 0.25...0.7, step: 0.05) { editing in
+                    if !editing { reloadWidget() }
+                }
+                Picker("阴影强度", selection: readablePreset) {
+                    ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
+                }.pickerStyle(.segmented)
+                Button("全部恢复标准") { resetReadable() }
+            }
+        } else if readable.hasCustomValues {
+            Text("已使用自定义参数").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var readable: AppearanceStore { AppearanceStore.shared }
+    private var readableAnchor: Binding<TextAnchor> {
+        Binding(get: { readable.anchor }, set: { readable.anchor = $0; reloadWidget() })
+    }
+    private var readableIntensity: Binding<ReadabilityIntensity> {
+        Binding(get: { readable.intensity }, set: { readable.intensity = $0; reloadWidget() })
+    }
+    private var readablePreset: Binding<ShadowPreset> {
+        Binding(get: { readable.shadowPreset }, set: { readable.shadowPreset = $0; reloadWidget() })
+    }
+    private var readableScrim: Binding<Double> {
+        Binding(get: { readable.scrimOverride ?? readable.autoScrim(imageID: store.appearance.widget.backgroundPhotoName) }, set: { readable.scrimOverride = $0 })
+    }
+    private var readableHeightRatio: Binding<Double> {
+        Binding(get: { readable.scrimHeightRatio }, set: { readable.scrimHeightRatio = $0 })
+    }
+    private func reloadWidget() {
+        WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+    }
+    private func resetReadable() {
+        readable.anchor = ReadableDefaults.anchor
+        readable.intensity = .automatic
+        readable.scrimOverride = nil
+        readable.scrimHeightRatio = ReadableDefaults.scrimHeightRatio
+        readable.shadowPreset = ReadableDefaults.shadowPreset
+        reloadWidget()
     }
     @ViewBuilder private var markerControls: some View {
         Toggle("统一标记（对所有待办生效）", isOn: Binding(

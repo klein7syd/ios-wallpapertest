@@ -47,6 +47,11 @@ struct TodoWidgetContent: View {
         let l = TextLegibility.luminance(resolved)
         return .black.opacity(0.10 + 0.32 * l)
     }
+    private var readable: AppearanceStore { AppearanceStore.shared }
+    private var readableAnchor: TextAnchor { readable.anchor }
+    private var readableScrim: Double { readable.effectiveScrim(imageID: style.backgroundPhotoName) }
+    private var readableHeightRatio: CGFloat { CGFloat(readable.scrimHeightRatio) }
+    private var readablePreset: ShadowPreset { readable.shadowPreset }
     private var heading: WidgetHeaderAppearance { style.heading }
     private var headingFont: CTFont { NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17) }
     private var fontSize: Double { style.fontSize * bodyUnit / 15 }
@@ -77,6 +82,9 @@ struct TodoWidgetContent: View {
                 appearance: appearance, family: family, width: geometry.size.width, height: geometry.size.height,
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
+            ReadableLayer(anchor: readableAnchor, scrim: readableScrim,
+                          scrimHeightRatio: readableHeightRatio,
+                          shadowPreset: readablePreset) {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)
@@ -113,8 +121,10 @@ struct TodoWidgetContent: View {
                         .frame(height: metrics.footerHeight).padding(.top, metrics.spacing)
                 }
             }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .foregroundStyle(foreground).clipped()
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
     private func measure(_ text: String, font: CTFont) -> (width: Double, height: Double) {
@@ -187,54 +197,17 @@ struct TodoWidgetContent: View {
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if style.textOutline == true {
-                // 描边只能走位图；关闭描边时仍用 Text，保留换行和省略号。
-                Image(uiImage: titleImage(item))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-            } else {
-                Text(item.title).font(Font(titleFont))
-                    .strikethrough(item.isCompleted && style.textCompletion.strikes)
-                    .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-                    .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
-                    .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
-            }
+            Text(item.title).font(Font(titleFont))
+                .strikethrough(item.isCompleted && style.textCompletion.strikes)
+                .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
+                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
+                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
             if let schedule = item.schedule {
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
 
-    }
-    /// 描边必须离线画进 UIImage：SwiftUI Text 忽略 strokeWidth，ImageRenderer 也不渲染 UIViewRepresentable。
-    private func titleImage(_ item: TodoItem) -> UIImage {
-        let fillColor = item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground
-        let attrs = NSMutableAttributedString(string: item.title)
-        let full = NSRange(location: 0, length: attrs.length)
-        attrs.addAttribute(.font, value: titleFont as UIFont, range: full)
-        attrs.addAttribute(.foregroundColor, value: UIColor(fillColor), range: full)
-        if style.textOutline == true {
-            attrs.addAttribute(.strokeWidth, value: -4.0, range: full)
-            attrs.addAttribute(.strokeColor, value: strokeColor, range: full)
-        }
-        if item.isCompleted && style.textCompletion.strikes {
-            attrs.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: full)
-        }
-        let bounds = attrs.boundingRect(with: CGSize(width: 2000, height: CGFloat.greatestFiniteMagnitude),
-                                        options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-        let size = CGSize(width: ceil(bounds.width) + 8, height: ceil(bounds.height) + 2)
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 2
-        format.opaque = false
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        return renderer.image { _ in attrs.draw(at: .zero) }
-    }
-    private var strokeColor: UIColor {
-        let requested = style.followsSystemText
-            ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
-            : style.textColor
-        let resolved = TextLegibility.readable(requested, on: background)
-        return TextLegibility.luminance(resolved) > 0.5 ? .black : .white
     }
 }
 

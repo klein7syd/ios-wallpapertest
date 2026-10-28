@@ -12,8 +12,10 @@ final class AppearanceStore {
 
     private enum Key {
         static let anchor = "readable.anchor"
+        static let intensity = "readable.intensity"
         static let scrimOverride = "readable.scrimOverride"
         static let shadowPreset = "readable.shadowPreset"
+        static let scrimHeightRatio = "readable.scrimHeightRatio"
         static let analysisPrefix = "readable.analysis."
     }
 
@@ -21,16 +23,34 @@ final class AppearanceStore {
 
     init(defaults: UserDefaults = AppGroup.defaults) {
         self.defaults = defaults
+        // 旧描边实现的残留 key，启动时清理
+        for key in ["textOutline", "readable.outline", "widget.textOutline"] {
+            defaults.removeObject(forKey: key)
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     var anchor: TextAnchor {
-        get { defaults.string(forKey: Key.anchor).flatMap(TextAnchor.init(rawValue:)) ?? .bottom }
+        get { defaults.string(forKey: Key.anchor).flatMap(TextAnchor.init(rawValue:)) ?? ReadableDefaults.anchor }
         set { defaults.set(newValue.rawValue, forKey: Key.anchor) }
     }
 
+    var intensity: ReadabilityIntensity {
+        get { defaults.string(forKey: Key.intensity).flatMap(ReadabilityIntensity.init(rawValue:)) ?? .automatic }
+        set { defaults.set(newValue.rawValue, forKey: Key.intensity) }
+    }
+
     var shadowPreset: ShadowPreset {
-        get { defaults.string(forKey: Key.shadowPreset).flatMap(ShadowPreset.init(rawValue:)) ?? .standard }
+        get { defaults.string(forKey: Key.shadowPreset).flatMap(ShadowPreset.init(rawValue:)) ?? ReadableDefaults.shadowPreset }
         set { defaults.set(newValue.rawValue, forKey: Key.shadowPreset) }
+    }
+
+    var scrimHeightRatio: Double {
+        get {
+            let value = defaults.double(forKey: Key.scrimHeightRatio)
+            return value <= 0 ? ReadableDefaults.scrimHeightRatio : value
+        }
+        set { defaults.set(newValue, forKey: Key.scrimHeightRatio) }
     }
 
     /// nil 表示没有手动覆盖
@@ -59,10 +79,28 @@ final class AppearanceStore {
         defaults.removeObject(forKey: Key.analysisPrefix + imageID)
     }
 
-    /// 最终 scrim：手动覆盖 > 图片分析 > 0.4
+    /// 当前背景图按自动规则算出的 scrim（不含手动覆盖）
+    func autoScrim(imageID: String?) -> Double {
+        let base = imageID.flatMap { analysis(for: $0)?.suggestedScrim } ?? ReadableDefaults.scrim
+        return min(ReadableDefaults.scrimRange.upperBound,
+                   max(ReadableDefaults.scrimRange.lowerBound, base * intensity.multiplier))
+    }
+
+    /// 小组件与预览统一走这里：手动值 > 图片分析 > 标准值
     func effectiveScrim(imageID: String?) -> Double {
-        if let scrimOverride { return scrimOverride }
-        if let imageID, let analysis = analysis(for: imageID) { return analysis.suggestedScrim }
-        return 0.4
+        if let scrimOverride {
+            return min(ReadableDefaults.scrimRange.upperBound,
+                       max(ReadableDefaults.scrimRange.lowerBound, scrimOverride))
+        }
+        return autoScrim(imageID: imageID)
+    }
+
+    /// 是否偏离了标准值，用于普通模式下提示"已使用自定义参数"
+    var hasCustomValues: Bool {
+        scrimOverride != nil
+            || anchor != ReadableDefaults.anchor
+            || intensity != .automatic
+            || shadowPreset != ReadableDefaults.shadowPreset
+            || abs(scrimHeightRatio - ReadableDefaults.scrimHeightRatio) > 0.001
     }
 }

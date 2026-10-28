@@ -14,8 +14,19 @@ enum TestImageFactory {
             Sample(name: "纯白", image: solid(.white, size: size)),
             Sample(name: "纯黑", image: solid(.black, size: size)),
             Sample(name: "黑白条纹", image: stripes(size: size)),
-            Sample(name: "彩色噪点", image: gradientNoise(size: size))
+            Sample(name: "彩色噪点", image: gradientNoise(size: size)),
+            Sample(name: "上下分半", image: split(size: size))
         ]
+    }
+
+    /// 上半纯白、下半纯黑：验证采样方向
+    private static func split(size: CGSize) -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height / 2))
+            UIColor.black.setFill()
+            context.fill(CGRect(x: 0, y: size.height / 2, width: size.width, height: size.height / 2))
+        }
     }
 
     private static func solid(_ color: UIColor, size: CGSize) -> UIImage {
