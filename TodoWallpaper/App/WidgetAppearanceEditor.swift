@@ -146,6 +146,12 @@ struct WidgetAppearanceEditor: View {
                 if next.readableShadowPreset == nil { next.readableShadowPreset = legacy.shadowPreset }
                 if next.readableHeightRatio == nil { next.readableHeightRatio = legacy.heightRatio }
                 if next.readableScrimOverride == nil { next.readableScrimOverride = legacy.scrimOverride }
+                if next.readableEdgeInset == nil, var header = next.header, header.topInset > 0,
+                   next.readableAnchor == .top || (next.readableAnchor == nil && legacy.anchor == .top) {
+                    next.readableEdgeInset = header.topInset
+                    header.topInset = 0
+                    next.header = header
+                }
                 widget.wrappedValue = next
                 store.flushAppearance()
             }
@@ -228,7 +234,7 @@ struct WidgetAppearanceEditor: View {
                             WidgetBackgroundView(style: store.appearance.widget, date: photoDate,
                                                  scrim: readable.value, scrimAnchor: store.appearance.widget.readable.anchor,
                                                  scrimHeightRatio: store.appearance.widget.readable.heightRatio,
-                                                 scrimColor: readable.color)
+                                                 scrimColor: readable.color, scrimExtraInset: store.appearance.widget.readable.edgeInset)
                         }
                     }
                     .environment(\.colorScheme, scheme)
@@ -314,7 +320,7 @@ struct WidgetAppearanceEditor: View {
             if advanced {
                 PreciseSlider(title: "标题大小", value: heading.fontSize, range: 12...32, standard: 17)
                 PreciseSlider(title: "标题水平位置", value: heading.horizontalPosition, range: 0...1, standard: 0, precision: 2)
-                PreciseSlider(title: "标题顶部留白", value: heading.topInset, range: 0...24, standard: 0)
+                PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
             }
         }
     }
@@ -368,6 +374,7 @@ struct WidgetAppearanceEditor: View {
                  : String(format: "手动：%.2f", settings.scrimOverride ?? 0))
                 .font(.caption).foregroundStyle(.secondary)
             PreciseSlider(title: "渐变范围", value: heightBinding, range: 0.25...0.7, standard: ReadableDefaults.scrimHeightRatio, precision: 2)
+            PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
             Picker("阴影强度", selection: readablePreset) {
                 ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented)
@@ -384,7 +391,12 @@ struct WidgetAppearanceEditor: View {
         return settings.autoScrim(analysis: analysis)
     }
     private var readableAnchor: Binding<TextAnchor> {
-        Binding(get: { settings.anchor }, set: { widget.wrappedValue.readableAnchor = $0 })
+        Binding(get: { settings.anchor }, set: { next in
+            widget.wrappedValue.readableAnchor = next
+            let current = widget.wrappedValue.readable.edgeInset
+            let clamped = next == .center ? max(-40, min(40, current)) : max(0, min(40, current))
+            if clamped != current { widget.wrappedValue.readableEdgeInset = clamped }
+        })
     }
     private var readableIntensity: Binding<ReadabilityIntensity> {
         Binding(get: { settings.intensity }, set: { widget.wrappedValue.readableIntensity = $0 })
@@ -405,6 +417,19 @@ struct WidgetAppearanceEditor: View {
     }
     private var heightBinding: Binding<Double> {
         Binding(get: { settings.heightRatio }, set: { widget.wrappedValue.readableHeightRatio = $0 })
+    }
+    private var edgeLabel: String {
+        switch settings.anchor {
+        case .top: return "顶部留白"
+        case .center: return "垂直偏移"
+        case .bottom: return "底部留白"
+        }
+    }
+    private var edgeRange: ClosedRange<Double> {
+        settings.anchor == .center ? -40...40 : 0...40
+    }
+    private var edgeBinding: Binding<Double> {
+        Binding(get: { settings.edgeInset }, set: { widget.wrappedValue.readableEdgeInset = $0 })
     }
     private func reloadWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)

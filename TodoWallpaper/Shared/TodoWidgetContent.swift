@@ -74,10 +74,10 @@ struct TodoWidgetContent: View {
             let items = document?.items ?? []
             let headingMetrics = headerMetrics(width: geometry.size.width, height: geometry.size.height, items: items)
             let metrics = WidgetLayoutMetrics.make(items: items,
-                appearance: appearance, family: family, width: geometry.size.width, height: geometry.size.height,
+                appearance: appearance, family: family, width: geometry.size.width, height: max(0, geometry.size.height - abs(settings.edgeInset)),
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
-            ReadableLayer(shadowPreset: settings.shadowPreset, enabled: textIsLight) {
+            ReadableLayer(shadowPreset: settings.shadowPreset, isLightText: textIsLight) {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)
@@ -116,6 +116,9 @@ struct TodoWidgetContent: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
             .foregroundStyle(foreground).clipped()
             }
+            .padding(.top, settings.anchor == .top ? max(0, settings.edgeInset) : 0)
+            .padding(.bottom, settings.anchor == .bottom ? max(0, settings.edgeInset) : 0)
+            .offset(y: settings.anchor == .center ? settings.edgeInset : 0)
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: contentAlignment)
         }
     }

@@ -47,6 +47,7 @@ enum ReadableDefaults {
     static let shadowPreset: ShadowPreset = .standard
     static let scrimRange: ClosedRange<Double> = 0...0.8
     static let heightRatioRange: ClosedRange<Double> = 0.25...0.7
+    static let edgeInsetRange: ClosedRange<Double> = -40...40
 }
 
 /// 可读性强度：自动走图片分析，弱/强是在自动值上乘 0.7 / 1.3
@@ -79,6 +80,8 @@ struct ReadableSettings: Equatable {
     var scrimOverride: Double?
     var heightRatio: Double = ReadableDefaults.scrimHeightRatio
     var shadowPreset: ShadowPreset = ReadableDefaults.shadowPreset
+    /// 文字块离锚点边缘的距离；居中锚点时作为垂直偏移
+    var edgeInset: Double = 0
 
     /// 最终 scrim：手动值优先，否则用自动值
     func scrim(auto: Double) -> Double {

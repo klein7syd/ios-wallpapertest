@@ -14,6 +14,7 @@ struct WidgetBackgroundView: View {
     var scrimAnchor: TextAnchor = .bottom
     var scrimHeightRatio: Double = ReadableDefaults.scrimHeightRatio
     var scrimColor: Color = .black
+    var scrimExtraInset: Double = 0
     @Environment(\.colorScheme) private var systemScheme
     var body: some View {
         GeometryReader { geometry in
@@ -32,7 +33,7 @@ struct WidgetBackgroundView: View {
                     }
                 }
                 if scrim > 0 {
-                    ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor)
+                    ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor, extraInset: scrimExtraInset)
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
 

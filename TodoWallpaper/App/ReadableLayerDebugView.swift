@@ -127,23 +127,16 @@ struct ReadableLayerDebugView: View {
         let analysis = ImageAnalyzer.analyzeImage(sample.image, anchor: anchor)
 
         VStack(alignment: .leading, spacing: 6) {
+            // 走与小组件完全相同的渲染路径
             ZStack {
                 Image(uiImage: sample.image).resizable().scaledToFill()
                 ScrimView(anchor: anchor, strength: scrim, heightRatio: heightRatio,
                           color: lightText ? .black : .white)
-                VStack(alignment: anchor == .center ? .center : .leading, spacing: 2) {
-                    Text("占位标题").font(.system(size: 16, weight: .semibold))
-                    Text("这里是占位副标题").font(.system(size: 12, weight: .medium)).opacity(0.85)
-                }
-                .foregroundStyle(lightText ? Color.white : Color.black)
-                .readableText(style: preset, enabled: lightText)
-                .frame(maxWidth: .infinity, maxHeight: .infinity,
-                       alignment: anchor == .center ? .center : anchor == .top ? .topLeading : .bottomLeading)
-                .padding(14)
+                TodoWidgetContent(document: debugDocument, appearance: debugAppearance,
+                                  error: nil, family: .medium, interactive: false)
             }
             .frame(height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            // 红色描边框，用来看蒙层边缘有没有硬边
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.red.opacity(0.8), lineWidth: 1))
 
@@ -157,6 +150,25 @@ struct ReadableLayerDebugView: View {
         }
     }
 
+    private var debugAppearance: TodoAppearance {
+        var appearance = TodoAppearance()
+        appearance.widget.followsSystemText = false
+        appearance.widget.textColor = lightText ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0)
+        appearance.widget.readableAnchor = anchor
+        appearance.widget.readableScrimOverride = scrim
+        appearance.widget.readableHeightRatio = heightRatio
+        appearance.widget.readableShadowPreset = preset
+        return appearance
+    }
+
+    private var debugDocument: TodoDocument {
+        let now = Date()
+        return TodoDocument(items: [
+            TodoItem(id: UUID(), title: "占位标题", isCompleted: false, createdAt: now, updatedAt: now),
+            TodoItem(id: UUID(), title: "这里是占位副标题", isCompleted: true, createdAt: now, updatedAt: now)
+        ])
+    }
+
     /// 三个锚点各自的 meanLuma 与 suggestedScrim
     private func anchorSummary(sample: TestImageFactory.Sample) -> String {
         TextAnchor.allCases.map { value in
@@ -167,7 +179,6 @@ struct ReadableLayerDebugView: View {
 }
 
 private extension Binding where Value == Bool {
-    /// 反相绑定，方便用"深色文字"表达
     var invertedLabel: Binding<Bool> {
         Binding(get: { !wrappedValue }, set: { wrappedValue = !$0 })
     }

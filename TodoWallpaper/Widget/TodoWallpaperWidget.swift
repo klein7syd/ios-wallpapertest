@@ -57,7 +57,8 @@ struct TodoWidgetView: View {
             .containerBackground(for: .widget) {
                 WidgetBackgroundView(style: style, date: entry.date, preparedPhoto: entry.background, preparedOnly: true,
                                      scrim: readable.value, scrimAnchor: style.readable.anchor,
-                                     scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color)
+                                     scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color,
+                                     scrimExtraInset: style.readable.edgeInset)
             }
             .environment(\.colorScheme, scheme)
     }

@@ -2,24 +2,25 @@ import SwiftUI
 
 // MARK: - 蒙层（铺满全幅，画在背景层）
 
-/// 只压暗文字所在区域，不碰整张图。由 WidgetBackgroundView 调用，铺满整块背景。
 struct ScrimView: View {
     let anchor: TextAnchor
     let strength: Double
     let heightRatio: Double
     var color: Color = .black
+    /// 额外覆盖的高度，文字块留白变大时用它兜住
+    var extraInset: Double = 0
 
     var body: some View {
         GeometryReader { proxy in
             switch anchor {
             case .bottom:
                 LinearGradient(stops: stops, startPoint: .bottom, endPoint: .top)
-                    .frame(height: proxy.size.height * heightRatio)
+                    .frame(height: coverHeight(proxy.size.height))
                     .frame(maxHeight: .infinity, alignment: .bottom)
 
             case .top:
                 LinearGradient(stops: stops, startPoint: .top, endPoint: .bottom)
-                    .frame(height: proxy.size.height * heightRatio)
+                    .frame(height: coverHeight(proxy.size.height))
                     .frame(maxHeight: .infinity, alignment: .top)
 
             case .center:
@@ -30,6 +31,10 @@ struct ScrimView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    private func coverHeight(_ height: Double) -> Double {
+        min(height, height * heightRatio + abs(extraInset))
     }
 
     /// 三个 stop 避免出现明显的一条带
@@ -46,41 +51,49 @@ struct ScrimView: View {
 
 struct TextStyleModifier: ViewModifier {
     let preset: ShadowPreset
-    let enabled: Bool
+    /// 浅色文字用黑阴影，深色文字用一层很轻的白阴影
+    let isLightText: Bool
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        let scale = enabled ? preset.opacityScale : 0
-
-        return content
-            // 第一层：紧贴字形，保证边缘锐利
-            .shadow(color: .black.opacity(0.35 * scale), radius: 1, x: 0, y: 0.5)
-            // 第二层：柔和外晕，把文字从背景里托起来
-            .shadow(color: .black.opacity(0.25 * scale), radius: 4, x: 0, y: 1)
+        if isLightText {
+            content
+                // 紧贴字形的细黑边：在蒙层上也要看得见，所以不透明度比原来高
+                .shadow(color: .black.opacity(0.55 * preset.opacityScale), radius: 1, x: 0, y: 0.5)
+                // 柔和外晕
+                .shadow(color: .black.opacity(0.30 * preset.opacityScale), radius: 3.5, x: 0, y: 1)
+        } else {
+            // 深色文字只留一层细白影，加大 radius 就会发白发糊
+            content
+                .shadow(color: .white.opacity(0.35 * preset.opacityScale), radius: 1, x: 0, y: 0.5)
+        }
     }
 }
 
 extension View {
-    func readableText(style: ShadowPreset = .standard, enabled: Bool = true) -> some View {
-        modifier(TextStyleModifier(preset: style, enabled: enabled))
+    func readableText(style: ShadowPreset = .standard, isLightText: Bool = true) -> some View {
+        modifier(TextStyleModifier(preset: style, isLightText: isLightText))
     }
 }
 
 // MARK: - 只负责文字阴影
 
-/// 蒙层已经移到背景层，这里不再加 padding，也不再画蒙层。
 struct ReadableLayer<Content: View>: View {
     var shadowPreset: ShadowPreset = .standard
-    var enabled: Bool = true
+    var isLightText: Bool = true
     @ViewBuilder var content: () -> Content
 
     @Environment(\.widgetRenderingMode) private var renderingMode
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
+        #if DEBUG
+        let _ = debugLog()
+        #endif
         if isAccessory || renderingMode != .fullColor {
             content()
         } else {
-            content().modifier(TextStyleModifier(preset: shadowPreset, enabled: enabled))
+            content().modifier(TextStyleModifier(preset: shadowPreset, isLightText: isLightText))
         }
     }
 
@@ -92,6 +105,13 @@ struct ReadableLayer<Content: View>: View {
             return false
         }
     }
+
+    #if DEBUG
+    /// 只有 DEBUG 才会打印，方便排查真机是否被 accented / vibrant 关掉了阴影
+    private func debugLog() -> Void {
+        print("[ReadableLayer] renderingMode=\(renderingMode) family=\(family) lightText=\(isLightText) accessory=\(isAccessory)")
+    }
+    #endif
 }
 
 // MARK: - 蒙层取值
