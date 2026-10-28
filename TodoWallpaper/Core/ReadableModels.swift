@@ -15,7 +15,111 @@ enum TextAnchor: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// 阴影预设：只改透明度，radius 固定
+/// 一层阴影
+struct ShadowLayer: Equatable, Sendable {
+    var radius: Double
+    var y: Double
+    var opacity: Double
+}
+
+/// 一套阴影配方：同一套配方里阴影颜色一致
+struct ShadowRecipe: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let layers: [ShadowLayer]
+    let usesWhite: Bool
+
+    var summary: String {
+        guard !layers.isEmpty else { return "无阴影" }
+        return layers.map { String(format: "r%.1f %.2f", $0.radius, $0.opacity) }.joined(separator: " + ")
+    }
+}
+
+enum ShadowRecipes {
+    /// 浅色文字（黑阴影）
+    static let light: [ShadowRecipe] = [
+        ShadowRecipe(id: "A", name: "单层", layers: [ShadowLayer(radius: 2.5, y: 1, opacity: 0.35)], usesWhite: false),
+        ShadowRecipe(id: "B", name: "双层", layers: [ShadowLayer(radius: 1, y: 0.5, opacity: 0.45),
+                                                ShadowLayer(radius: 3, y: 1, opacity: 0.25)], usesWhite: false),
+        ShadowRecipe(id: "C", name: "宽柔", layers: [ShadowLayer(radius: 2, y: 1, opacity: 0.40),
+                                                ShadowLayer(radius: 8, y: 2, opacity: 0.25)], usesWhite: false),
+        ShadowRecipe(id: "D", name: "无阴影", layers: [], usesWhite: false)
+    ]
+
+    /// 深色文字（白阴影）
+    static let dark: [ShadowRecipe] = [
+        ShadowRecipe(id: "E", name: "当前", layers: [ShadowLayer(radius: 1, y: 0.5, opacity: 0.35)], usesWhite: true),
+        ShadowRecipe(id: "F", name: "细光晕", layers: [ShadowLayer(radius: 1.5, y: 0.5, opacity: 0.60),
+                                                 ShadowLayer(radius: 4, y: 1, opacity: 0.35)], usesWhite: true),
+        ShadowRecipe(id: "G", name: "宽光晕", layers: [ShadowLayer(radius: 2, y: 1, opacity: 0.50),
+                                                 ShadowLayer(radius: 8, y: 2, opacity: 0.40)], usesWhite: true),
+        ShadowRecipe(id: "H", name: "无阴影", layers: [], usesWhite: true)
+    ]
+}
+
+/// 标准值集中在这里，只改这一处
+enum ReadableDefaults {
+    static let anchor: TextAnchor = .bottom
+    /// 没有图片分析结果时的回退值
+    static let scrim: Double = 0.4
+    static let scrimHeightRatio: Double = 0.45
+    static let scrimRange: ClosedRange<Double> = 0...0.8
+    static let heightRatioRange: ClosedRange<Double> = 0.25...0.7
+    static let edgeInsetRange: ClosedRange<Double> = -40...40
+
+    /// 当前选中的阴影配方；选定字母后只改这两行
+    static let lightTextRecipe: ShadowRecipe = ShadowRecipes.light[1]   // B
+    static let darkTextRecipe: ShadowRecipe = ShadowRecipes.dark[0]     // E
+}
+
+/// 可读性强度：同时作用于蒙层与阴影
+enum ReadabilityIntensity: String, Codable, CaseIterable, Identifiable {
+    case subtle, standard, strong
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .subtle: return "弱"
+        case .standard: return "标准"
+        case .strong: return "强"
+        }
+    }
+
+    var multiplier: Double {
+        switch self {
+        case .subtle: return 0.7
+        case .standard: return 1.0
+        case .strong: return 1.3
+        }
+    }
+}
+
+/// 一组完整的可读性设置，存在 WidgetAppearance 里，随撤销和预览实时生效
+struct ReadableSettings: Equatable {
+    var anchor: TextAnchor = ReadableDefaults.anchor
+    var intensity: ReadabilityIntensity = .standard
+    var scrimOverride: Double?
+    var heightRatio: Double = ReadableDefaults.scrimHeightRatio
+    var shadowPreset: ShadowPreset = .standard
+    /// 文字块离锚点边缘的距离；居中锚点时作为垂直偏移
+    var edgeInset: Double = 0
+
+    func scrim(auto: Double) -> Double {
+        let value = scrimOverride ?? auto
+        return min(ReadableDefaults.scrimRange.upperBound,
+                   max(ReadableDefaults.scrimRange.lowerBound, value))
+    }
+
+    func autoScrim(analysis: ImageAnalysis?) -> Double {
+        let base = analysis?.suggestedScrim ?? ReadableDefaults.scrim
+        let value = base * intensity.multiplier
+        return min(ReadableDefaults.scrimRange.upperBound,
+                   max(ReadableDefaults.scrimRange.lowerBound, value))
+    }
+}
+
+/// 旧字段保留解码兼容，不再参与渲染
 enum ShadowPreset: String, Codable, CaseIterable, Identifiable {
     case subtle, standard, strong
 
@@ -29,73 +133,7 @@ enum ShadowPreset: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var opacityScale: Double {
-        switch self {
-        case .subtle: return 0.7
-        case .standard: return 1.0
-        case .strong: return 1.35
-        }
-    }
-}
-
-/// 标准值集中在这里，只改这一处
-enum ReadableDefaults {
-    static let anchor: TextAnchor = .bottom
-    /// 没有图片分析结果时的回退值
-    static let scrim: Double = 0.4
-    static let scrimHeightRatio: Double = 0.45
-    static let shadowPreset: ShadowPreset = .standard
-    static let scrimRange: ClosedRange<Double> = 0...0.8
-    static let heightRatioRange: ClosedRange<Double> = 0.25...0.7
-    static let edgeInsetRange: ClosedRange<Double> = -40...40
-}
-
-/// 可读性强度：自动走图片分析，弱/强是在自动值上乘 0.7 / 1.3
-enum ReadabilityIntensity: String, Codable, CaseIterable, Identifiable {
-    case automatic, subtle, strong
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .automatic: return "自动"
-        case .subtle: return "弱"
-        case .strong: return "强"
-        }
-    }
-
-    var multiplier: Double {
-        switch self {
-        case .automatic: return 1.0
-        case .subtle: return 0.7
-        case .strong: return 1.3
-        }
-    }
-}
-
-/// 一组完整的可读性设置，存在 WidgetAppearance 里，随撤销和预览实时生效
-struct ReadableSettings: Equatable {
-    var anchor: TextAnchor = ReadableDefaults.anchor
-    var intensity: ReadabilityIntensity = .automatic
-    var scrimOverride: Double?
-    var heightRatio: Double = ReadableDefaults.scrimHeightRatio
-    var shadowPreset: ShadowPreset = ReadableDefaults.shadowPreset
-    /// 文字块离锚点边缘的距离；居中锚点时作为垂直偏移
-    var edgeInset: Double = 0
-
-    /// 最终 scrim：手动值优先，否则用自动值
-    func scrim(auto: Double) -> Double {
-        let value = scrimOverride ?? auto
-        return min(ReadableDefaults.scrimRange.upperBound,
-                   max(ReadableDefaults.scrimRange.lowerBound, value))
-    }
-
-    func autoScrim(analysis: ImageAnalysis?) -> Double {
-        let base = analysis?.suggestedScrim ?? ReadableDefaults.scrim
-        let value = base * intensity.multiplier
-        return min(ReadableDefaults.scrimRange.upperBound,
-                   max(ReadableDefaults.scrimRange.lowerBound, value))
-    }
+    var opacityScale: Double { 1.0 }
 }
 
 /// 主 App 侧对一张图的亮度分析结果，写进 App Group 供 Widget 只读

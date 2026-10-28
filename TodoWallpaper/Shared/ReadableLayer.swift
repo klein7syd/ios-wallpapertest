@@ -37,7 +37,6 @@ struct ScrimView: View {
         min(height, height * heightRatio + abs(extraInset))
     }
 
-    /// 三个 stop 避免出现明显的一条带
     private var stops: [Gradient.Stop] {
         [
             .init(color: color.opacity(strength), location: 0),
@@ -50,50 +49,64 @@ struct ScrimView: View {
 // MARK: - 文字阴影
 
 struct TextStyleModifier: ViewModifier {
-    let preset: ShadowPreset
-    /// 浅色文字用黑阴影，深色文字用一层很轻的白阴影
-    let isLightText: Bool
+    /// 这一层用的是哪套配方；nil 表示按文字亮度取默认配方
+    var recipe: ShadowRecipe?
+    var isLightText: Bool
+    /// 强度倍率，同时作用于蒙层（由调用方传入）
+    var intensity: Double = 1.0
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if isLightText {
-            content
-                // 紧贴字形的细黑边：在蒙层上也要看得见，所以不透明度比原来高
-                .shadow(color: .black.opacity(0.55 * preset.opacityScale), radius: 1, x: 0, y: 0.5)
-                // 柔和外晕
-                .shadow(color: .black.opacity(0.30 * preset.opacityScale), radius: 3.5, x: 0, y: 1)
-        } else {
-            // 深色文字只留一层细白影，加大 radius 就会发白发糊
-            content
-                .shadow(color: .white.opacity(0.35 * preset.opacityScale), radius: 1, x: 0, y: 0.5)
+        let chosen = recipe ?? (isLightText ? ReadableDefaults.lightTextRecipe : ReadableDefaults.darkTextRecipe)
+        let tint = chosen.usesWhite ? Color.white : Color.black
+        let layers = chosen.layers
+
+        return Group {
+            switch layers.count {
+            case 0:
+                content
+            case 1:
+                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
+                               radius: layers[0].radius, x: 0, y: layers[0].y)
+            case 2:
+                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
+                               radius: layers[0].radius, x: 0, y: layers[0].y)
+                       .shadow(color: tint.opacity(layers[1].opacity * intensity),
+                               radius: layers[1].radius, x: 0, y: layers[1].y)
+            default:
+                content.shadow(color: tint.opacity(layers[0].opacity * intensity),
+                               radius: layers[0].radius, x: 0, y: layers[0].y)
+                       .shadow(color: tint.opacity(layers[1].opacity * intensity),
+                               radius: layers[1].radius, x: 0, y: layers[1].y)
+                       .shadow(color: tint.opacity(layers[2].opacity * intensity),
+                               radius: layers[2].radius, x: 0, y: layers[2].y)
+            }
         }
     }
 }
 
 extension View {
-    func readableText(style: ShadowPreset = .standard, isLightText: Bool = true) -> some View {
-        modifier(TextStyleModifier(preset: style, isLightText: isLightText))
+    func readableText(recipe: ShadowRecipe? = nil, isLightText: Bool = true, intensity: Double = 1.0) -> some View {
+        modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText, intensity: intensity))
     }
 }
 
 // MARK: - 只负责文字阴影
 
 struct ReadableLayer<Content: View>: View {
-    var shadowPreset: ShadowPreset = .standard
     var isLightText: Bool = true
+    var intensity: Double = 1.0
+    /// 调试对比页用它指定配方
+    var recipe: ShadowRecipe?
     @ViewBuilder var content: () -> Content
 
     @Environment(\.widgetRenderingMode) private var renderingMode
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        #if DEBUG
-        let _ = debugLog()
-        #endif
         if isAccessory || renderingMode != .fullColor {
             content()
         } else {
-            content().modifier(TextStyleModifier(preset: shadowPreset, isLightText: isLightText))
+            content().modifier(TextStyleModifier(recipe: recipe, isLightText: isLightText, intensity: intensity))
         }
     }
 
@@ -105,13 +118,6 @@ struct ReadableLayer<Content: View>: View {
             return false
         }
     }
-
-    #if DEBUG
-    /// 只有 DEBUG 才会打印，方便排查真机是否被 accented / vibrant 关掉了阴影
-    private func debugLog() -> Void {
-        print("[ReadableLayer] renderingMode=\(renderingMode) family=\(family) lightText=\(isLightText) accessory=\(isAccessory)")
-    }
-    #endif
 }
 
 // MARK: - 蒙层取值

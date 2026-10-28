@@ -331,10 +331,6 @@ struct WidgetAppearanceEditor: View {
         Picker("可读性强度", selection: readableIntensity) {
             ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.segmented)
-        .disabled(settings.scrimOverride != nil)
-        if settings.scrimOverride != nil {
-            Text("手动值优先").font(.caption).foregroundStyle(.secondary)
-        }
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
         if advanced {
@@ -346,15 +342,7 @@ struct WidgetAppearanceEditor: View {
         Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if advanced {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("行距").font(.subheadline)
-                    Spacer(minLength: 6)
-                    Text(widget.wrappedValue.spacing, format: .number.precision(.fractionLength(0...1)))
-                        .font(.subheadline.monospacedDigit())
-                }
-                Slider(value: widget.spacing, in: -10...40, step: 0.5)
-            }
+            PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
         }
         Toggle("紧凑布局", isOn: widget.compact)
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
@@ -374,10 +362,6 @@ struct WidgetAppearanceEditor: View {
                  : String(format: "手动：%.2f", settings.scrimOverride ?? 0))
                 .font(.caption).foregroundStyle(.secondary)
             PreciseSlider(title: "渐变范围", value: heightBinding, range: 0.25...0.7, standard: ReadableDefaults.scrimHeightRatio, precision: 2)
-            PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
-            Picker("阴影强度", selection: readablePreset) {
-                ForEach(ShadowPreset.allCases) { Text($0.title).tag($0) }
-            }.pickerStyle(.segmented)
             Button("全部恢复标准") { resetReadable() }
         } else if settings != ReadableSettings() {
             Text("已使用自定义参数").font(.caption).foregroundStyle(.secondary)
@@ -399,10 +383,11 @@ struct WidgetAppearanceEditor: View {
         })
     }
     private var readableIntensity: Binding<ReadabilityIntensity> {
-        Binding(get: { settings.intensity }, set: { widget.wrappedValue.readableIntensity = $0 })
-    }
-    private var readablePreset: Binding<ShadowPreset> {
-        Binding(get: { settings.shadowPreset }, set: { widget.wrappedValue.readableShadowPreset = $0 })
+        Binding(get: { settings.intensity }, set: { next in
+            widget.wrappedValue.readableIntensity = next
+            // 手动 Scrim 会盖住强度，这里一并清掉让强度立刻生效
+            widget.wrappedValue.readableScrimOverride = nil
+        })
     }
     /// 拖到蓝点附近 = 清除手动覆盖，回到自动
     private var scrimBinding: Binding<Double> {
@@ -436,7 +421,7 @@ struct WidgetAppearanceEditor: View {
     }
     private func resetReadable() {
         widget.wrappedValue.readableAnchor = nil
-        widget.wrappedValue.readableIntensity = nil
+        widget.wrappedValue.readableIntensity = .standard
         widget.wrappedValue.readableScrimOverride = nil
         widget.wrappedValue.readableHeightRatio = nil
         widget.wrappedValue.readableShadowPreset = nil

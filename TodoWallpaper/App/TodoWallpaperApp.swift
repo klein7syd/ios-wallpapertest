@@ -299,6 +299,7 @@ struct AboutView: View {
                 }
                 Section("调试") {
                     NavigationLink("文字可读性测试") { ReadableLayerDebugView() }
+                    NavigationLink("阴影对比") { ShadowCompareView() }
                 }
                 Section("本次测试") {
                     Text("支持新增、编辑、删除、拖动排序和完成待办。")

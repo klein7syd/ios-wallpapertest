@@ -87,7 +87,7 @@ require('SmoothValueSlider(value: sliding' in marker and 'CADisplayLink' in read
 require('@Published private var history' not in read('TodoWallpaper/App/EditorUndoState.swift'), 'History does not republish the entire editor for every grouped sample')
 text_section = widget[widget.index('@ViewBuilder private var textControls'):widget.index('@ViewBuilder private var markerControls')]
 content_section = widget[widget.index('@ViewBuilder private var contentControls'):widget.index('private var help:')]
-require('Text("行距")' in text_section and 'Slider(value: widget.spacing, in: -10...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
+require('PreciseSlider(title: "行距"' in text_section and 'range: -10...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
 require(widget.index('Toggle("玻璃背景') < widget.index('Picker("明暗"'), 'Glass switch is the first theme setting')
 require('TextLegibility.readable' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))

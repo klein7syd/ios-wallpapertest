@@ -77,7 +77,7 @@ struct TodoWidgetContent: View {
                 appearance: appearance, family: family, width: geometry.size.width, height: max(0, geometry.size.height - abs(settings.edgeInset)),
                 fontLineHeight: lineHeight, headerHeight: headingMetrics.height, footerHeight: ceil(footerUnit * 1.3))
             let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
-            ReadableLayer(shadowPreset: settings.shadowPreset, isLightText: textIsLight) {
+            ReadableLayer(isLightText: textIsLight, intensity: settings.intensity.multiplier) {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)

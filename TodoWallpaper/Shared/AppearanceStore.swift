@@ -9,6 +9,8 @@ final class AppearanceStore {
     }
 
     private let defaults: UserDefaults
+    /// 视图 body 里不再读 UserDefaults / 解 JSON，全部走这里
+    private var cache: [String: ImageAnalysis] = [:]
 
     init(defaults: UserDefaults = AppGroup.defaults) {
         self.defaults = defaults
@@ -19,13 +21,19 @@ final class AppearanceStore {
     }
 
     func analysis(for imageID: String, anchor: TextAnchor) -> ImageAnalysis? {
-        guard let data = defaults.data(forKey: key(imageID, anchor)) else { return nil }
-        return try? JSONDecoder().decode(ImageAnalysis.self, from: data)
+        let cacheKey = key(imageID, anchor)
+        if let cached = cache[cacheKey] { return cached }
+        guard let data = defaults.data(forKey: cacheKey),
+              let decoded = try? JSONDecoder().decode(ImageAnalysis.self, from: data) else { return nil }
+        cache[cacheKey] = decoded
+        return decoded
     }
 
     func setAnalysis(_ analysis: ImageAnalysis, for imageID: String, anchor: TextAnchor) {
         guard let data = try? JSONEncoder().encode(analysis) else { return }
-        defaults.set(data, forKey: key(imageID, anchor))
+        let cacheKey = key(imageID, anchor)
+        cache[cacheKey] = analysis
+        defaults.set(data, forKey: cacheKey)
     }
 
     /// 三个锚点一次写好，切换锚点不用重算
@@ -37,7 +45,9 @@ final class AppearanceStore {
 
     func removeAnalysis(for imageID: String) {
         for anchor in TextAnchor.allCases {
-            defaults.removeObject(forKey: key(imageID, anchor))
+            let cacheKey = key(imageID, anchor)
+            cache.removeValue(forKey: cacheKey)
+            defaults.removeObject(forKey: cacheKey)
         }
     }
 }
