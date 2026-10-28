@@ -290,6 +290,9 @@ struct WidgetAppearanceEditor: View {
                         if let photos = store.appearance.widget.photoRotation?.photos {
                             photos.forEach { AppearanceStore.shared.removeAnalysis(for: $0) }
                         }
+                        if let current = store.appearance.widget.backgroundPhotoName {
+                            AppearanceStore.shared.removeAnalysis(for: current)
+                        }
                         var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation?.enabled = false; next.backdrop = .system
                         widget.wrappedValue = next; cropPhoto = false
                     }
@@ -378,7 +381,7 @@ struct WidgetAppearanceEditor: View {
         Binding(get: { settings.anchor }, set: { next in
             widget.wrappedValue.readableAnchor = next
             let current = widget.wrappedValue.readable.edgeInset
-            let clamped = next == .center ? max(-40, min(40, current)) : max(0, min(40, current))
+            let clamped = next == .center ? max(-40, min(40, current)) : max(-12, min(40, current))
             if clamped != current { widget.wrappedValue.readableEdgeInset = clamped }
         })
     }

@@ -11,6 +11,7 @@ final class AppearanceStore {
     private let defaults: UserDefaults
     /// 视图 body 里不再读 UserDefaults / 解 JSON，全部走这里
     private var cache: [String: ImageAnalysis] = [:]
+    private let lock = NSLock()
 
     init(defaults: UserDefaults = AppGroup.defaults) {
         self.defaults = defaults
@@ -22,17 +23,18 @@ final class AppearanceStore {
 
     func analysis(for imageID: String, anchor: TextAnchor) -> ImageAnalysis? {
         let cacheKey = key(imageID, anchor)
-        if let cached = cache[cacheKey] { return cached }
+        lock.lock(); let cached = cache[cacheKey]; lock.unlock()
+        if let cached { return cached }
         guard let data = defaults.data(forKey: cacheKey),
               let decoded = try? JSONDecoder().decode(ImageAnalysis.self, from: data) else { return nil }
-        cache[cacheKey] = decoded
+        lock.lock(); cache[cacheKey] = decoded; lock.unlock()
         return decoded
     }
 
     func setAnalysis(_ analysis: ImageAnalysis, for imageID: String, anchor: TextAnchor) {
         guard let data = try? JSONEncoder().encode(analysis) else { return }
         let cacheKey = key(imageID, anchor)
-        cache[cacheKey] = analysis
+        lock.lock(); cache[cacheKey] = analysis; lock.unlock()
         defaults.set(data, forKey: cacheKey)
     }
 
@@ -46,7 +48,7 @@ final class AppearanceStore {
     func removeAnalysis(for imageID: String) {
         for anchor in TextAnchor.allCases {
             let cacheKey = key(imageID, anchor)
-            cache.removeValue(forKey: cacheKey)
+            lock.lock(); cache.removeValue(forKey: cacheKey); lock.unlock()
             defaults.removeObject(forKey: cacheKey)
         }
     }

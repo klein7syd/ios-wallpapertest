@@ -94,8 +94,7 @@ private final class WallpaperLayerView: PhotoMotionView {
             settings.customPosition = true
             var x = Double(rect.midX / 390 + delta.x / max(1, bounds.width))
             var y = Double(rect.midY / template.canvas.height + delta.y / max(1, bounds.height))
-            if abs(x - 0.5) * bounds.width < 3 { x = 0.5 }
-            if abs(y - 0.5) * bounds.height < 3 { y = 0.5 }
+            // 增量路径里不能吸附：单帧位移常只有 1~2pt，会被反复吸回中心而拖不动
             settings.panelX = min(1, max(0, x)); settings.panelY = min(1, max(0, y))
             gesture.setTranslation(.zero, in: self); updateLayers()
         }

@@ -23,7 +23,7 @@ private actor CalendarReader {
     private let events = EKEventStore()
     func read(source: CalendarSource, start: Date, end: Date, includeCompleted: Bool) async throws -> [TodoImportCandidate] {
         if source == .events {
-            guard end > start, let days = Calendar.current.dateComponents([.day], from: start, to: end).day, days <= 90 else { throw CalendarImportError.dateRange }
+            guard end >= start, let days = Calendar.current.dateComponents([.day], from: start, to: end).day, days <= 90 else { throw CalendarImportError.dateRange }
             guard try await events.requestFullAccessToEvents() else { throw CalendarImportError.permission }
             let predicate = events.predicateForEvents(withStart: start, end: end, calendars: nil)
             let formatter = DateFormatter(); formatter.dateStyle = .short; formatter.timeStyle = .short
@@ -48,10 +48,17 @@ private actor CalendarReader {
                 let candidates = reminders.filter { includeCompleted || !$0.isCompleted }.compactMap { reminder -> TodoImportCandidate? in
                     let title = (reminder.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !title.isEmpty else { return nil }
+                    // dueDateComponents 不带 calendar 时 .date 会返回 nil，这里补上当前日历
+                    let dueDate = reminder.dueDateComponents.flatMap { components -> Date? in
+                        if let date = components.date { return date }
+                        var fixed = components
+                        fixed.calendar = Calendar.current
+                        return fixed.date
+                    }
                     return TodoImportCandidate(id: TodoImportIdentity.make(source: "reminder", calendar: reminder.calendar.calendarIdentifier,
                         item: reminder.calendarItemIdentifier), title: String(title.prefix(200)), detail: reminder.calendar.title,
-                        isCompleted: reminder.isCompleted, sortDate: reminder.dueDateComponents?.date ?? .distantFuture,
-                        schedule: reminder.dueDateComponents?.date.map { TodoSchedule(date: $0, includesTime: reminder.dueDateComponents?.hour != nil) })
+                        isCompleted: reminder.isCompleted, sortDate: dueDate ?? .distantFuture,
+                        schedule: dueDate.map { TodoSchedule(date: $0, includesTime: reminder.dueDateComponents?.hour != nil) })
                 }
                 continuation.resume(returning: candidates)
             }

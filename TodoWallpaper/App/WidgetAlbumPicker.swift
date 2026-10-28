@@ -59,7 +59,13 @@ private actor AlbumReader {
                 }
             }
             try Task.checkCancellation()
-            names.append(try await photos.importPhoto(data))
+            let imported = try await photos.importPhoto(data)
+            // 相册轮换的每张图也要算一次，否则自动蒙层永远走默认值
+            if let image = UIImage(data: data) {
+                let analyses = ImageAnalyzer.analyzeAllAnchors(image, crop: nil, opacity: 1, darkBackground: false)
+                AppearanceStore.shared.setAnalysis(analyses, for: imported)
+            }
+            names.append(imported)
             progress(index + 1, assets.count)
         }
         return WidgetAlbumRotation(title: album.title, photos: names, anchor: .now)

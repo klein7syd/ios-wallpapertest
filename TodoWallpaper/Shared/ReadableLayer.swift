@@ -28,6 +28,7 @@ struct ScrimView: View {
                                center: .center,
                                startRadius: 0,
                                endRadius: proxy.size.height * 0.55)
+                    .offset(y: extraInset)
             }
         }
         .allowsHitTesting(false)
