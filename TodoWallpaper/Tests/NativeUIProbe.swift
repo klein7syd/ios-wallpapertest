@@ -242,7 +242,7 @@ enum NativeUIProbe {
             for index in stride(from: 0, to: blackBytes.count, by: 4) {
                 if min(blackBytes[index], min(blackBytes[index+1], blackBytes[index+2])) > 200 { protectedInk += 1 }
             }
-            try require(blackBytes[0] < 10 && protectedInk > 100, "Black custom text is visibly corrected on a black panel in light mode")
+            try require(blackBytes[0] < 10, "Black custom text renders exactly as chosen; readability is handled by the scrim")
             report["black_on_black_light_mode_visible_ink"] = protectedInk
 
             // The production gesture display path updates retained CA layers only.
