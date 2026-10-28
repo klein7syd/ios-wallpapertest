@@ -334,7 +334,6 @@ struct WidgetAppearanceEditor: View {
         if store.appearance.widget.textCompletion == .color {
             StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
-    }
         if advanced {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
