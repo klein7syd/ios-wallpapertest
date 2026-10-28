@@ -28,6 +28,10 @@ struct TodoWidgetContent: View {
     }
     private var background: WallpaperColor { TextLegibility.widgetBase(style, dark: style.isExplicitlyDark ?? (hostScheme == .dark)) }
     private var settings: ReadableSettings { style.readable }
+    private func safeColor(_ color: WallpaperColor) -> Color {
+        if renderingMode != .fullColor { return .primary }
+        return TextLegibility.readable(color, on: background).swiftColor
+    }
     /// 浅色文字才加黑色阴影；深色文字不加，避免发白发糊
     private var textIsLight: Bool {
         guard renderingMode == .fullColor else { return false }
