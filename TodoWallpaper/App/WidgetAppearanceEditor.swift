@@ -31,7 +31,7 @@ struct WidgetAppearanceEditor: View {
     @State private var cropPhoto = false
     @State private var chooseAlbum = false
     @State private var previewDay = 0
-    private let photos = WidgetPhotoStore()
+    private let photos = WidgetPhotoStore.shared
     @State private var previousWidgetMarker: TodoMarker?
     @State private var readableGeometry = ReadableContentGeometry(canvasHeight: 138, textHeight: 138)
     @Environment(\.colorScheme) private var systemScheme
@@ -72,6 +72,7 @@ struct WidgetAppearanceEditor: View {
             .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
             .onChange(of: store.appearance.widget.backdrop) { _, _ in cropPhoto = false }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
+            .onChange(of: previousWidgetMarker) { _, value in store.retainPhotoAssets(PhotoAssetReferences.marker(value), owner: "widget.previousMarker") }
     }
     private var analysisObservers: some View {
         editingObservers
@@ -103,13 +104,15 @@ struct WidgetAppearanceEditor: View {
     private var currentTaskIDs: [UUID] { store.items.map(\.id) }
     private var currentAnalysisPhotoName: String? { store.appearance.widget.photoName(at: photoDate) }
     private var albumPicker: some View {
-        WidgetAlbumPicker(onSelect: acceptAlbum)
+        WidgetAlbumPicker(onSelect: acceptAlbum, onCommitted: { store.collectPhotoAssets() })
     }
-    private func acceptAlbum(_ rotation: WidgetAlbumRotation) {
+    private func acceptAlbum(_ rotation: WidgetAlbumRotation, skipped: Int) throws {
         var next = store.appearance.widget
         next.photoRotation = rotation; next.backgroundPhotoName = rotation.photos.first
         next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop()
-        widget.wrappedValue = next; previewDay = 0; store.flushAppearance()
+        var root = store.appearance; root.widget = next
+        try store.saveAppearance(root.clampedForEditing()); previewDay = 0
+        if skipped > 0 { error = "\(skipped) 张读取失败，已跳过" }
     }
     private var editorSurface: some View {
         GeometryReader { geometry in
@@ -158,6 +161,7 @@ struct WidgetAppearanceEditor: View {
         editorSurface
         .onAppear {
             isVisible = true
+            configureAssetRetention()
             updateAnalysisPriority()
             store.updateAnalysisSystemTheme(dark: systemScheme == .dark)
             store.resumePhotoAnalysis()
@@ -204,6 +208,16 @@ struct WidgetAppearanceEditor: View {
                 store.flushAppearance()
             }
         }
+    }
+    private func configureAssetRetention() {
+        edits.retainedValuesChanged = { values in
+            let names = values.reduce(into: Set<String>()) { result, value in
+                result.formUnion(PhotoAssetReferences.widget(value.style))
+                for item in value.markers { result.formUnion(PhotoAssetReferences.marker(item.marker)) }
+            }
+            store.retainPhotoAssets(names, owner: "widget")
+        }
+        edits.retainedValuesChanged(edits.retainedValues)
     }
     private func undoEdit() {
         Task {
@@ -335,8 +349,8 @@ struct WidgetAppearanceEditor: View {
                         if let current = store.appearance.widget.backgroundPhotoName {
                             store.forgetPhotoAnalysis([current])
                         }
-                        var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation?.enabled = false; next.backdrop = .system
-                        widget.wrappedValue = next; cropPhoto = false
+                        var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation = nil; next.backdrop = .system
+                        widget.wrappedValue = next; cropPhoto = false; store.flushAppearance(); store.collectPhotoAssets()
                     }
                 }
             }

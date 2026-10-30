@@ -23,8 +23,13 @@ final class EditorUndoState<Value: Equatable>: ObservableObject {
     @Published private(set) var isRestoring = false
     private var activeKey: String?
     private var settle: Task<Void, Never>?
+    var retainedValuesChanged: ([Value]) -> Void = { _ in }
+    var retainedValues: [Value] { history.retainedValues }
     var canUndo: Bool { hasUndo && !isRestoring }
-    private func updateAvailability() { if hasUndo != history.canUndo { hasUndo = history.canUndo } }
+    private func updateAvailability() {
+        if hasUndo != history.canUndo { hasUndo = history.canUndo }
+        retainedValuesChanged(history.retainedValues)
+    }
     func synchronize(_ value: Value) {
         settle?.cancel(); settle = nil; activeKey = nil
         history.endInteraction(); history.synchronize(value); updateAvailability()

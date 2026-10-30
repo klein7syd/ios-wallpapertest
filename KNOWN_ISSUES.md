@@ -3,9 +3,6 @@
 ## a. 已知未修复（现象 → 涉及位置 → 根因 → 建议）
 
 1. **壁纸"包含已完成"无视觉区分** — `Wallpaper/WallpaperRenderer.swift:drawContent`：`completed: false` 写死，标题与日期没套完成效果。建议把 `item.isCompleted` 传进 `drawText` 的 `strike` 与透明度。
-3. **孤立图片无回收** — `App/WidgetPhotoStore.swift:importPhoto/importMarker` 只写不删；`Wallpaper/WallpaperDraftStore.swift:cleanExpired` 只清草稿，App Group 的 `WidgetPhotos/`、`MarkerImages/` 无清理。
-4. **`todos-v1.json` 重复读取** — `Core/TodoSharedStorage.swift:TodoMigration.prepare` 与 `App/TodoStore.swift:reload` 各 `load()` 一次；`Widget/TodoWallpaperWidget.swift:TodoWidgetProvider.read` 同样两次。
-5. **相册导入整张读入且单张失败即中断** — `App/WidgetAlbumPicker.swift:AlbumReader.prepare`：用 `requestImageDataAndOrientation` 取原图，任一 `throw` 直接退出，已写入文件不回滚。
 6. **`TodoSchedule.label` 每次新建 `DateFormatter`** — `Core/TodoSchedule.swift:label`（计算属性）。
 7. **双指连坐回滚** — `App/PhotoMotionView.swift:finish`：任一识别器 `.cancelled` 会把整次交互回滚到 `initialCrop`。
 12. **壁纸 `drawText` 的 `shadow` 参数已成死参数** — `Wallpaper/WallpaperRenderer.swift:drawText` 签名仍保留 `shadow: CGColor? = nil`，但 `setShadow` 已删除、无人再传值。
@@ -61,3 +58,11 @@
 - 原 a15：选大图在 MainActor 解码并分析 → Task 继承视图隔离 → 统一 utility 串行队列只读取 1536px 已导入文件并用 ImageIO 降到 128px，再纯 CG 合成一次 32×32 → 不要重新引入 UIImage(data:) 原图分析或每图 detached 并发。
 - 新增原子 AnalysisCache 三锚点封套与 AnalysisRequests 队列，解决 defaults 异步可见性；旧 defaults 不复用，只清理兼容。内存短锁、独立文件锁和删除版本防止卡主线程或删除后复活；坏/未来缓存封套安全回退。
 - 单图失败不阻断分析批次；导入本身的单张失败回滚、原图读取与图片回收仍属第3组，尚未在此组修复。
+
+## 第3组历史踩坑
+
+- 相册读取原图且任一失败中断 → 无缩图请求及写入事务 → `AlbumReader` 改目标尺寸逐张读取，`WidgetPhotoStore` 记录/提交/回滚名称，单张跳过、全失败/过半失败/取消回滚 → 不能恢复原图整批驻留或删除已提交外观的图片。
+- App Group 图片只增不减 → 缺少跨编辑器引用集合 → `PhotoAssetMaintenance` 在共享 actor 内保守回收，保护当前、任务、备份及两个撤销栈，保留最近 10 分钟文件，加载失败整体跳过 → 不得仅凭当前预览判断孤立文件。
+- 迁移与调用方重复读取 todos → 仓库返回后再次 load → `TodoRepositorySnapshot` 供 App/Provider 复用校验结果 → 不得改为跨事务全局缓存，仍需锁和回执校验。
+
+iCloud 网络与取消按钮的真实 Photos 体验仍需真机；原生回归覆盖失败阈值、真实文件事务、回收保留及迁移幂等，不冒充相册权限验收。

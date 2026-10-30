@@ -23,15 +23,19 @@ enum MigrationChecks {
         catch TodoDataError.migrationRequired { }
         try require(!FileManager.default.fileExists(atPath: sharedURL.appendingPathComponent("todos-v1.json").path), "Widget must not create data before migration")
 
-        let shared = try migration.prepare()
-        let migrated = try shared.load()
+        let snapshot = try migration.prepareSnapshot()
+        let shared = snapshot.repository
+        let migrated = snapshot.document
         try require(migrated.items == before.items, "UUID, content, dates, order and completion must migrate unchanged")
         try require(tryData(shared.fileURL) == original && tryData(old.fileURL) == original, "Exact data copied; private source untouched")
-        _ = try TodoMigration.readyRepository(sharedDirectory: sharedURL, groupID: "group.fixture.todo")
+        let widgetSnapshot = try TodoMigration.readySnapshot(sharedDirectory: sharedURL, groupID: "group.fixture.todo")
+        try require(widgetSnapshot.document.items == migrated.items, "Widget reuses the document already validated by the readiness path")
         _ = try shared.add(title: "共享容器中的新事项")
         _ = try shared.setCompleted(id: second, completed: true)
         let newer = try Data(contentsOf: shared.fileURL)
-        _ = try migration.prepare()
+        let repeated = try migration.prepareSnapshot()
+        try require(repeated.document.items.count == migrated.items.count + 1, "Repeated migration returns the current shared snapshot, not a stale cache")
+        try require(snapshot.document.items == migrated.items, "A prepared snapshot needs no second disk read after concurrent writes")
         try require(tryData(shared.fileURL) == newer && tryData(old.fileURL) == original, "Repeat migration must not overwrite newer shared data")
 
         // Resume after copy succeeded but before either receipt was committed.
