@@ -17,7 +17,7 @@
 `TodoWidgetProvider` 读 App Group 数据并预生成背景位图；`TodoWidgetView` 组合内容层与 `containerBackground`；点击走 AppIntent 直接改共享文件再 `reloadTimelines`。
 
 **照片与相册（App/WidgetPhotoStore, App/WidgetAlbumPicker, Core/PhotoComposition）**
-`WidgetPhotoStore` 把 Photos 数据缩到 1536px（照片）/512px（标记）写进 App Group；`AlbumReader.prepare` 批量导入相册；`WidgetAlbumRotation.photo(at:)` 决定当天用哪张。
+`WidgetPhotoStore` 把 Photos 数据缩到 1536px（照片）/512px（标记）写进 App Group；`AlbumReader.prepare` 批量导入相册；`WidgetAlbumRotation.photo(at:)` 决定当天用哪张。照片提交后由 `TodoStore` 统一调度 `PhotoAnalysisService`，不在选图 MainActor 解码原图作分析。
 
 **壁纸（Wallpaper/*）**
 `WallpaperEditorModel` 状态机 + `WallpaperLiveCanvas`（实时 UIKit 层）+ `WallpaperRenderer`（CoreGraphics 合成）+ `WallpaperDraftStore`（草稿）。
@@ -43,8 +43,10 @@ App Group 容器下（`TodoSharedStorage.sharedDirectory()` 返回 `<group>/Todo
 | `appgroup-migration-v1.json` | App | App | JSON 回执 | 旧目录迁移确认 |
 | `WidgetPhotos/widget-photo-<UUID>.jpg` | App | Widget | JPEG | 最长边 1536 |
 | `MarkerImages/marker-image-<UUID>.png` | App | App / Widget | PNG | 最长边 512 |
+| `AnalysisCache/<完整上下文>.json` | App utility 批次 | App / Widget Provider | schemaVersion=1，request + 三锚点原始统计 | 单封套原子写入 |
+| `AnalysisRequests/<完整上下文>.json` | Widget Provider | App utility 批次 | PhotoAnalysisRequest | 原子发布后发公开 Darwin 通知 |
 
-UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `ImageAnalysis` 的 JSON Data；`ReadableSettingsMigration` 会一次性读取并删除旧键 `readable.anchor` / `readable.intensity` / `readable.scrimOverride` / `readable.shadowPreset` / `readable.scrimHeightRatio`。
+UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<图片名>.<锚点>` 不包含裁剪/底色/比例，生产不再复用，只保留清理兼容。`ReadableSettingsMigration` 会一次性读取并删除旧键 `readable.anchor` / `readable.intensity` / `readable.scrimOverride` / `readable.shadowPreset` / `readable.scrimHeightRatio`。`AppearanceStore` 可注入独立 defaults 后端供旧键兼容检查；实际生产读写上述原子文件。
 
 字段表（只列已从源码确认的字段；完整默认值以源码为准）：
 
@@ -75,9 +77,9 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 **改一个参数**：编辑页控件 → `widget.wrappedValue.xxx = …` → `TodoStore.setAppearance` → `validate()`（失败则 `clampedForEditing()` 规范化数值并重试；语义错误仍拒绝）→ 成功立即清除校验错误，返回 Bool → 内存赋值 → `appearanceDirty = true` → `scheduleAppearanceSave()`（800ms 去抖）→ `saveAppearance` → `AppearanceRepository.save` → `WidgetCenter.reloadTimelines`。存储错误单独保留，实际 IO 成功才清除，避免同值 setter 隐藏损坏/未来版本文件保护。拖动期间 `PreciseSlider` 调用 `editorInteraction.begin/end`，`TodoStore.beginAppearanceInteraction` 会 `defersAppearanceSave = true`，松手才落盘。撤销检查接收结果，失败保留可重试历史。
 
-**选照片**：`PhotosPicker` → `selection.loadTransferable(Data)` → `WidgetPhotoStore.importPhoto`（缩到 1536、写 App Group）→ 若在选图处则 `ImageAnalyzer.analyzeAllAnchors` → `AppearanceStore.setAnalysis` → `widget.wrappedValue = next` → 落盘 + 刷新。相册：`AlbumReader.prepare`（逐张 `importPhoto`，当前也会算分析）。
+**选照片**：`PhotosPicker` → `selection.loadTransferable(Data)` → `WidgetPhotoStore.importPhoto`（缩到 1536、写 App Group）→ 更新外观 → `TodoStore` 结束交互后 400ms 去抖 → utility 串行服务读取已落盘照片并分析 → 原子写结果 → MainActor 发布 `analysisRevision`。相册提交后同一路径，今天图片先算，再逐张分析所有照片；crop/opacity/有效明暗变化使整个相册旧变体失效并重算。旧 generation 取消后不发布 UI 结果；删除版本拒绝在途回写。
 
-**Provider**：`getSnapshot` 读仓库与外观后 `WidgetPhotoCache.prepared`；`getTimeline` 在相册开启时生成今天/明天两个 entry，`policy = .after(明天)`，否则单 entry `.never`。
+**Provider**：`getSnapshot` / `getTimeline` 起始先 `AppearanceStore.clearMemoryCache()`。按 `context.displaySize` 的真实比例读取结果，缺失则登记原子请求文件；系统明暗且照片半透明时登记两种底色。entry 携实际比例和两个底色所需分析快照，防止另一尺寸 Provider 清缓存或冷进程渲染导致回退。`WidgetPhotoCache.prepared` 仍只预生成背景位图；Widget 不计算图片统计。相册生成今天/明天两个 entry，`policy = .after(明天)`，否则单 entry `.never`。
 
 **点按完成**：Widget 行的 `Button(intent: SetTodoCompletionIntent(taskID:completed:))` → `perform()` → `TodoSharedStorage.widgetRepository().setCompleted` → `defer` 里 `reloadTimelines`。
 
@@ -93,7 +95,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 - 颜色判断：`ReadableTone.resolve` 用线性亮度阈值 **0.179** 判定深浅并给出 `scrimColor`；`TodoWidgetContent.foreground` 与 `ReadableResolver.scrim` 都走它。第三处历史实现 `TextLegibility.readable` 仍在壁纸渲染中使用（未统一）。
 - 强度与 Scrim 优先级：`scrimOverride`（手动）> `autoScrim(analysis:isLightText:)`；后者根据原始亮度/对比度与当前文字深浅算基础值，再乘强度并夹取到 0…0.8。无分析时基础值为 0.4，弱/标准/强最终为 0.28/0.4/0.52。
 - `edgeInset`：顶部/底部锚点作为该方向的 padding（可为负）；居中锚点作为 `offset(y:)`。与 `header.topInset` 无耦合，后者已不参与布局。
-- `ImageAnalyzer`：缩到 32×32；取样行区间 bottom = 后 40%、top = 前 40%、center = 中间 40%（缓冲区第 0 行是顶部）；luma = 0.2126R+0.7152G+0.0722B（sRGB 近似，不转线性）；contrast = min(1, 标准差 / 0.35)。`ReadableRules.scrim` 运行时计算：黑蒙层 `difficulty = min(1, mean/0.8)`，白蒙层 `difficulty = clamp((0.8-mean)/0.8, 0…1)`；基础值 `0.25 + 0.25×difficulty + 0.10×contrast`，黑蒙层 `mean < 0.25` 或白蒙层 `mean > 0.75` 时取 ≤0.15，最终夹取 0.2…0.55。`ImageAnalysis` 新写只含 `meanLuma`、`contrast`；旧 `suggestedScrim` 可缺省解码但不参与渲染。缓存：`AppearanceStore` 内存字典 + `NSLock`，键 `readable.analysis.<图片名>.<锚点>`，写入/删除时更新；Widget 进程不主动失效。
+- `PhotoAnalysisService`：从已导入的 1536px 文件用 ImageIO 取最大边 128px 缩略图（含方向变换），纯 CoreGraphics 按实际 crop、画布比例、透明度与白/0.09 深色底色合成一次 32×32 位图，再分别统计 top 前 40%、center 中间 40%、bottom 后 40%。luma = 0.2126R+0.7152G+0.0722B（sRGB 近似），contrast = min(1, 标准差/0.35)。`ReadableRules.scrim` 继续运行时按当前文字深浅执行黑/白映射；新结果只存 meanLuma/contrast，旧 suggestedScrim 仅解码兼容。`ImageAnalyzer` 只服务 UIKit 调试页，生产入口不调用。
 - `StyleColorControl` 与标记颜色解算先用 CoreGraphics 转为 sRGB，再夹取 0…1，保留 alpha；不直接把 Display P3 数值解释为 sRGB。
 
 ## e. 布局与测量
@@ -125,7 +127,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 | 强度倍率 | 0.7/1.0/1.3 | `Core/ReadableModels.swift:ReadabilityIntensity` | 蒙层 |
 | 阴影不透明度倍率 | 0.5/0.8/1.1 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
 | 阴影半径缩放 | 0.7/0.85/1.0 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
-| 分析缩图 | 32×32 | `App/ImageAnalyzer.swift:ImageAnalyzer` | 采样尺寸 |
+| 分析缩图 | 128px 解码 / 32×32 合成 | `App/PhotoAnalysisService.swift:PhotoAnalysisService` | 后台采样尺寸 |
 | 对比度归一 | 0.35 | `App/ImageAnalyzer.swift:ImageAnalyzer` | 标准差基准 |
 | 照片最长边 | 1536 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
 | 标记图最长边 | 512 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
@@ -167,4 +169,13 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 ## j. 线程与并发
 
-主线程：所有 SwiftUI 视图、`TodoStore`、编辑页、`WallpaperEditorViewModel`。后台：`WidgetPhotoStore.importMarker/importPhoto` 是 `actor`；`AlbumReader.prepare` 是 async；`ImageAnalyzer` 在调用方线程执行（选图处目前在 Task 内）。锁：`TodoRepository`、`AppearanceRepository`、`TodoMigration` 用 `O_EXLOCK` 文件锁；`AppearanceStore` 缓存用 `NSLock`；`MarkerBitmapCache` / `WidgetPhotoCache` 用 `NSCache`（线程安全）。
+主线程只提交/取消请求、管理交互状态与 400ms 结束去抖、按 generation 接收 revision 通知，正文读取已暖内存或 entry 快照。`PhotoAnalysisService` actor 的单一 utility 串行队列负责缓存枚举/批次失效、请求组装、ImageIO 128px 解码、CG 32×32 合成与三锚点分析、结果原子写入。今天图片与批次结束各合并一次 Widget 刷新；命中已有文件的批次也发布最终 analysisRevision，确保冷启动自动数值更新。取消 token 的 NSLock 只保护布尔值，不跨 IO；`AppearanceStore` 内存 NSLock 只保护 cache/revision/imageVersion，独立文件锁串行化 IO。锁外读后复核 memoryRevision，写入校验删除版本并检查源文件仍存在，避免旧任务复活已删除图片。`TodoRepository`、`AppearanceRepository`、`TodoMigration` 原有 O_EXLOCK 不变。
+
+### 图片分析请求与事件闭环
+
+- `PhotoAnalysisRequest` 的稳定标识包括图片名、zoom/panX/panY、opacity、实际 canvasAspect 与有效底色；opacity=1 时明暗归一。三种预览比例和 Widget 登记的实际比例都参与分析，改变相册参数前先保存实际比例再失效。
+- `AnalysisRequests` 原子文件先可见，再通过公开 Darwin 通知提示 App。观察者由生产 TodoStore 生命周期持有；注入测试 store 不注册系统观察者。启动、回到前台和存活期间请求事件都会补算，body 无登记/分析/通知注册副作用。
+- 同参数批次进行中收到晚到请求只标记 rescan，不取消或重复清理当前相册；批末清任务与失效标记后补扫，避免“今天刷新→明天缺失→反复全清”的循环。实际参数改变仍立即取消旧 generation，并在交互结束后重新计时 400ms。
+- 编辑页通过事件提交当前预览图与比例优先级；服务顺序为今天图片、当前预览图片、剩余相册，且当前比例先算。主线程不执行文件扫描或失效；400ms 后所有批次 IO 均在 utility 队列。
+- `removeAnalysis(for:)` 删除旧 defaults、所有文件变体与待算请求；`cachedPhotoNames()` 和 `cleanOrphanAnalysis(existing:)` 为后续图片回收提供统一接口，不要求调用方猜缓存路径。
+- 生产纯 CG 分析由 `native-tools/check-photo-analysis.sh` 独立编译执行；上下/左右色块验证方向、裁剪、透明度、底色、实际比例、后台执行、取消、文件后端与相册重算，iOS probe 另验证交互去抖和 observable 刷新。

@@ -64,6 +64,31 @@ struct WidgetAppearanceEditor: View {
             end: { base.end(); store.endAppearanceInteraction() }, pulse: base.pulse)
     }
     var body: some View {
+        configuredEditor
+        .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
+        .onChange(of: store.appearance.widget.backdrop) { _, _ in cropPhoto = false }
+        .onChange(of: advanced) { _, _ in edits.finish(editState) }
+        .onChange(of: systemScheme) { _, value in store.updateAnalysisSystemTheme(dark: value == .dark) }
+        .onChange(of: previewDay) { _, _ in updateAnalysisPriority() }
+        .onChange(of: family) { _, _ in updateAnalysisPriority() }
+        .onChange(of: store.appearance.widget.photoName(at: photoDate)) { _, _ in updateAnalysisPriority() }
+        .onChange(of: store.items.map(\.id)) { _, ids in if let selectedTaskID, !ids.contains(selectedTaskID) { self.selectedTaskID = nil } }
+        .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance() }
+        .sheet(isPresented: $showHelp) { help }
+        .sheet(isPresented: $chooseAlbum) {
+            WidgetAlbumPicker { rotation in
+                var next = store.appearance.widget
+                next.photoRotation = rotation; next.backgroundPhotoName = rotation.photos.first
+                next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop()
+                widget.wrappedValue = next; previewDay = 0; store.flushAppearance()
+            }
+        }
+        .alert("样式", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            Button("好", role: .cancel) { }
+        } message: { Text(error ?? "") }
+        .environment(\.editorInteraction, editorInteraction)
+    }
+    private var configuredEditor: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
@@ -107,6 +132,9 @@ struct WidgetAppearanceEditor: View {
         }
         .onAppear {
             isVisible = true
+            updateAnalysisPriority()
+            store.updateAnalysisSystemTheme(dark: systemScheme == .dark)
+            store.resumePhotoAnalysis()
             edits.synchronize(editState)
             #if TODO_UI_CHECKS
             if ProcessInfo.processInfo.arguments.contains("--native-widget-text") { tool = .text }
@@ -126,13 +154,6 @@ struct WidgetAppearanceEditor: View {
                 do {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
-                    // 选图后按三个锚点各算一次（含透明度合成），写进 App Group
-                    if let uiImage = UIImage(data: data) {
-                        let analyses = ImageAnalyzer.analyzeAllAnchors(
-                            uiImage, crop: nil, opacity: 1,
-                            darkBackground: store.appearance.widget.isExplicitlyDark ?? (systemScheme == .dark))
-                        AppearanceStore.shared.setAnalysis(analyses, for: name)
-                    }
                     var next = store.appearance.widget
                     next.backgroundPhotoName = name; next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
                     widget.wrappedValue = next; store.flushAppearance()
@@ -157,24 +178,6 @@ struct WidgetAppearanceEditor: View {
                 store.flushAppearance()
             }
         }
-        .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
-        .onChange(of: store.appearance.widget.backdrop) { _, _ in cropPhoto = false }
-        .onChange(of: advanced) { _, _ in edits.finish(editState) }
-        .onChange(of: store.items.map(\.id)) { _, ids in if let selectedTaskID, !ids.contains(selectedTaskID) { self.selectedTaskID = nil } }
-        .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance() }
-        .sheet(isPresented: $showHelp) { help }
-        .sheet(isPresented: $chooseAlbum) {
-            WidgetAlbumPicker { rotation in
-                var next = store.appearance.widget
-                next.photoRotation = rotation; next.backgroundPhotoName = rotation.photos.first
-                next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop()
-                widget.wrappedValue = next; previewDay = 0; store.flushAppearance()
-            }
-        }
-        .alert("样式", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-            Button("好", role: .cancel) { }
-        } message: { Text(error ?? "") }
-        .environment(\.editorInteraction, editorInteraction)
     }
     private func undoEdit() {
         Task {
@@ -241,7 +244,8 @@ struct WidgetAppearanceEditor: View {
                             WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: store.appearance.widget.photoOpacity,
                                 background: scheme == .dark ? UIColor(white: 0.09, alpha: 1) : .white)
                         } else {
-                            let readable = ReadableResolver.scrim(style: store.appearance.widget, date: photoDate, scheme: scheme)
+                            let readable = ReadableResolver.scrim(style: store.appearance.widget, date: photoDate, scheme: scheme,
+                                canvasAspect: family.width / family.height)
                             WidgetBackgroundView(style: store.appearance.widget, date: photoDate,
                                                  scrim: readable.value, scrimAnchor: store.appearance.widget.readable.anchor,
                                                  scrimHeightRatio: store.appearance.widget.readable.heightRatio,
@@ -300,10 +304,10 @@ struct WidgetAppearanceEditor: View {
                     Button("恢复照片构图") { photoCrop.wrappedValue = PhotoCrop() }
                     Button("移除照片") {
                         if let photos = store.appearance.widget.photoRotation?.photos {
-                            photos.forEach { AppearanceStore.shared.removeAnalysis(for: $0) }
+                            store.forgetPhotoAnalysis(photos)
                         }
                         if let current = store.appearance.widget.backgroundPhotoName {
-                            AppearanceStore.shared.removeAnalysis(for: current)
+                            store.forgetPhotoAnalysis([current])
                         }
                         var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation?.enabled = false; next.backdrop = .system
                         widget.wrappedValue = next; cropPhoto = false
@@ -388,9 +392,15 @@ struct WidgetAppearanceEditor: View {
     /// 当前图片在当前锚点上的自动值，滑条的蓝点
     private var autoScrim: Double {
         let id = store.appearance.widget.photoName(at: photoDate)
-        let analysis = id.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
+        let analysis = id.flatMap { name in
+            AppearanceStore.shared.cachedAnalysis(for: store.appearance.widget.analysisRequest(photoName: name,
+                canvasAspect: family.width / family.height, darkBackground: scheme == .dark), anchor: settings.anchor)
+        }
         let tone = ReadableTone.resolve(style: store.appearance.widget, scheme: scheme, renderingMode: .fullColor)
         return settings.autoScrim(analysis: analysis, isLightText: tone.isLightText)
+    }
+    private func updateAnalysisPriority() {
+        store.prioritizePhotoAnalysis(photoName: store.appearance.widget.photoName(at: photoDate), canvasAspect: family.width / family.height)
     }
     private var readableAnchor: Binding<TextAnchor> {
         Binding(get: { settings.anchor }, set: { next in
