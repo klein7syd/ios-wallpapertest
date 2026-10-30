@@ -29,6 +29,8 @@ final class TodoStore: ObservableObject {
     private var analysisObserver: PhotoAnalysisRequestObserver?
     private var analysisPreferredName: String?
     private var analysisPreferredAspect: Double?
+    private var assetRetainers: [String: Set<String>] = [:]
+    private var startupCollectionScheduled = false
 
     init(repository: TodoRepository? = nil, appearanceRepository: AppearanceRepository? = nil,
          analysisDirectory: URL? = nil, analysisCache: AppearanceStore = .shared) {
@@ -45,9 +47,12 @@ final class TodoStore: ObservableObject {
 
     func reload() {
         do {
-            if usesSharedStorage { repository = try TodoSharedStorage.appRepository() }
-            accept(try activeRepository().load())
+            if usesSharedStorage {
+                let snapshot = try TodoSharedStorage.appSnapshot()
+                repository = snapshot.repository; accept(snapshot.document)
+            } else { accept(try activeRepository().load()) }
             reloadAppearance()
+            if !startupCollectionScheduled { startupCollectionScheduled = true; collectPhotoAssets() }
         } catch {
             loadError = error.localizedDescription
             canRecover = usesSharedStorage && TodoSharedStorage.canRecover()
@@ -116,7 +121,9 @@ final class TodoStore: ObservableObject {
     }
     func saveAppearance(_ value: TodoAppearance) throws {
         try activeAppearanceRepository().save(value)
+        let previous = appearance.widget
         appearance = value; appearanceDirty = false; appearanceStorageError = nil; appearanceError = nil
+        if previous != value.widget { schedulePhotoAnalysis(invalidating: analysisContextChanged(previous, value.widget)) }
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
     }
     func reloadAppearance() {
@@ -158,6 +165,17 @@ final class TodoStore: ObservableObject {
     private func recordAppearanceStorageError(_ error: Error) {
         appearanceStorageError = error.localizedDescription
         appearanceError = appearanceStorageError
+    }
+    func retainPhotoAssets(_ names: Set<String>, owner: String) { assetRetainers[owner] = names }
+    func collectPhotoAssets() {
+        guard usesSharedStorage, hasLoaded, loadError == nil, appearanceStorageError == nil else { return }
+        flushAppearance()
+        guard !appearanceDirty, appearanceStorageError == nil else { return }
+        let retained = assetRetainers.values.reduce(PhotoAssetReferences.appearance(appearance).union(PhotoAssetReferences.items(items))) { $0.union($1) }
+        Task(priority: .utility) {
+            do { _ = try await WidgetPhotoStore.shared.collect(retaining: retained) }
+            catch { /* 权威数据或备份不可读时整体跳过，保留图片等待恢复。 */ }
+        }
     }
     func updateAnalysisSystemTheme(dark: Bool) {
         guard dark != analysisSystemDark else { return }

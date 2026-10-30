@@ -59,7 +59,7 @@ struct TodoWidgetProvider: TimelineProvider {
     }
     private func read() -> TodoWidgetEntry {
         do {
-            let document = try TodoSharedStorage.widgetRepository().load()
+            let document = try TodoSharedStorage.widgetSnapshot().document
             let appearance = try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).load()
             return TodoWidgetEntry(date: .now, document: document, appearance: appearance, error: nil)
         } catch { return TodoWidgetEntry(date: .now, document: nil, error: error.localizedDescription) }

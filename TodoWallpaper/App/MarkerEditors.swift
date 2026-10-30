@@ -63,7 +63,7 @@ struct MarkerChoiceEditor: View {
                 defer { importing = false; selection = nil }
                 do {
                     guard let data = try await item.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
-                    let name = try await WidgetPhotoStore().importMarker(data)
+                    let name = try await WidgetPhotoStore.shared.importMarker(data)
                     var next = choice; next.kind = .image; next.imageName = name; choice = next
                 } catch { self.error = error.localizedDescription }
             }

@@ -155,6 +155,28 @@ require('bash native-tools/check-photo-analysis.sh' in read('native-tools/check-
     and 'ranOnMainThread' in read('TodoWallpaper/Tests/PhotoAnalysisChecks.swift')
     and 'photo_analysis_interaction_debounce_generation_and_actual_aspect' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
     '完整native门禁执行独立CG分析和iOS生产交互调度回归，不仅检查源码')
+album = read('TodoWallpaper/App/WidgetAlbumPicker.swift')
+photo_store = read('TodoWallpaper/App/WidgetPhotoStore.swift')
+asset_gc = read('TodoWallpaper/Core/PhotoAssetMaintenance.swift')
+require('requestImageDataAndOrientation' not in album and 'targetSize: CGSize(width: 1536, height: 1536)' in album
+    and 'isNetworkAccessAllowed = true' in album and 'cancelImageRequest' in album and 'PHImageResultIsDegradedKey' in album,
+    '相册逐张请求目标图并处理取消和重复降级回调，不读取原图Data')
+require('PhotoImportProgress' in album and 'validateResult()' in album and 'rollbackBatch' in album
+    and 'published = true' in album and 'if !published' in album and 'PhotoImports' in photo_store,
+    '相册跳过单张失败并按阈值回滚，持久化发布后取消不删除照片，名称事务有日志')
+require('WidgetPhotoStore().import' not in widget + marker + album and 'transactions.isEmpty' in photo_store and 'now.timeIntervalSince(max(created, modified)) >= 600' in asset_gc
+    and 'isSymbolicLink' in asset_gc and 'todo.assetReferences()' in asset_gc and 'look.assetReferences()' in asset_gc
+    and 'cleanOrphanAnalysis' in photo_store,
+    '回收保护导入、十分钟新文件、权威数据和备份，并清除孤立分析')
+require('retainedValuesChanged' in widget and 'retainedValuesChanged' in wallpaper and 'steps.flatMap' in read('TodoWallpaper/Core/EditorHistory.swift')
+    and 'owner: "widget"' in widget and 'owner: "wallpaper"' in wallpaper and 'store.collectPhotoAssets()' in widget,
+    '两个编辑器所有撤销快照都进入保留集合，相册和移除照片后触发回收')
+require('TodoSharedStorage.appSnapshot()' in store and 'accept(snapshot.document)' in store
+    and 'TodoSharedStorage.widgetSnapshot().document' in extension and 'existingSnapshot' in read('TodoWallpaper/Core/TodoRepository.swift'),
+    'App和Provider复用同一次加锁校验的迁移快照，不重复load或长期缓存')
+require('PhotoAssetMaintenanceChecks.swift' in read('native-tools/check-native.sh')
+    and 'album_transaction_rollback_commit_busy_and_undo_retention' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
+    '门禁执行真实文件回收、导入事务和编辑器保留回归')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

@@ -13,6 +13,7 @@ struct EditorHistory<Value: Equatable> {
     private var group: UUID?
     let limit: Int
     init(limit: Int = 50) { self.limit = max(1, limit) }
+    var retainedValues: [Value] { (current.map { [$0] } ?? []) + steps.flatMap { [$0.before, $0.after] } }
     var previous: Step? { steps.last }
     var canUndo: Bool { !steps.isEmpty }
     mutating func synchronize(_ value: Value) {

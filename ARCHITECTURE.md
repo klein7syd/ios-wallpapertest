@@ -17,7 +17,7 @@
 `TodoWidgetProvider` 读 App Group 数据并预生成背景位图；`TodoWidgetView` 组合内容层与 `containerBackground`；点击走 AppIntent 直接改共享文件再 `reloadTimelines`。
 
 **照片与相册（App/WidgetPhotoStore, App/WidgetAlbumPicker, Core/PhotoComposition）**
-`WidgetPhotoStore` 把 Photos 数据缩到 1536px（照片）/512px（标记）写进 App Group；`AlbumReader.prepare` 批量导入相册；`WidgetAlbumRotation.photo(at:)` 决定当天用哪张。照片提交后由 `TodoStore` 统一调度 `PhotoAnalysisService`，不在选图 MainActor 解码原图作分析。
+`WidgetPhotoStore` 把 Photos 数据缩到 1536px（照片）/512px（标记）写进 App Group；`AlbumReader.prepare` 用 PhotoKit 请求约 1536px、允许 iCloud 网络的目标图，逐张写入共享 actor 的有记录事务；单张失败跳过，全部或超过半数失败/取消整体回滚，外观落盘后才提交相册；`WidgetAlbumRotation.photo(at:)` 决定当天用哪张。照片提交后由 `TodoStore` 统一调度 `PhotoAnalysisService`，不在选图 MainActor 解码原图作分析。
 
 **壁纸（Wallpaper/*）**
 `WallpaperEditorModel` 状态机 + `WallpaperLiveCanvas`（实时 UIKit 层）+ `WallpaperRenderer`（CoreGraphics 合成）+ `WallpaperDraftStore`（草稿）。
@@ -104,7 +104,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 
 ## f. 编辑页与撤销
 
-`EditorUndoState` 用 `WidgetEditState`（style + 每个任务的标记）做快照；`EditorInteractionContext` 把一次连续手势合并成一个撤销步。`PreciseSlider`：`SmoothValueSlider`（UISlider + CADisplayLink 每帧 flush）+ `StandardDetent`（吸附半径 = 每点单位 ×4，已吸附时 ×7）+ 数字输入框与"标准"按钮。撤销可恢复外观与任务标记；**不能**恢复已写入 App Group 的图片文件或已导出的 PNG。
+`EditorUndoState` 用 `WidgetEditState`（style + 每个任务的标记）做快照；`EditorInteractionContext` 把一次连续手势合并成一个撤销步。`PreciseSlider`：`SmoothValueSlider`（UISlider + CADisplayLink 每帧 flush）+ `StandardDetent`（吸附半径 = 每点单位 ×4，已吸附时 ×7）+ 数字输入框与"标准"按钮。撤销可恢复外观与任务标记；两个编辑器把全部 current/before/after 快照的图片名交给 TodoStore 保留，GC 不删除这些文件。已导出的 PNG 不随撤销恢复。
 
 ## g. 壁纸子系统
 
@@ -179,3 +179,11 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 - 编辑页通过事件提交当前预览图与比例优先级；服务顺序为今天图片、当前预览图片、剩余相册，且当前比例先算。主线程不执行文件扫描或失效；400ms 后所有批次 IO 均在 utility 队列。
 - `removeAnalysis(for:)` 删除旧 defaults、所有文件变体与待算请求；`cachedPhotoNames()` 和 `cleanOrphanAnalysis(existing:)` 为后续图片回收提供统一接口，不要求调用方猜缓存路径。
 - 生产纯 CG 分析由 `native-tools/check-photo-analysis.sh` 独立编译执行；上下/左右色块验证方向、裁剪、透明度、底色、实际比例、后台执行、取消、文件后端与相册重算，iOS probe 另验证交互去抖和 observable 刷新。
+
+## 第3组：导入事务、回收与读取快照
+
+`WidgetPhotoStore.shared` 是 App 内所有照片/标记导入的共同 actor。相册先写 `PhotoImports/<UUID>.json` 名称日志；串行请求/编码一张后再处理下一张，高质量非 degraded 回调只消费一次，取消同时取消 PhotoKit 请求。成功数大于零且失败不超过一半才允许发布，部分成功提示跳过数。父编辑器先同步原子保存外观，再结束事务；发布后到达的取消不得删除已被引用的图。异常回滚只删除本事务 UUID 文件，不触碰其他导入。
+
+回收在启动、相册提交后、移除照片后进入同一 actor，导入活跃时跳过。`PhotoAssetGarbageCollector` 先验证 todos、appearance 及可恢复备份/恢复归档，再收集全部候选，任一读取失败不删除。保留当前全部引用（含禁用相册）、所有任务标记、两个编辑器撤销快照及备份；只处理正确目录中的规范 UUID 普通文件，拒绝符号链接，创建或修改不足 10 分钟均保留。删除失败留待后续重试。回收后通过 AppearanceStore 同步失效所有已删照片变体并清理无源分析键。损坏的历史恢复归档也会使回收跳过，优先数据可恢复性。
+
+迁移提供 `TodoRepositorySnapshot(repository, document)`；App reload、Provider read 直接使用已校验 document，既有 prepare/readyRepository 包装继续供 Intent 等使用。未增加跨事务缓存，迁移锁顺序、回执发布和每次事务文件锁不变。existingSnapshot 的 JSON 与原始 bytes 也来自同一次读取。

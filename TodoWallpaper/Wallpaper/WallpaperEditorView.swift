@@ -102,7 +102,7 @@ struct WallpaperEditorView: View {
             .onChange(of: model.ready) { _, ready in
                 if ready { syncOutputFields(); edits.synchronize(editState) }
             }
-            .onAppear { isVisible = true; if model.ready { edits.synchronize(editState) } }
+            .onAppear { isVisible = true; configureAssetRetention(); if model.ready { edits.synchronize(editState) } }
             .onChange(of: editState) { _, state in if model.ready && isVisible { edits.observe(state) } }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
             .onChange(of: store.items) { _, items in model.updateItems(items) }
@@ -131,6 +131,17 @@ struct WallpaperEditorView: View {
     private func toggleInspector() {
         edits.finish(editState)
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.toggleInspector() }
+    }
+    private func configureAssetRetention() {
+        edits.retainedValuesChanged = { values in
+            let names = values.reduce(into: Set<String>()) { result, value in
+                result.formUnion(PhotoAssetReferences.marker(value.marker))
+                result.formUnion(PhotoAssetReferences.widget(value.widgetStyle))
+                for marker in value.taskMarkers.values { result.formUnion(PhotoAssetReferences.marker(marker)) }
+            }
+            store.retainPhotoAssets(names, owner: "wallpaper")
+        }
+        edits.retainedValuesChanged(edits.retainedValues)
     }
     private func undoEdit() {
         Task {

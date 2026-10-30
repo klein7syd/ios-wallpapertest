@@ -157,13 +157,25 @@ struct TodoRepository {
         return document
     }
 
+    /// 回收需要保留当前文件及全部可恢复数据的图片；任一损坏/未来版本都使本轮回收停止。
+    func assetReferences() throws -> Set<String> {
+        try withLock {
+            var names = PhotoAssetReferences.items(try readDocument().items)
+            let archives = try FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent == "todos-v1.backup.json" || $0.lastPathComponent.hasPrefix("recovery-preserved-") }
+            for url in archives { names.formUnion(PhotoAssetReferences.items(try decodeDocument(Data(contentsOf: url)).items)) }
+            return names
+        }
+    }
+
     func existingSnapshot() throws -> (document: TodoDocument, data: Data)? {
         try withLock {
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 guard !FileManager.default.fileExists(atPath: backupURL.path) else { throw TodoDataError.primaryMissing }
                 return nil
             }
-            return (try readDocument(), try Data(contentsOf: fileURL))
+            let data = try Data(contentsOf: fileURL)
+            return (try decodeDocument(data), data)
         }
     }
 
