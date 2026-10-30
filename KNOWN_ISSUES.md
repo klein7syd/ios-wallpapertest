@@ -3,17 +3,13 @@
 ## a. 已知未修复（现象 → 涉及位置 → 根因 → 建议）
 
 1. **壁纸"包含已完成"无视觉区分** — `Wallpaper/WallpaperRenderer.swift:drawContent`：`completed: false` 写死，标题与日期没套完成效果。建议把 `item.isCompleted` 传进 `drawText` 的 `strike` 与透明度。
-2. **裁剪/透明度/明暗变化后不重算亮度** — `App/ImageAnalyzer.swift:analyzePhoto` 无调用点；`App/WidgetAppearanceEditor.swift` 只在选图时以 `crop: nil, opacity: 1` 调 `analyzeAllAnchors`。建议交互结束 400ms 去抖重算。
 3. **孤立图片无回收** — `App/WidgetPhotoStore.swift:importPhoto/importMarker` 只写不删；`Wallpaper/WallpaperDraftStore.swift:cleanExpired` 只清草稿，App Group 的 `WidgetPhotos/`、`MarkerImages/` 无清理。
 4. **`todos-v1.json` 重复读取** — `Core/TodoSharedStorage.swift:TodoMigration.prepare` 与 `App/TodoStore.swift:reload` 各 `load()` 一次；`Widget/TodoWallpaperWidget.swift:TodoWidgetProvider.read` 同样两次。
 5. **相册导入整张读入且单张失败即中断** — `App/WidgetAlbumPicker.swift:AlbumReader.prepare`：用 `requestImageDataAndOrientation` 取原图，任一 `throw` 直接退出，已写入文件不回滚。
 6. **`TodoSchedule.label` 每次新建 `DateFormatter`** — `Core/TodoSchedule.swift:label`（计算属性）。
 7. **双指连坐回滚** — `App/PhotoMotionView.swift:finish`：任一识别器 `.cancelled` 会把整次交互回滚到 `initialCrop`。
-9. **轮换到未分析的那张图时回退固定值** — `Shared/AppearanceStore.swift:analysis(for:anchor:)` 命中不了缓存时，`Core/ReadableModels.swift:ReadableSettings.autoScrim` 回退 `ReadableDefaults.scrim = 0.4`。相册导入时每张都算过，只有历史数据或绕过导入路径时才会缺。
-10. **Widget 进程内分析缓存不失效** — `Shared/AppearanceStore.swift:AppearanceStore.analysis` 的进程内字典在 Widget 扩展里没有失效入口。
 12. **壁纸 `drawText` 的 `shadow` 参数已成死参数** — `Wallpaper/WallpaperRenderer.swift:drawText` 签名仍保留 `shadow: CGColor? = nil`，但 `setShadow` 已删除、无人再传值。
 13. **壁纸微调步进过小、从边缘会跳变** — `Wallpaper/WallpaperEditorView.swift:nudge`：按 `layout.panel.midX / 390` 重算再叠 `dx / size.width`（约 0.2pt），且未包在 `interaction.begin/end` 里；`panelX` 被夹在 0…1 但 `midX` 只能落在 0.46…0.54，从边缘点一次会跳。
-15. **选图时的亮度分析在主线程** — `App/WidgetAppearanceEditor.swift` 的 `.onChange(of: selectedPhoto)` 里 `Task { … analyzeAllAnchors … }` 继承视图的 MainActor，解码大图并做三次 32×32 取样仍在主线程；48×48 仅属于传入非空裁剪的合成分支。
 
 ## b. 真机未验证
 
@@ -56,3 +52,12 @@
 - 居中偏移范围由自然文字高度与画布高度动态确定，滑条、setter、锚点切换和渲染共用规则；历史顶部/底部 -40 值仍能加载。
 - 原 a14：`setAppearance` 对数值做规范化后重试并返回结果，成功立即清除校验错误；存储/未来版本错误须实际 IO 成功才清除。撤销检查接收结果，失败可重试。
 - 新增纯 Core 规则/历史数据检查及 iOS 原生颜色、像素、样式保护与撤销检查；源码检查不构成真机验收证据。
+
+## f. 第2组图片分析管线修复（本组原生/编译证据另记）
+
+- 原 a2：裁剪、缩放、透明度与有效明暗曾只改变显示、不重算 → 缺统一生命周期调度 → TodoStore 结束交互后 400ms 去抖，PhotoAnalysisService 按完整上下文重算整个相册 → 不要恢复选图单次分析或 body 内工作。
+- 原 a9：历史/缺失分析回退固定基础值 → 旧键不包含显示上下文且无补算闭环 → Provider 登记实际比例原子请求，App 启动/前台/公开通知串行补算，缺失时仍安全回退基础值 0.4 → 不要在 Widget 内同步计算。
+- 原 a10：Widget 长生命周期内存结果陈旧 → 缺失效入口 → 每次 Provider 起始清内存并将结果快照放入 entry → 不要依赖可被另一尺寸清空的全局缓存渲染已准备 entry。
+- 原 a15：选大图在 MainActor 解码并分析 → Task 继承视图隔离 → 统一 utility 串行队列只读取 1536px 已导入文件并用 ImageIO 降到 128px，再纯 CG 合成一次 32×32 → 不要重新引入 UIImage(data:) 原图分析或每图 detached 并发。
+- 新增原子 AnalysisCache 三锚点封套与 AnalysisRequests 队列，解决 defaults 异步可见性；旧 defaults 不复用，只清理兼容。内存短锁、独立文件锁和删除版本防止卡主线程或删除后复活；坏/未来缓存封套安全回退。
+- 单图失败不阻断分析批次；导入本身的单张失败回滚、原图读取与图片回收仍属第3组，尚未在此组修复。

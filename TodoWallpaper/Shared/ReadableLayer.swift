@@ -157,13 +157,19 @@ enum ReadableResolver {
     /// 蒙层只在照片背景下出现；颜色跟文字亮度联动
     static func scrim(style: WidgetAppearance, date: Date, scheme: ColorScheme,
                       renderingMode: WidgetRenderingMode = .fullColor,
-                      family: WidgetFamily = .systemMedium) -> (value: Double, color: Color) {
+                      family: WidgetFamily = .systemMedium, canvasAspect: Double = 1,
+                      preparedAnalyses: [String: ImageAnalysis]? = nil) -> (value: Double, color: Color) {
         guard style.backdrop == .photo, !style.materialEnabled else { return (0, .black) }
         let tone = ReadableTone.resolve(style: style, scheme: scheme, renderingMode: renderingMode, family: family)
         guard tone.enabled else { return (0, tone.scrimColor) }
         let settings = style.readable
         let imageID = style.photoName(at: date)
-        let analysis = imageID.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
+        let analysis = imageID.flatMap { name in
+            let request = style.analysisRequest(photoName: name, canvasAspect: canvasAspect,
+                darkBackground: style.isExplicitlyDark ?? (scheme == .dark))
+            if let preparedAnalyses { return preparedAnalyses[request.cacheID + "." + settings.anchor.rawValue] }
+            return AppearanceStore.shared.cachedAnalysis(for: request, anchor: settings.anchor)
+        }
         let value = settings.scrim(auto: settings.autoScrim(analysis: analysis, isLightText: tone.isLightText))
         return (value, tone.scrimColor)
     }

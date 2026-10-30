@@ -38,6 +38,6 @@
 7. `header.topInset` 已不参与布局（`WidgetHeaderLayout.titleY = 0`），位置由 `readableEdgeInset` 控制。
 8. 颜色先通过 CoreGraphics 从 P3 转换到 sRGB，再 clamp 到 0…1；`setAppearance` 会重试规范化数值并返回是否接收，撤销须检查返回值。
 9. 拖动面板时不能在增量路径里做吸附（每帧位移只有 1~2pt，会被反复吸回中心）。
-10. 分析缓存键是「图片名 + 锚点」，主 App 写、Widget 读；Widget 进程内不会自动失效（已知问题）。
+10. 分析上下文含图片名、crop、透明度、实际画布比例与有效底色（opacity=1 共用明暗）；结果与缺失请求为 App Group 原子文件。主 App utility 串行分析，Widget 只读/登记缺失；每次 Provider 起始清内存且 entry 携分析快照，body 仅读内存或快照。
 11. CI 的 render 检查带像素断言，改布局/字体/颜色会让断言失败，需要同步更新 Tests。
 12. 调试页入口在 `#if DEBUG` 内，不要放到正式版。

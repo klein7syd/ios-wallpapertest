@@ -6,7 +6,8 @@
 | --- | --- | --- | --- |
 | App/CalendarImportView.swift | App | 日历/提醒事项导入 | CalendarSource, CalendarImportError, CalendarReader |
 | App/EditorUndoState.swift | App | 编辑页撤销栈与 interaction 上下文 | EditorInteractionContext, EditorInteractionKey, EditorUndoState |
-| App/ImageAnalyzer.swift | App | 缩图取亮度、对比度、建议蒙层（仅主 App） | ImageAnalyzer |
+| App/ImageAnalyzer.swift | App | 仅可读性调试页的 UIKit 分析兼容入口，生产照片走统一后台服务 | ImageAnalyzer |
+| App/PhotoAnalysisService.swift | App + macOS检查 | utility 串行 ImageIO/CG 分析、整批缓存更新与公开请求通知观察 | PhotoAnalysisService, PhotoAnalysisOutput, PhotoAnalysisRequestObserver |
 | App/InspectorComponents.swift | App | 见主要类型（职责待补充） | EditorToolPicker, InspectorViewport |
 | App/MarkerEditors.swift | App | 标记编辑控件、PreciseSlider、StyleColorControl | MarkerChoiceEditor, EmojiEntry, PreciseSlider |
 | App/PhotoMotionView.swift | App | 照片裁剪手势 | PhotoMotionView, WidgetPhotoMotionSurface |
@@ -25,6 +26,7 @@
 | Core/MarkerImageReference.swift | App + Widget | 标记图片命名与读取 | MarkerImageReference |
 | Core/NativeTypography.swift | App + Widget | CTFont 构造与字体家族 | NativeTypography, FontBox |
 | Core/PhotoComposition.swift | App + Widget | PhotoCrop、相册轮换、每日时间线 | PhotoCrop, WidgetAlbumRotation, WidgetDayTimeline |
+| Core/PhotoAnalysisRequest.swift | App + Widget | 完整分析上下文、稳定缓存标识与不透明底色归一 | PhotoAnalysisRequest |
 | Core/ReadableModels.swift | App + Widget | 可读性规则、动态偏移边界、强度、阴影配方、原始图片分析 | TextAnchor, ReadableRules, ReadableContentGeometry, ImageAnalysis |
 | Core/TextLegibility.swift | App + Widget | 亮度、对比度、可读色（壁纸仍在用） | TextLegibility |
 | Core/TodoAppearance.swift | App + Widget | TodoAppearance / WidgetAppearance / 标记与颜色模型 | MarkerKind, TodoMarker, EmojiInput |
@@ -37,7 +39,7 @@
 | Core/WidgetHeaderLayout.swift | App + Widget | 标题栏度量 | WidgetHeaderLayout |
 | Core/WidgetLayout.swift | App + Widget | 小组件行高、容量、间距计算 | WidgetLayoutMetrics, WidgetPreviewState |
 | Core/WidgetPhotoReference.swift | App + Widget | 小组件照片命名与读取 | WidgetPhotoReference |
-| Shared/AppearanceStore.swift | App + Widget | 亮度分析缓存与旧设置迁移 | AppearanceStore, Key, AppGroup |
+| Shared/AppearanceStore.swift | App + Widget | 原子分析封套/请求、短内存锁与后台文件锁、清理接口、旧设置迁移 | AppearanceStore, Key, AppGroup |
 | Shared/ReadableLayer.swift | App + Widget | 蒙层、文字/标记阴影、色调、模式门禁与内容几何偏好 | ScrimView, TextStyleModifier, ReadableTone, ReadableGeometryPreference |
 | Shared/SetTodoCompletionIntent.swift | App + Widget | 小组件点按完成的 AppIntent | SetTodoCompletionIntent |
 | Shared/TodoMarkerView.swift | App + Widget | 标记视图与位图缓存 | TodoMarkerView, MarkerBitmapCache |
@@ -51,6 +53,7 @@
 | Tests/MigrationChecks.swift | App(Debug) | 见主要类型（职责待补充） | MigrationChecks |
 | Tests/NativeUIProbe.swift | App(Debug) | 见主要类型（职责待补充） | NativeUIProbe, ProbeTrackingSlider |
 | Tests/PhotoRepairChecks.swift | App(Debug) | 见主要类型（职责待补充） | PhotoRepairChecks |
+| Tests/PhotoAnalysisChecks.swift | 独立macOS检查 | 实际CG分析、文件后端、取消与相册批次可执行回归 | PhotoAnalysisChecks |
 | Tests/PhotoRepairRenderChecks.swift | App(Debug) | 见主要类型（职责待补充） | PhotoRepairRenderChecks |
 | Tests/RepositoryChecks.swift | App(Debug) | 见主要类型（职责待补充） | RepositoryChecks |
 | Tests/UIStateChecks.swift | App(Debug) | 见主要类型（职责待补充） | UIStateChecks |
