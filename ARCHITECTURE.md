@@ -136,6 +136,34 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 | 日历窗口 | 90 天 | `App/CalendarImportView.swift:CalendarReader` | 导入范围 |
 | 最大行数 | 10 | `Core/TodoAppearance.swift:WidgetAppearance` | 小组件行数 |
 
+### 阴影配方表（`Core/ReadableModels.swift` → `ShadowRecipes`）
+
+| 编号 | 名称 | 层数 | 各层 radius / y / 不透明度 | 颜色 | 用途 |
+| --- | --- | --- | --- | --- | --- |
+| A | 单层 | 1 | 2.5 / 1.0 / 0.35 | 黑 | 浅色文字候选 |
+| B | 双层 | 2 | 1.0 / 0.5 / 0.45；3.0 / 1.0 / 0.25 | 黑 | 浅色文字候选 |
+| C | 宽柔 | 2 | 2.0 / 1.0 / 0.40；8.0 / 2.0 / 0.25 | 黑 | 浅色文字候选 |
+| D | 无阴影 | 0 | — | — | 浅色文字候选 |
+| I | 当前默认 | 2 | 0.8 / 0.5 / 0.30；2.0 / 1.0 / 0.18 | 黑 | **`ReadableDefaults.lightTextRecipe`** |
+| E | 当前 | 1 | 1.0 / 0.5 / 0.35 | 白 | 深色文字候选 |
+| F | 细光晕 | 2 | 1.5 / 0.5 / 0.60；4.0 / 1.0 / 0.35 | 白 | 深色文字候选 |
+| G | 宽光晕 | 2 | 2.0 / 1.0 / 0.50；8.0 / 2.0 / 0.40 | 白 | 深色文字候选 |
+| H | 无阴影 | 0 | — | — | 深色文字候选 |
+| J | 当前默认 | 1 | 1.0 / 0.5 / 0.40 | 白 | **`ReadableDefaults.darkTextRecipe`** |
+
+实际生效前还会乘强度：不透明度 × `shadowOpacityMultiplier`（0.5 / 0.8 / 1.1），半径 × `shadowRadiusScale`（0.7 / 0.85 / 1.0）。
+定义位置：`Core/ReadableModels.swift` 的 `ShadowRecipes.light` / `ShadowRecipes.dark`，默认值在 `ReadableDefaults`。
+
+### edgeInset 规则
+
+- 存储：`WidgetAppearance.readableEdgeInset: Double?`，`validate()` 允许 -40…40（`Core/TodoAppearance.swift`）。
+- 全局默认与范围常量：`ReadableDefaults.edgeInsetRange = -40...40`（`Core/ReadableModels.swift`）。
+- 滑条范围：顶部/底部 -12…40，居中 -40…40；实现在 `App/WidgetAppearanceEditor.swift` 的 `edgeRange` 计算属性，控件是标题页顶部的 `PreciseSlider`（`standard: 0`）。
+- 切换锚点时的 clamp：`readableAnchor` 的 setter 里，居中用 `max(-40, min(40, v))`，其余用 `max(-12, min(40, v))`（`App/WidgetAppearanceEditor.swift`）。
+- 作用位置：顶部锚点 = `padding(.top, edgeInset)`；底部锚点 = `padding(.bottom, edgeInset)`；居中锚点 = `offset(y: edgeInset)`，均作用在 `TodoWidgetContent.body` 的整个文字块上（含标题栏、列表与底部说明）。
+- 与蒙层的关系：`WidgetBackgroundView` 把 `edgeInset` 作为 `scrimExtraInset` 传给 `ScrimView`，只用于放大渐变覆盖高度；负值按 0 计。
+- 与 `header.topInset` 的关系：后者已不参与布局（`WidgetHeaderLayout.titleY = 0`），仅保留解码兼容。
+
 ## j. 线程与并发
 
 主线程：所有 SwiftUI 视图、`TodoStore`、编辑页、`WallpaperEditorViewModel`。后台：`WidgetPhotoStore.importMarker/importPhoto` 是 `actor`；`AlbumReader.prepare` 是 async；`ImageAnalyzer` 在调用方线程执行（选图处目前在 Task 内）。锁：`TodoRepository`、`AppearanceRepository`、`TodoMigration` 用 `O_EXLOCK` 文件锁；`AppearanceStore` 缓存用 `NSLock`；`MarkerBitmapCache` / `WidgetPhotoCache` 用 `NSCache`（线程安全）。
