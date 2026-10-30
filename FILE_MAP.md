@@ -8,7 +8,7 @@
 | App/EditorUndoState.swift | App | 编辑页撤销栈与 interaction 上下文 | EditorInteractionContext, EditorInteractionKey, EditorUndoState |
 | App/ImageAnalyzer.swift | App | 仅可读性调试页的 UIKit 分析兼容入口，生产照片走统一后台服务 | ImageAnalyzer |
 | App/PhotoAnalysisService.swift | App + macOS检查 | utility 串行 ImageIO/CG 分析、整批缓存更新与公开请求通知观察 | PhotoAnalysisService, PhotoAnalysisOutput, PhotoAnalysisRequestObserver |
-| App/InspectorComponents.swift | App | 共享工具选择器与可滚动参数容器 | EditorToolPicker, InspectorViewport |
+| App/InspectorComponents.swift | App | 共享工具选择器与可滚动参数容器 | EditorToolPicker, InspectorViewport, InspectorGroupTitle |
 | App/MarkerEditors.swift | App | 标记编辑控件、PreciseSlider、StyleColorControl | MarkerChoiceEditor, EmojiEntry, PreciseSlider |
 | App/PhotoMotionView.swift | App | 保留图层裁剪与组合手势，全部取消才回滚 | PhotoMotionView, WidgetPhotoMotionSurface |
 | App/ReadableLayerDebugView.swift | App | 可读性调试页（5 张测试图） | TestImageFactory, Sample, ReadableLayerDebugView |

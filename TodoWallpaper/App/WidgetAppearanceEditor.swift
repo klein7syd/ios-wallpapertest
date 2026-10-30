@@ -118,10 +118,6 @@ struct WidgetAppearanceEditor: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
-                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
-                    title: { $0.rawValue }, compact: geometry.size.height < 320)
-                    .padding(.horizontal, 16).padding(.vertical, 6)
-                    .accessibilityIdentifier("widget.tools")
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") + (selectedTaskID?.uuidString ?? ".default")) {
                     if let message = store.appearanceError {
                         Text(message).font(.caption).foregroundStyle(.red)
@@ -139,6 +135,10 @@ struct WidgetAppearanceEditor: View {
                     }
                 }
                 .frame(maxHeight: .infinity).accessibilityIdentifier("widget.settings")
+                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
+                    title: { $0.rawValue }, compact: geometry.size.height < 320)
+                    .padding(.horizontal, 16).padding(.vertical, 6)
+                    .accessibilityIdentifier("widget.tools")
             }
             .clipped()
         }
@@ -307,9 +307,7 @@ struct WidgetAppearanceEditor: View {
         .accessibilityIdentifier("widget.fixedPreview")
     }
     @ViewBuilder private var themeControls: some View {
-        Toggle("玻璃背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
-            widget.wrappedValue.systemMaterial = $0; cropPhoto = false
-        }))
+        InspectorGroupTitle(title: "背景与照片", detail: "先选背景，再调整照片构图与明暗。")
         Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         if store.appearance.widget.materialEnabled {
             Text("请求原生 Liquid Glass。默认图标模式能否透出桌面壁纸，仍需实机确认；系统透明模式由 iOS 控制。")
@@ -342,7 +340,8 @@ struct WidgetAppearanceEditor: View {
                         PreciseSlider(title: "照片垂直位置", value: photoCrop.panY, range: -1...1, standard: 0, precision: 2)
                     }
                     Button("恢复照片构图") { photoCrop.wrappedValue = PhotoCrop() }
-                    Button("移除照片") {
+                    Divider()
+                    Button("移除照片", role: .destructive) {
                         if let photos = store.appearance.widget.photoRotation?.photos {
                             store.forgetPhotoAnalysis(photos)
                         }
@@ -355,12 +354,17 @@ struct WidgetAppearanceEditor: View {
                 }
             }
         }
+        InspectorGroupTitle(title: "实验选项", detail: "系统玻璃效果受 iOS 模式影响，可按需开启。")
+        Toggle("玻璃背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
+            widget.wrappedValue.systemMaterial = $0; cropPhoto = false
+        }))
         if advanced {
             Text("网格不会出现在主屏幕。系统外观会影响实际小组件背景。")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
     @ViewBuilder private var headerControls: some View {
+        InspectorGroupTitle(title: "标题与位置", detail: "标题内容与整块文字的位置在这里调整。")
         PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
         Toggle("显示标题", isOn: heading.showsTitle)
         if store.appearance.widget.heading.showsTitle {
@@ -385,6 +389,7 @@ struct WidgetAppearanceEditor: View {
         }
     }
     @ViewBuilder private var textControls: some View {
+        InspectorGroupTitle(title: "文字与可读性", detail: "先选位置与颜色，再细调字体和护字效果。")
         Picker("文字位置", selection: readableAnchor) {
             ForEach(TextAnchor.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.segmented)
@@ -552,6 +557,7 @@ struct WidgetAppearanceEditor: View {
         catch { self.error = error.localizedDescription }
     }
     @ViewBuilder private var contentControls: some View {
+        InspectorGroupTitle(title: "显示内容", detail: "控制数量、筛选和辅助说明。")
         Toggle("显示左下角说明", isOn: Binding(get: { store.appearance.widget.footerVisible }, set: { widget.wrappedValue.showsFooter = $0 }))
         Toggle("显示未完成数量", isOn: heading.showsSummary)
         Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))

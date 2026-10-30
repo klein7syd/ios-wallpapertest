@@ -170,7 +170,6 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
-            toolSelector.frame(height: 44)
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +
                     (tool == .marker ? (selectedMarkerTask?.id.uuidString ?? ".uniform") : "")) {
@@ -190,6 +189,7 @@ struct WallpaperEditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .disabled(!model.ready || model.busy || model.draftBlocked)
             }
+            toolSelector.frame(height: 44)
         }
         .frame(height: height)
         .accessibilityIdentifier("wallpaper.inspector")
@@ -205,7 +205,7 @@ struct WallpaperEditorView: View {
                 toggleInspector()
             } label: {
                 Image(systemName: navigation.inspectorExpanded ? "chevron.down" : "chevron.up")
-                    .font(.subheadline).frame(width: 36, height: 44)
+                    .font(.subheadline).frame(width: 44, height: 44)
             }.buttonStyle(.plain)
                 .accessibilityLabel(navigation.inspectorExpanded ? "收起参数" : "展开参数")
         }
@@ -221,6 +221,7 @@ struct WallpaperEditorView: View {
     }
     @ViewBuilder private var backgroundControls: some View {
         let photoTitle = model.hasPhoto ? "更换背景照片" : "选择背景照片"
+        InspectorGroupTitle(title: "背景素材", detail: "先选照片，再在上方预览中调整构图。")
         PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
             Label(photoTitle, systemImage: "photo")
         }.buttonStyle(.bordered)
@@ -239,6 +240,7 @@ struct WallpaperEditorView: View {
         }
     }
     @ViewBuilder private var panelControls: some View {
+        InspectorGroupTitle(title: "面板布局", detail: "先调整大小和位置，再调整玻璃质感。")
         if !advanced {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
         } else {
@@ -260,6 +262,7 @@ struct WallpaperEditorView: View {
             PreciseSlider(title: "圆角", value: $model.settings.cornerRadius, range: 0...80, standard: 24)
             PreciseSlider(title: "内边距", value: $model.settings.padding, range: 8...48, standard: 20)
         }
+        InspectorGroupTitle(title: "玻璃质感", detail: "透明度、模糊和底色共同决定面板效果。")
         PreciseSlider(title: "玻璃不透明度", value: $model.settings.glassOpacity, range: 0...0.85, standard: 0.22, precision: 2)
         PreciseSlider(title: "模糊程度", value: $model.settings.blurRadius, range: 0...45, standard: 22)
         Toggle("深色底色", isOn: $model.settings.darkGlass)
@@ -275,9 +278,10 @@ struct WallpaperEditorView: View {
             interaction.begin("wallpaper.panel.nudge")
             defer { interaction.end() }
             model.settings = model.settings.nudged(in: layout, dx: dx, dy: dy)
-        } label: { Image(systemName: icon) }.buttonStyle(.bordered).accessibilityLabel("面板移动一个像素 \(icon)")
+        } label: { Image(systemName: icon).frame(minWidth: 44, minHeight: 44) }.buttonStyle(.bordered).accessibilityLabel("面板移动一个像素 \(icon)")
     }
     @ViewBuilder private var textControls: some View {
+        InspectorGroupTitle(title: "文字排版", detail: "先调字号与颜色，再选择显示哪些事项。")
         StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
         if advanced {
             PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
@@ -352,6 +356,7 @@ struct WallpaperEditorView: View {
         if advanced { Button("将壁纸样式应用到小组件") { applyWidgetStyle() }.buttonStyle(.bordered) }
     }
     @ViewBuilder private var outputControls: some View {
+        InspectorGroupTitle(title: "成品设置", detail: "确认比例和清晰度后，保存或分享。")
         if advanced { PreciseSlider(title: "编辑预览大小", value: $previewScale, range: 0.55...1, standard: 1, precision: 2) }
         Picker("画布比例", selection: Binding(get: { aspect }, set: { chooseAspect($0) })) {
             ForEach(WallpaperAspect.allCases) { Text($0.title).tag($0) }
@@ -367,9 +372,9 @@ struct WallpaperEditorView: View {
             HStack { TextField("宽 px", text: $pixelWidth); Text("×"); TextField("高 px", text: $pixelHeight); Button("应用") { applyPixels() } }.keyboardType(.numberPad)
         }
         Text("输出 \(model.settings.size.label) · 相册保存前会校验实际 PNG 像素尺寸").font(.caption)
-        HStack {
-            Button { Task { await model.export(saveToPhotos: true) } } label: { Label("保存相册", systemImage: "square.and.arrow.down") }
-            Button { Task { await model.export(saveToPhotos: false) } } label: { Label("系统分享", systemImage: "square.and.arrow.up") }
+        VStack(spacing: 12) {
+            Button { Task { await model.export(saveToPhotos: true) } } label: { Label("保存相册", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity, minHeight: 44) }
+            Button { Task { await model.export(saveToPhotos: false) } } label: { Label("系统分享", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
         }.buttonStyle(.borderedProminent).disabled(!canExport)
         if let size = model.lastExportSize { Text("最近成品已校验：\(size) px").font(.caption) }
         if advanced {

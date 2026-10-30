@@ -58,3 +58,18 @@ struct InspectorViewport<Content: View>: View {
     }
 }
 
+
+// Target Membership：App；参数分组标题提供阅读层级，不改变控件身份或滚动容器。
+struct InspectorGroupTitle: View {
+    let title: String
+    let detail: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.headline).foregroundStyle(.primary)
+            Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
