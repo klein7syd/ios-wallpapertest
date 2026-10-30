@@ -305,6 +305,7 @@ struct WidgetAppearanceEditor: View {
         }
     }
     @ViewBuilder private var headerControls: some View {
+        PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
         Toggle("显示标题", isOn: heading.showsTitle)
         if store.appearance.widget.heading.showsTitle {
             TextField("标题内容", text: Binding(get: { store.appearance.widget.heading.text }, set: { text in
@@ -312,7 +313,8 @@ struct WidgetAppearanceEditor: View {
                 heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
             })).textInputAutocapitalization(.never).submitLabel(.done)
             Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
-            if !store.appearance.widget.heading.followsTextColor { StyleColorControl(title: "标题颜色", value: heading.color) }
+            StyleColorControl(title: "标题颜色", value: heading.color)
+            .disabled(store.appearance.widget.heading.followsTextColor)
             Picker("标题位置", selection: Binding(get: { store.appearance.widget.heading.horizontalPosition < 0.25 ? 0 : store.appearance.widget.heading.horizontalPosition > 0.75 ? 2 : 1 }, set: {
                 heading.wrappedValue.horizontalPosition = Double($0) / 2
             })) {
@@ -323,7 +325,6 @@ struct WidgetAppearanceEditor: View {
             if advanced {
                 PreciseSlider(title: "标题大小", value: heading.fontSize, range: 12...32, standard: 17)
                 PreciseSlider(title: "标题水平位置", value: heading.horizontalPosition, range: 0...1, standard: 0, precision: 2)
-                PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
             }
         }
     }
@@ -335,7 +336,8 @@ struct WidgetAppearanceEditor: View {
             ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.segmented)
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
-        if !store.appearance.widget.followsSystemText { StyleColorControl(title: "文字色", value: widget.textColor) }
+        StyleColorControl(title: "文字色", value: widget.textColor)
+            .disabled(store.appearance.widget.followsSystemText)
         if advanced {
             PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
             if hasVisibleMarker { PreciseSlider(title: "标记与文字间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }

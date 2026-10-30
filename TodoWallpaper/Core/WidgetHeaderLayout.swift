@@ -19,7 +19,7 @@ struct WidgetHeaderLayout: Equatable {
         // A large inset must not take height away from a title's ink box.
         let titleHeight = style.visibleTitle ? min(max(0, maximumHeight),
             titleLineHeight * (measuredTitleWidth > region ? 2 : 1)) : 0
-        let titleY = min(style.topInset, max(0, maximumHeight - titleHeight))
+        let titleY = 0.0   // 旧的 topInset 不再参与布局，统一走 edgeInset
         let height = min(maximumHeight, max(style.visibleTitle ? titleY + titleHeight : 0,
             style.showsSummary ? summaryHeight : 0))
         return WidgetHeaderLayout(height: max(0, height), titleX: max(0, region - titleWidth) * style.horizontalPosition,

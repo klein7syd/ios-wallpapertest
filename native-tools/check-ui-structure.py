@@ -89,7 +89,7 @@ text_section = widget[widget.index('@ViewBuilder private var textControls'):widg
 content_section = widget[widget.index('@ViewBuilder private var contentControls'):widget.index('private var help:')]
 require('PreciseSlider(title: "行距"' in text_section and 'range: -10...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
 require(widget.index('Toggle("玻璃背景') < widget.index('Picker("明暗"'), 'Glass switch is the first theme setting')
-require('TextLegibility.luminance' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
+require('ReadableTone.resolve' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

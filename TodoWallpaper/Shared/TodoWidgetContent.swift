@@ -21,10 +21,14 @@ struct TodoWidgetContent: View {
     private var style: WidgetAppearance { appearance.widget }
     @Environment(\.widgetRenderingMode) private var renderingMode
     @Environment(\.colorScheme) private var hostScheme
+    private var tone: ReadableTone {
+        ReadableTone.resolve(style: style, scheme: hostScheme, renderingMode: renderingMode)
+    }
     private var foreground: Color {
         if renderingMode != .fullColor { return .primary }
-        let requested = style.followsSystemText ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0)) : style.textColor
-        return safeColor(requested)
+        return safeColor(style.followsSystemText
+            ? ((style.isExplicitlyDark ?? (hostScheme == .dark)) ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            : style.textColor)
     }
     private var background: WallpaperColor { TextLegibility.widgetBase(style, dark: style.isExplicitlyDark ?? (hostScheme == .dark)) }
     private var settings: ReadableSettings { style.readable }
@@ -35,14 +39,7 @@ struct TodoWidgetContent: View {
     }
     /// 浅色文字才加黑色阴影；深色文字不加，避免发白发糊
     /// 由主文字的最终颜色决定深浅，不再参考系统模式或底色
-    private var textIsLight: Bool {
-        guard renderingMode == .fullColor else { return false }
-        let dark = style.isExplicitlyDark ?? (hostScheme == .dark)
-        let requested = style.followsSystemText
-            ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
-            : style.textColor
-        return TextLegibility.luminance(requested) > 0.5
-    }
+    private var textIsLight: Bool { tone.enabled && tone.isLightText }
     private var contentAlignment: Alignment {
         switch settings.anchor {
         case .top: return .topLeading
@@ -112,6 +109,8 @@ struct TodoWidgetContent: View {
                 if metrics.showsFooter {
                     Text(items.count > shown.count ? "另有 \(items.count - shown.count) 项" : "点任务可完成或恢复")
                         .font(.system(size: footerUnit)).opacity(0.7).lineLimit(1)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                                  enabled: renderingMode == .fullColor)
                         .frame(height: metrics.footerHeight).padding(.top, metrics.spacing)
                 }
             }
@@ -155,6 +154,10 @@ struct TodoWidgetContent: View {
             if heading.showsSummary {
                 Text("\(items.filter { !$0.isCompleted }.count) 未完成")
                     .font(.system(size: footerUnit)).opacity(0.7).lineLimit(1).minimumScaleFactor(0.7)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                                  enabled: renderingMode == .fullColor)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity,
+                                  enabled: renderingMode == .fullColor)
                     .frame(width: layout.summaryWidth, height: layout.height, alignment: .topTrailing)
                     .offset(x: layout.summaryX)
             }
@@ -194,16 +197,22 @@ struct TodoWidgetContent: View {
             }
     }
     private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        // 标题与日期共用同一份颜色与淡出，避免日期不跟随完成效果
+        let rowColor = item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground
+        let rowFade = item.isCompleted && style.textCompletion.fades ? 0.55 : 1
+        return VStack(alignment: .leading, spacing: 2) {
             Text(item.title).font(Font(titleFont))
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
-                .opacity(item.isCompleted && style.textCompletion.fades ? 0.55 : 1)
-                .foregroundStyle(item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground)
+                .opacity(rowFade)
+                .foregroundStyle(rowColor)
                 .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
                 .readableText(isLightText: textIsLight, intensity: settings.intensity,
                               enabled: renderingMode == .fullColor)
             if let schedule = item.schedule {
-                Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1).opacity(0.75)
+                // 日期不划线；淡出与标题一致
+                Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1)
+                    .opacity(0.75 * rowFade)
+                    .foregroundStyle(rowColor)
                     .readableText(isLightText: textIsLight, intensity: settings.intensity,
                                   enabled: renderingMode == .fullColor)
             }

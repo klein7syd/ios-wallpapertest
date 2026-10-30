@@ -317,7 +317,6 @@ enum WallpaperRenderer {
         context.clip(to: panel)
         let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panel.width - 50) / 2))
         let textColor = effectiveTextColor(settings)
-        let shadow: CGColor? = settings.glassOpacity < 0.75 ? CGColor(gray: TextLegibility.luminance(textColor) > 0.5 ? 0 : 1, alpha: 0.65) : nil
         for row in layout.rows {
             let placement = rowPlacement(row, layout: layout, settings: settings)
             let rect = CGRect(x: placement.markerX, y: layout.canvas.height - row.markerTop - row.markerSize,
@@ -325,15 +324,15 @@ enum WallpaperRenderer {
             MarkerDrawing.draw(marker: row.marker, completed: false, style: appearance.markerStyle,
                                textColor: textColor, rect: rect, context: context, assetDirectory: assetDirectory)
             drawText(row.block, in: context, x: placement.textX, top: row.top,
-                width: placement.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment, shadow: shadow)
+                width: placement.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         if let empty = layout.emptyText {
             drawText(empty, in: context, x: panel.minX + padding, top: layout.emptyTop,
-                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment, shadow: shadow)
+                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         if let footer = layout.footer {
             drawText(footer, in: context, x: panel.minX + padding, top: layout.footerTop,
-                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment, shadow: shadow)
+                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
         context.restoreGState()
     }
@@ -356,7 +355,6 @@ enum WallpaperRenderer {
                                  alignment: WallpaperAlignment, strike: Bool = false, strikeColor: CGColor? = nil, shadow: CGColor? = nil) {
         context.saveGState()
         context.clip(to: CGRect(x: x, y: canvasHeight - top - block.height, width: width, height: block.height).insetBy(dx: -2, dy: -2))
-        if let shadow { context.setShadow(offset: CGSize(width: 0, height: -0.4), blur: 1.2, color: shadow) }
         defer { context.restoreGState() }
         context.textMatrix = .identity
         for (index, line) in block.lines.enumerated() {

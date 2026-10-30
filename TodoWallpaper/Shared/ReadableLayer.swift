@@ -126,21 +126,42 @@ struct ReadableLayer<Content: View>: View {
     }
 }
 
+// MARK: - 唯一色调解算
+
+/// 文字色、深浅判定、蒙层色、是否启用效果，全部从这里出
+struct ReadableTone {
+    var textColor: Color
+    var isLightText: Bool
+    var scrimColor: Color
+    var enabled: Bool
+
+    static func resolve(style: WidgetAppearance, scheme: ColorScheme,
+                        renderingMode: WidgetRenderingMode) -> ReadableTone {
+        let dark = style.isExplicitlyDark ?? (scheme == .dark)
+        let requested = style.followsSystemText
+            ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
+            : style.textColor
+        // 0.179 是与黑、白对比度相等的分界点，粉/绿/浅蓝不再被判成深色
+        let light = TextLegibility.luminance(requested) > 0.179
+        return ReadableTone(textColor: requested.swiftColor,
+                            isLightText: light,
+                            scrimColor: light ? .black : .white,
+                            enabled: renderingMode == .fullColor)
+    }
+}
+
 // MARK: - 蒙层取值
 
 enum ReadableResolver {
     /// 蒙层只在照片背景下出现；颜色跟文字亮度联动
     static func scrim(style: WidgetAppearance, date: Date, scheme: ColorScheme) -> (value: Double, color: Color) {
         guard style.backdrop == .photo, !style.materialEnabled else { return (0, .black) }
+        let tone = ReadableTone.resolve(style: style, scheme: scheme, renderingMode: .fullColor)
+        guard tone.enabled else { return (0, tone.scrimColor) }
         let settings = style.readable
         let imageID = style.photoName(at: date)
         let analysis = imageID.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
         let value = settings.scrim(auto: settings.autoScrim(analysis: analysis))
-        let dark = style.isExplicitlyDark ?? (scheme == .dark)
-        let requested = style.followsSystemText
-            ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
-            : style.textColor
-        let light = TextLegibility.luminance(requested) > 0.5
-        return (value, light ? .black : .white)
+        return (value, tone.scrimColor)
     }
 }
