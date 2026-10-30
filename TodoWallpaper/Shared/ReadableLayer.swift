@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 // MARK: - 蒙层（铺满全幅，画在背景层）
 

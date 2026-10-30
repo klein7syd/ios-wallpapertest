@@ -41,7 +41,7 @@ enum PhotoRepairChecks {
         for inset in [0.0, 8, 16, 24] {
             let heading = WidgetHeaderAppearance(text: "今天的计划", fontSize: 24, topInset: inset)
             let layout = WidgetHeaderLayout.make(style: heading, width: 332, maximumHeight: 82.8, measuredTitleWidth: 130, titleLineHeight: 30, measuredSummaryWidth: 64, summaryHeight: 15)
-            try require(layout.titleHeight == 30 && layout.titleY + layout.titleHeight <= layout.height && layout.titleY == inset, "Inset reserves full title height before adding top whitespace")
+            try require(layout.titleHeight == 30 && layout.titleY + layout.titleHeight <= layout.height && layout.titleY == 0, "Legacy topInset no longer participates in layout")
         }
         let black = WallpaperColor(red: 0, green: 0, blue: 0)
         var widget = WidgetAppearance(); widget.theme = .light; widget.backdrop = .solid; widget.panelColor = black
