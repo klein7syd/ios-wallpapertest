@@ -142,7 +142,8 @@ struct ReadableLayerDebugView: View {
 
             Text(sample.name).font(.caption2).foregroundStyle(.secondary)
             Text(String(format: "L %.2f  C %.2f  → %.2f",
-                        analysis.meanLuma, analysis.contrast, analysis.suggestedScrim))
+                        analysis.meanLuma, analysis.contrast,
+                        ReadableRules.scrim(meanLuma: analysis.meanLuma, contrast: analysis.contrast, isLightText: lightText)))
                 .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             Text(anchorSummary(sample: sample))
                 .font(.system(size: 9).monospacedDigit()).foregroundStyle(.secondary)
@@ -169,11 +170,12 @@ struct ReadableLayerDebugView: View {
         ])
     }
 
-    /// 三个锚点各自的 meanLuma 与 suggestedScrim
+    /// 三个锚点各自的亮度与当前文字颜色对应的蒙层建议值
     private func anchorSummary(sample: TestImageFactory.Sample) -> String {
         TextAnchor.allCases.map { value in
             let result = ImageAnalyzer.analyzeImage(sample.image, anchor: value)
-            return String(format: "%@ L%.2f/%.2f", value.title, result.meanLuma, result.suggestedScrim)
+            return String(format: "%@ L%.2f/%.2f", value.title, result.meanLuma,
+                ReadableRules.scrim(meanLuma: result.meanLuma, contrast: result.contrast, isLightText: lightText))
         }.joined(separator: "  ")
     }
 }

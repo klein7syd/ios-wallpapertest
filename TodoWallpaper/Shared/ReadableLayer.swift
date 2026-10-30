@@ -36,7 +36,7 @@ struct ScrimView: View {
     }
 
     private func coverHeight(_ height: Double) -> Double {
-        min(height, height * heightRatio + abs(extraInset))
+        ReadableRules.coverHeight(height, ratio: heightRatio, extraInset: extraInset)
     }
 
     private var stops: [Gradient.Stop] {
@@ -137,17 +137,17 @@ struct ReadableTone {
     var enabled: Bool
 
     static func resolve(style: WidgetAppearance, scheme: ColorScheme,
-                        renderingMode: WidgetRenderingMode) -> ReadableTone {
+                        renderingMode: WidgetRenderingMode, family: WidgetFamily = .systemMedium) -> ReadableTone {
         let dark = style.isExplicitlyDark ?? (scheme == .dark)
         let requested = style.followsSystemText
             ? (dark ? WallpaperColor() : WallpaperColor(red: 0, green: 0, blue: 0))
             : style.textColor
         // 0.179 是与黑、白对比度相等的分界点，粉/绿/浅蓝不再被判成深色
         let light = TextLegibility.luminance(requested) > 0.179
-        return ReadableTone(textColor: requested.swiftColor,
+        return ReadableTone(textColor: renderingMode == .fullColor ? requested.swiftColor : .primary,
                             isLightText: light,
                             scrimColor: light ? .black : .white,
-                            enabled: renderingMode == .fullColor)
+                            enabled: ReadableRules.permitsEffects(isFullColor: renderingMode == .fullColor, isAccessory: family.isReadableAccessory))
     }
 }
 
@@ -155,14 +155,30 @@ struct ReadableTone {
 
 enum ReadableResolver {
     /// 蒙层只在照片背景下出现；颜色跟文字亮度联动
-    static func scrim(style: WidgetAppearance, date: Date, scheme: ColorScheme) -> (value: Double, color: Color) {
+    static func scrim(style: WidgetAppearance, date: Date, scheme: ColorScheme,
+                      renderingMode: WidgetRenderingMode = .fullColor,
+                      family: WidgetFamily = .systemMedium) -> (value: Double, color: Color) {
         guard style.backdrop == .photo, !style.materialEnabled else { return (0, .black) }
-        let tone = ReadableTone.resolve(style: style, scheme: scheme, renderingMode: .fullColor)
+        let tone = ReadableTone.resolve(style: style, scheme: scheme, renderingMode: renderingMode, family: family)
         guard tone.enabled else { return (0, tone.scrimColor) }
         let settings = style.readable
         let imageID = style.photoName(at: date)
         let analysis = imageID.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
-        let value = settings.scrim(auto: settings.autoScrim(analysis: analysis))
+        let value = settings.scrim(auto: settings.autoScrim(analysis: analysis, isLightText: tone.isLightText))
         return (value, tone.scrimColor)
     }
+}
+
+extension WidgetFamily {
+    var isReadableAccessory: Bool {
+        switch self {
+        case .accessoryCircular, .accessoryRectangular, .accessoryInline: return true
+        default: return false
+        }
+    }
+}
+
+struct ReadableGeometryPreference: PreferenceKey {
+    static var defaultValue = ReadableContentGeometry()
+    static func reduce(value: inout ReadableContentGeometry, nextValue: () -> ReadableContentGeometry) { value = nextValue() }
 }

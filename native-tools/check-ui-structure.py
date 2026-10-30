@@ -90,6 +90,35 @@ content_section = widget[widget.index('@ViewBuilder private var contentControls'
 require('PreciseSlider(title: "行距"' in text_section and 'range: -10...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
 require(widget.index('Toggle("玻璃背景') < widget.index('Picker("明暗"'), 'Glass switch is the first theme setting')
 require('ReadableTone.resolve' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
+readable_rules = read('TodoWallpaper/Core/ReadableModels.swift')
+readable_layer = read('TodoWallpaper/Shared/ReadableLayer.swift')
+background = read('TodoWallpaper/Shared/WidgetBackgroundView.swift')
+store = read('TodoWallpaper/App/TodoStore.swift')
+require('import UIKit' not in readable_rules and 'enum ReadableRules' in readable_rules,
+    '可读性数值规则保持纯 Core，可由 macOS 原生检查直接运行')
+require('ReadableRules.coverHeight' in readable_layer and 'max(0, extraInset)' in readable_rules,
+    '负边距不会增加照片蒙层覆盖高度')
+mark_section = shared[shared.index('private func mark('):shared.index('private func title(')]
+require('.readableText(' in mark_section and 'enabled: tone.enabled' in mark_section,
+    '实际标记与文字共用阴影及效果门禁，保留位图缓存')
+header_section = shared[shared.index('private func header('):shared.index('@ViewBuilder private func task(')]
+require(header_section.count('.readableText(') == 2,
+    '标题和摘要各套一次文字阴影，不叠加重复摘要阴影')
+require('family.isReadableAccessory' in readable_layer and 'widgetRenderingMode' in background
+    and 'permitsEffects' in background and 'renderingMode: renderingMode, family: family' in extension,
+    '真实着色模式和锁屏 family 同时禁用背景蒙层与内容阴影')
+require('ReadableRules.insetRange' in widget and 'ReadableRules.inset(' in widget + shared
+    and 'ReadableGeometryPreference' in widget + shared and 'settings.anchor == .center ? 0' in shared,
+    '居中偏移以自然内容高度计算，滑条、切换锚点和渲染共用边界')
+require('WidgetContentLayout.make' in shared + background and 'contentGeometry: readableGeometry' in widget
+    and 'widgetContentMargins' in extension and 'contentDocument: entry.document' in extension,
+    '中心蒙层与文字共用实际内容几何和有效偏移，跨尺寸不沿用旧画布偏移')
+require('WallpaperColor.sRGB(UIColor(next))' in marker
+    and 'converted(to: space' in read('TodoWallpaper/Shared/TodoMarkerView.swift'),
+    '系统取色先转换 sRGB 再规范化，不重新解释 Display P3 分量')
+require('value.clampedForEditing()' in store and 'func setAppearance(_ value: TodoAppearance) -> Bool' in store
+    and store.index('appearanceError = appearanceStorageError', store.index('func setAppearance')) < store.index('guard accepted != appearance'),
+    '样式校验可修复数值且成功立即清校验错误，存储保护错误只在实际IO成功后清除')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

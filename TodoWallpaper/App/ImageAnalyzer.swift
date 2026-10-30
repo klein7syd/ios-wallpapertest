@@ -39,7 +39,7 @@ enum ImageAnalyzer {
             width: side, height: side,
             bitsPerComponent: 8,
             bytesPerRow: side * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
+            space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return .fallback }
 
@@ -73,19 +73,13 @@ enum ImageAnalyzer {
         let variance = lumas.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(lumas.count)
         let contrast = min(1, variance.squareRoot() / 0.35)
 
-        return ImageAnalysis(meanLuma: mean, contrast: contrast,
-                             suggestedScrim: suggestedScrim(meanLuma: mean, contrast: contrast))
+        return ImageAnalysis(meanLuma: mean, contrast: contrast)
     }
 
     /// 观感映射，调手感只改这一个函数
     static func suggestedScrim(meanLuma: Double, contrast: Double) -> Double {
-        var value = 0.25
-        value += 0.25 * min(1, meanLuma / 0.8)
-        value += 0.10 * contrast
-        if meanLuma < 0.25 {
-            value = min(value, 0.15)
-        }
-        return min(0.55, max(0.2, value))
+        // 调试兼容入口；实际渲染按当前文字亮度重算，不写入缓存。
+        ReadableRules.scrim(meanLuma: meanLuma, contrast: contrast, isLightText: true)
     }
 
     /// 三个锚点一次算完

@@ -185,14 +185,10 @@ struct StyleColorControl: View {
     ]
     private var color: Binding<Color> {
         Binding(get: { value.swiftColor }, set: { next in
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 1
-            if UIColor(next).getRed(&r, green: &g, blue: &b, alpha: &a) {
+            if let converted = WallpaperColor.sRGB(UIColor(next)) {
                 interaction.pulse("color." + title)
-                // 广色域取色会给出 <0 或 >1 的分量，必须截断，否则校验失败并锁死撤销
-                value = WallpaperColor(red: min(1, max(0, Double(r))),
-                                       green: min(1, max(0, Double(g))),
-                                       blue: min(1, max(0, Double(b))),
-                                       alpha: min(1, max(0, Double(a))))
+                // 先转换到存储约定的 sRGB，再夹取越界分量，避免把 P3 数值误当作 sRGB。
+                value = converted
             }
         })
     }

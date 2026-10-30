@@ -49,7 +49,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 字段表（只列已从源码确认的字段；完整默认值以源码为准）：
 
 `TodoAppearance`：`schemaVersion = 1`、`defaultMarker: TodoMarker`、`markerStyle: MarkerStyle`、`widget: WidgetAppearance`。
-`WidgetAppearance`：`theme`、`backdrop`、`panelColor`、`followsSystemText`、`textColor`、`font`、`weight`、`fontSize`(12…20)、`markerOverride: TodoMarker?`、`markerStyle`、`spacing`(-10…40)、`compact`、`maximumItems`(1…10)、`completed`、`completedTextStyle`、`completedTextColor`、`showsSeparators`、`header: WidgetHeaderAppearance?`、`backgroundPhotoName`、`backgroundCrop`、`backgroundPhotoOpacity`(0…1)、`photoRotation`、`systemMaterial`、`showsFooter`、`maximumTitleLines`(1…2)、`unifiedMarkers`、`hidesCompletedTasks`、`readableAnchor`、`readableIntensity`、`readableScrimOverride`(0…0.8)、`readableHeightRatio`(0.25…0.7)、`readableShadowPreset`、`readableEdgeInset`(-40…40)。
+`WidgetAppearance`：`theme`、`backdrop`、`panelColor`、`followsSystemText`、`textColor`、`font`、`weight`、`fontSize`(12…20)、`markerOverride: TodoMarker?`、`markerStyle`、`spacing`(-10…40)、`compact`、`maximumItems`(1…10)、`completed`、`completedTextStyle`、`completedTextColor`、`showsSeparators`、`header: WidgetHeaderAppearance?`、`backgroundPhotoName`、`backgroundCrop`、`backgroundPhotoOpacity`(0…1)、`photoRotation`、`systemMaterial`、`showsFooter`、`maximumTitleLines`(1…2)、`unifiedMarkers`、`hidesCompletedTasks`、`readableAnchor`、`readableIntensity`、`readableScrimOverride`(0…0.8)、`readableHeightRatio`(0.25…0.7)、`readableShadowPreset`、`readableEdgeInset`（居中存储允许有限值；顶部/底部兼容旧 -40…40，编辑与渲染夹取到 -12…40）。
 `WidgetHeaderAppearance`：`text`(≤40 无换行)、`fontSize`(12…32)、`color`、`followsTextColor`、`showsTitle`、`showsSummary`、`horizontalPosition`(0…1)、`topInset`(0…24，已不参与布局)。
 `ReadableSettings`：`anchor`、`intensity`、`scrimOverride: Double?`、`heightRatio`、`shadowPreset`、`edgeInset`。
 `WidgetAlbumRotation`：`title`(≤100)、`photos`(1…60)、`anchor: Date`、`enabled`。
@@ -73,7 +73,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 ## c. 关键调用链
 
-**改一个参数**：编辑页控件 → `widget.wrappedValue.xxx = …` → `TodoStore.setAppearance` → `validate()` → 内存赋值 → `appearanceDirty = true` → `scheduleAppearanceSave()`（800ms 去抖）→ `saveAppearance` → `AppearanceRepository.save` → `WidgetCenter.reloadTimelines`。拖动期间 `PreciseSlider` 调用 `editorInteraction.begin/end`，`TodoStore.beginAppearanceInteraction` 会 `defersAppearanceSave = true`，松手才落盘。
+**改一个参数**：编辑页控件 → `widget.wrappedValue.xxx = …` → `TodoStore.setAppearance` → `validate()`（失败则 `clampedForEditing()` 规范化数值并重试；语义错误仍拒绝）→ 成功立即清除校验错误，返回 Bool → 内存赋值 → `appearanceDirty = true` → `scheduleAppearanceSave()`（800ms 去抖）→ `saveAppearance` → `AppearanceRepository.save` → `WidgetCenter.reloadTimelines`。存储错误单独保留，实际 IO 成功才清除，避免同值 setter 隐藏损坏/未来版本文件保护。拖动期间 `PreciseSlider` 调用 `editorInteraction.begin/end`，`TodoStore.beginAppearanceInteraction` 会 `defersAppearanceSave = true`，松手才落盘。撤销检查接收结果，失败保留可重试历史。
 
 **选照片**：`PhotosPicker` → `selection.loadTransferable(Data)` → `WidgetPhotoStore.importPhoto`（缩到 1536、写 App Group）→ 若在选图处则 `ImageAnalyzer.analyzeAllAnchors` → `AppearanceStore.setAnalysis` → `widget.wrappedValue = next` → 落盘 + 刷新。相册：`AlbumReader.prepare`（逐张 `importPhoto`，当前也会算分析）。
 
@@ -87,13 +87,14 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 ## d. 可读性层
 
-- `ScrimView`：底部/顶部用 `LinearGradient`，三个 stop（1.0 / 0.45 / 0 倍强度），高度 = `高度 × heightRatio + |extraInset|`；居中用 `RadialGradient`（中心 `.center`，`endRadius = 高度 × 0.55`，按 `extraInset` 偏移）。
+- `ScrimView`：底部/顶部用 `LinearGradient`，三个 stop（1.0 / 0.45 / 0 倍强度），高度 = `min(高度, 高度 × heightRatio + max(0, extraInset))`；居中用 `RadialGradient`（中心 `.center`，`endRadius = 高度 × 0.55`，按有符号的 `extraInset` 偏移）。
 - `TextStyleModifier`：按 `ReadabilityIntensity` 取 `shadowOpacityMultiplier`（0.5/0.8/1.1）与 `shadowRadiusScale`（0.7/0.85/1.0）；配方来自 `ShadowRecipes`，默认 `lightTextRecipe = I`、`darkTextRecipe = J`。
-- 套了阴影的：标题栏文字、任务标题、日期、"N 未完成"、底部说明。未套的：行分隔线（画在行 overlay，不参与阴影链）、标记视图（`TodoMarkerView` 调用处没有加 `readableText`）。
+- 套了阴影的：标题栏文字、任务标题、日期、"N 未完成"、底部说明、标记视图；摘要只套一次。行分隔线画在行 overlay，不参与阴影链。文字、标记与背景使用同一 `ReadableRules.permitsEffects` 策略，实际着色模式以及锁屏 family 都禁用阴影和蒙层。
 - 颜色判断：`ReadableTone.resolve` 用线性亮度阈值 **0.179** 判定深浅并给出 `scrimColor`；`TodoWidgetContent.foreground` 与 `ReadableResolver.scrim` 都走它。第三处历史实现 `TextLegibility.readable` 仍在壁纸渲染中使用（未统一）。
-- 强度与 Scrim 优先级：`scrimOverride`（手动）> `autoScrim(analysis:) = suggestedScrim × 强度倍率`（clamp 0…0.8）> 无分析时 `ReadableDefaults.scrim = 0.4`。
+- 强度与 Scrim 优先级：`scrimOverride`（手动）> `autoScrim(analysis:isLightText:)`；后者根据原始亮度/对比度与当前文字深浅算基础值，再乘强度并夹取到 0…0.8。无分析时基础值为 0.4，弱/标准/强最终为 0.28/0.4/0.52。
 - `edgeInset`：顶部/底部锚点作为该方向的 padding（可为负）；居中锚点作为 `offset(y:)`。与 `header.topInset` 无耦合，后者已不参与布局。
-- `ImageAnalyzer`：缩到 32×32；取样行区间 bottom = 后 40%、top = 前 40%、center = 中间 40%（缓冲区第 0 行是顶部）；luma = 0.2126R+0.7152G+0.0722B（sRGB 近似，不转线性）；contrast = min(1, 标准差 / 0.35)；`suggestedScrim = 0.25 + 0.25×min(1, mean/0.8) + 0.10×contrast`，`mean < 0.25` 时取 ≤0.15，最终 clamp 0.2…0.55（**只对黑蒙层成立**，白蒙层尚未区分）。缓存：`AppearanceStore` 内存字典 + `NSLock`，键 `readable.analysis.<图片名>.<锚点>`，写入/删除时失效；Widget 进程不主动失效。
+- `ImageAnalyzer`：缩到 32×32；取样行区间 bottom = 后 40%、top = 前 40%、center = 中间 40%（缓冲区第 0 行是顶部）；luma = 0.2126R+0.7152G+0.0722B（sRGB 近似，不转线性）；contrast = min(1, 标准差 / 0.35)。`ReadableRules.scrim` 运行时计算：黑蒙层 `difficulty = min(1, mean/0.8)`，白蒙层 `difficulty = clamp((0.8-mean)/0.8, 0…1)`；基础值 `0.25 + 0.25×difficulty + 0.10×contrast`，黑蒙层 `mean < 0.25` 或白蒙层 `mean > 0.75` 时取 ≤0.15，最终夹取 0.2…0.55。`ImageAnalysis` 新写只含 `meanLuma`、`contrast`；旧 `suggestedScrim` 可缺省解码但不参与渲染。缓存：`AppearanceStore` 内存字典 + `NSLock`，键 `readable.analysis.<图片名>.<锚点>`，写入/删除时更新；Widget 进程不主动失效。
+- `StyleColorControl` 与标记颜色解算先用 CoreGraphics 转为 sRGB，再夹取 0…1，保留 alpha；不直接把 Display P3 数值解释为 sRGB。
 
 ## e. 布局与测量
 
@@ -120,7 +121,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 | 渐变比例 | 0.45 | `Core/ReadableModels.swift:ReadableDefaults` | 蒙层覆盖高度 |
 | Scrim 范围 | 0…0.8 | `Core/ReadableModels.swift:ReadableDefaults` | 手动滑条 |
 | 高度比范围 | 0.25…0.7 | `Core/ReadableModels.swift:ReadableDefaults` | 渐变范围滑条 |
-| edgeInset | -40…40 | `Core/ReadableModels.swift:ReadableDefaults` | 位置偏移 |
+| edgeInset | 顶/底 -12…40；居中 ±max(40, (画布高-自然文字高)/2) | `Core/ReadableModels.swift:ReadableRules.insetRange` | 位置偏移 |
 | 强度倍率 | 0.7/1.0/1.3 | `Core/ReadableModels.swift:ReadabilityIntensity` | 蒙层 |
 | 阴影不透明度倍率 | 0.5/0.8/1.1 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
 | 阴影半径缩放 | 0.7/0.85/1.0 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
@@ -156,12 +157,12 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 ### edgeInset 规则
 
-- 存储：`WidgetAppearance.readableEdgeInset: Double?`，`validate()` 允许 -40…40（`Core/TodoAppearance.swift`）。
-- 全局默认与范围常量：`ReadableDefaults.edgeInsetRange = -40...40`（`Core/ReadableModels.swift`）。
-- 滑条范围：顶部/底部 -12…40，居中 -40…40；实现在 `App/WidgetAppearanceEditor.swift` 的 `edgeRange` 计算属性，控件是标题页顶部的 `PreciseSlider`（`standard: 0`）。
-- 切换锚点时的 clamp：`readableAnchor` 的 setter 里，居中用 `max(-40, min(40, v))`，其余用 `max(-12, min(40, v))`（`App/WidgetAppearanceEditor.swift`）。
+- 存储：`WidgetAppearance.readableEdgeInset: Double?`；居中校验要求有限值，顶部/底部保留旧 -40…40 文件的解码校验兼容（`Core/TodoAppearance.swift`）。
+- 统一边界：`ReadableRules.insetRange` 顶部/底部返回 -12…40，居中返回 `±max(40, (canvasHeight-textHeight)/2)`；`ReadableRules.inset` 同时处理夹取和非有限值。
+- 滑条范围、数值 setter、切换锚点、几何改变后的夹取以及真实渲染都调用上述规则。`TodoWidgetContent` 对居中使用未扣除偏移的自然内容高度，利用 `ReadableGeometryPreference` 回传编辑器；不会在 `body` 直接改业务状态。
 - 作用位置：顶部锚点 = `padding(.top, edgeInset)`；底部锚点 = `padding(.bottom, edgeInset)`；居中锚点 = `offset(y: edgeInset)`，均作用在 `TodoWidgetContent.body` 的整个文字块上（含标题栏、列表与底部说明）。
-- 与蒙层的关系：`WidgetBackgroundView` 把 `edgeInset` 作为 `scrimExtraInset` 传给 `ScrimView`，只用于放大渐变覆盖高度；负值按 0 计。
+- 与蒙层的关系：`WidgetBackgroundView` 把 `edgeInset` 作为 `scrimExtraInset` 传给 `ScrimView`；顶部/底部覆盖高度的负增量按 0 计，居中径向蒙层保留偏移方向。
+- 中心蒙层必须与文字使用相同有效偏移：预览传入 Preference 几何，Widget 背景按真实 `widgetContentMargins` 换算内容区域并复用 `WidgetContentLayout.make`，不会直接沿用另一尺寸保存的中心偏移。
 - 与 `header.topInset` 的关系：后者已不参与布局（`WidgetHeaderLayout.titleY = 0`），仅保留解码兼容。
 
 ## j. 线程与并发

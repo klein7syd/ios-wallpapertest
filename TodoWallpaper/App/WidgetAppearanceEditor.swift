@@ -33,6 +33,7 @@ struct WidgetAppearanceEditor: View {
     @State private var previewDay = 0
     private let photos = WidgetPhotoStore()
     @State private var previousWidgetMarker: TodoMarker?
+    @State private var readableGeometry = ReadableContentGeometry(canvasHeight: 138, textHeight: 138)
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var widget: Binding<WidgetAppearance> {
@@ -179,6 +180,10 @@ struct WidgetAppearanceEditor: View {
         Task {
             do {
                 try await edits.undo(read: { editState }) { previous, expected in
+                    var restored = store.appearance
+                    restored.widget = previous.style
+                    restored = restored.clampedForEditing()
+                    try restored.validate()
                     let changed = previous.markers.filter { old in
                         expected.markers.first(where: { $0.id == old.id })?.marker != old.marker
                     }
@@ -193,7 +198,9 @@ struct WidgetAppearanceEditor: View {
                     try store.updateMarkers(changed.map { old in
                         TodoMarkerUpdate(id: old.id, expected: expected.markers.first(where: { $0.id == old.id })?.marker, marker: old.marker)
                     })
-                    if previous.style != expected.style { widget.wrappedValue = previous.style }
+                    if previous.style != expected.style, !store.setAppearance(restored) {
+                        throw AppearanceError.invalidStyle
+                    }
                 }
             } catch { self.error = "未能撤销：\(error.localizedDescription)" }
         }
@@ -222,6 +229,10 @@ struct WidgetAppearanceEditor: View {
                     appearance: store.appearance, error: store.loadError, family: family, interactive: false,
                     onPreviewToggle: { id in if let item = store.items.first(where: { $0.id == id }) { preview.toggle(item) } },
                     onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID, onPreviewHeader: { tool = .header })
+                    .onPreferenceChange(ReadableGeometryPreference.self) { geometry in
+                        readableGeometry = geometry
+                        clampReadableInset(geometry: geometry)
+                    }
                     .padding(16)
                     .frame(width: family.width, height: family.height)
                     .allowsHitTesting(!cropPhoto)
@@ -234,7 +245,8 @@ struct WidgetAppearanceEditor: View {
                             WidgetBackgroundView(style: store.appearance.widget, date: photoDate,
                                                  scrim: readable.value, scrimAnchor: store.appearance.widget.readable.anchor,
                                                  scrimHeightRatio: store.appearance.widget.readable.heightRatio,
-                                                 scrimColor: readable.color, scrimExtraInset: store.appearance.widget.readable.edgeInset)
+                                                 scrimColor: readable.color, scrimExtraInset: store.appearance.widget.readable.edgeInset,
+                                                 contentGeometry: readableGeometry)
                         }
                     }
                     .environment(\.colorScheme, scheme)
@@ -377,14 +389,16 @@ struct WidgetAppearanceEditor: View {
     private var autoScrim: Double {
         let id = store.appearance.widget.photoName(at: photoDate)
         let analysis = id.flatMap { AppearanceStore.shared.analysis(for: $0, anchor: settings.anchor) }
-        return settings.autoScrim(analysis: analysis)
+        let tone = ReadableTone.resolve(style: store.appearance.widget, scheme: scheme, renderingMode: .fullColor)
+        return settings.autoScrim(analysis: analysis, isLightText: tone.isLightText)
     }
     private var readableAnchor: Binding<TextAnchor> {
         Binding(get: { settings.anchor }, set: { next in
-            widget.wrappedValue.readableAnchor = next
-            let current = widget.wrappedValue.readable.edgeInset
-            let clamped = next == .center ? max(-40, min(40, current)) : max(-12, min(40, current))
-            if clamped != current { widget.wrappedValue.readableEdgeInset = clamped }
+            var value = widget.wrappedValue
+            value.readableAnchor = next
+            value.readableEdgeInset = ReadableRules.inset(value.readable.edgeInset, anchor: next,
+                canvasHeight: readableGeometry.canvasHeight, textHeight: readableGeometry.textHeight)
+            widget.wrappedValue = value
         })
     }
     private var readableIntensity: Binding<ReadabilityIntensity> {
@@ -416,10 +430,18 @@ struct WidgetAppearanceEditor: View {
         }
     }
     private var edgeRange: ClosedRange<Double> {
-        settings.anchor == .center ? -40...40 : -12...40
+        ReadableRules.insetRange(anchor: settings.anchor, canvasHeight: readableGeometry.canvasHeight, textHeight: readableGeometry.textHeight)
     }
     private var edgeBinding: Binding<Double> {
-        Binding(get: { settings.edgeInset }, set: { widget.wrappedValue.readableEdgeInset = $0 })
+        Binding(get: { ReadableRules.inset(settings.edgeInset, anchor: settings.anchor,
+                    canvasHeight: readableGeometry.canvasHeight, textHeight: readableGeometry.textHeight) },
+                set: { widget.wrappedValue.readableEdgeInset = ReadableRules.inset($0, anchor: settings.anchor,
+                    canvasHeight: readableGeometry.canvasHeight, textHeight: readableGeometry.textHeight) })
+    }
+    private func clampReadableInset(geometry: ReadableContentGeometry) {
+        let clamped = ReadableRules.inset(settings.edgeInset, anchor: settings.anchor,
+            canvasHeight: geometry.canvasHeight, textHeight: geometry.textHeight)
+        if clamped != settings.edgeInset { widget.wrappedValue.readableEdgeInset = clamped }
     }
     private func reloadWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)

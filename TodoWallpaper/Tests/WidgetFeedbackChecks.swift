@@ -68,6 +68,62 @@ enum WidgetFeedbackChecks {
         _ = try repository.setCompleted(id: id, completed: true)
         let stored = try repository.load().items[0]
         try require(stored.id == id && stored.marker == item.marker && stored.isCompleted, "Per-task preview-editor marker survives real persistence and intent-equivalent completion")
-        print("PASS: Widget feedback — legacy appearance, local-only preview completion/reset, custom Emoji and thin-circle completion, five text effects, full marker/gap slider ranges, Dynamic Type/reduced-space row budgets and persisted per-task marker/identity.")
+        try require(ReadableRules.coverHeight(400, ratio: 0.45, extraInset: -12) == 180,
+                    "Negative content inset cannot enlarge the photo scrim")
+        try require(ReadableRules.coverHeight(400, ratio: 0.45, extraInset: 12) == 192,
+                    "Positive content inset extends the photo scrim")
+        for light in [false, true] {
+            let easy = ReadableRules.scrim(meanLuma: light ? 0.1 : 0.9, contrast: 0.5, isLightText: light)
+            let difficult = ReadableRules.scrim(meanLuma: light ? 0.9 : 0.1, contrast: 0.5, isLightText: light)
+            try require(difficult > easy, "Black and white scrims both strengthen toward the background that reduces text contrast")
+        }
+        var readable = ReadableSettings()
+        let legacyAnalysis = try JSONDecoder().decode(ImageAnalysis.self, from: JSONSerialization.data(withJSONObject:
+            ["meanLuma": 0.15, "contrast": 0.4, "suggestedScrim": 0.8]))
+        let changedLegacy = ImageAnalysis(meanLuma: 0.15, contrast: 0.4)
+        try require(readable.autoScrim(analysis: legacyAnalysis, isLightText: false) == readable.autoScrim(analysis: changedLegacy, isLightText: false),
+                    "Legacy cached suggestion never overrides runtime text-tone analysis")
+        let decodedAnalysis = try JSONDecoder().decode(ImageAnalysis.self, from: JSONEncoder().encode(legacyAnalysis))
+        let encodedAnalysis = try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacyAnalysis)) as? [String: Any]
+        try require(decodedAnalysis.meanLuma == legacyAnalysis.meanLuma && decodedAnalysis.contrast == legacyAnalysis.contrast
+                    && decodedAnalysis.suggestedScrim == nil && encodedAnalysis?["suggestedScrim"] == nil,
+                    "Existing image-analysis JSON remains decodable and new caches store only raw analysis")
+        var strengths: [Double] = []
+        for strength in ReadabilityIntensity.allCases {
+            readable.intensity = strength
+            strengths.append(readable.autoScrim(analysis: legacyAnalysis, isLightText: false))
+        }
+        try require(strengths[0] < strengths[1] && strengths[1] < strengths[2], "All three runtime scrim intensities remain distinct")
+        for fullColor in [false, true] { for accessory in [false, true] {
+            try require(ReadableRules.permitsEffects(isFullColor: fullColor, isAccessory: accessory) == (fullColor && !accessory),
+                        "Tinted and lock-screen content cannot receive photo scrims or shadows")
+        } }
+        try require(ReadableRules.insetRange(anchor: .center, canvasHeight: 350, textHeight: 90) == -130...130,
+                    "Centered short content can move across the available canvas")
+        try require(ReadableRules.insetRange(anchor: .center, canvasHeight: 138, textHeight: 120) == -40...40,
+                    "Centered dense content retains the minimum movement range")
+        try require(ReadableRules.inset(500, anchor: .center, canvasHeight: 350, textHeight: 90) == 130
+                    && ReadableRules.inset(130, anchor: .top, canvasHeight: 350, textHeight: 90) == 40,
+                    "Slider, anchor changes and rendering share the same inset clamp")
+        var outside = TodoAppearance()
+        outside.widget.readableAnchor = .top; outside.widget.readableEdgeInset = -40
+        let legacyInset = try JSONDecoder().decode(TodoAppearance.self, from: JSONEncoder().encode(outside))
+        try legacyInset.validate()
+        try require(legacyInset.widget.readableEdgeInset == -40 && legacyInset.clampedForEditing().widget.readableEdgeInset == -12,
+                    "Previously valid negative inset files still load while new editing uses the narrower safe range")
+        outside.widget.readableAnchor = .center; outside.widget.readableEdgeInset = 130
+        try outside.validate()
+        outside.widget.fontSize = 50; outside.widget.textColor.red = 1.2
+        outside.widget.markerStyle.gap = -2; outside.widget.backgroundCrop = PhotoCrop(zoom: 8, panX: .nan)
+        let repaired = outside.clampedForEditing()
+        try repaired.validate()
+        try require(repaired.widget.fontSize == 20 && repaired.widget.textColor.red == 1
+                    && repaired.widget.markerStyle.gap == 0 && repaired.widget.photoCrop.zoom == 4
+                    && repaired.widget.photoCrop.panX == 0 && repaired.widget.readableEdgeInset == 130,
+                    "Numeric repair keeps finite centered positions while normalizing nested editing values")
+        outside.schemaVersion = 99; outside.defaultMarker = TodoMarker(kind: .emoji, emoji: "invalid")
+        try require(outside.clampedForEditing().schemaVersion == 99 && outside.clampedForEditing().defaultMarker.emoji == "invalid",
+                    "Numeric repair cannot silently replace schema or semantic marker input")
+        print("PASS: Widget feedback — legacy appearance and analysis, direct completion, marker sizing, row budgets, tone-aware scrims, effect exclusions, dynamic insets and safe numeric normalization.")
     }
 }

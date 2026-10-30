@@ -16,3 +16,13 @@ Public source-only personal project. Windows+iPhone, free Apple Account, macOS G
 CI executes actual production native rendering and persistence checks, packages unsigned ARM64 App+Widget IPA with unchanged R1 scripts. Compilation, signing, installation and device acceptance remain separate. The UI feedback revision awaits actual iPhone acceptance; compilation and source/state checks cannot prove the scrolling fix. Docs-only evidence commits use `[skip ci]`.
 
 The native TabView has four root pages; The 0.4.3 refinement keeps the system Tab Bar visible during wallpaper editing and retires the circular Dock. Source published while Public may be copied/cached even if made Private later.
+
+## 第1组：可读性、颜色与编辑状态修复
+
+负边距曾通过绝对值扩大照片蒙层；现在顶部/底部只计正增量。标记补上与文字相同的阴影，摘要删除重复阴影，并让真实着色模式与锁屏 family 同时禁用阴影和蒙层。位图标记缓存、任务完成行为与静态壁纸完成逻辑保持原有职责。
+
+旧分析把黑蒙层建议值与图片绑定，切换文字深浅后不适用。现在缓存仅写原始亮度与对比度，黑/白蒙层通过 Core 纯函数按当前文字颜色运行时计算；旧 `suggestedScrim` 只用于兼容解码。系统取色先通过 CoreGraphics 转换到 sRGB，再夹取分量并保留透明度。
+
+居中偏移不再固定在 ±40：以未扣除偏移的自然内容高度计算 `±max(40, (画布高-文字高)/2)`，预览通过 Preference 回传几何，滑条、setter、锚点切换和渲染共用边界。持久化仍接收旧顶部/底部 -40 值，避免历史合法文件被拒读。样式校验失败会规范化数值并重试，成功立即清除校验错误；存储和未来版本保护错误只在实际 IO 成功后清除。撤销检查接收结果，防止失败后误吞历史。
+
+检查变更原因：在已有 `WidgetFeedbackChecks` 加入蒙层方向、负边距、动态范围与历史 JSON 检查，在 `NativeUIProbe` 加入 P3 转换色值、真实背景/标记像素、存储错误保护和撤销检查，并在 `check-ui-structure.py` 固化共享规则及模式门禁。上述文件改变的是实际生产调用链，因此受保护源码清单需要审查后更新内容哈希，不能绕过或删除保护检查。当前组的 iOS 编译、原生检查与真机结果应分别以本次实际运行证据为准。
