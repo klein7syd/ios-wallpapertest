@@ -10,6 +10,8 @@ final class TodoStore: ObservableObject {
     @Published private(set) var canRecover = false
     @Published private(set) var appearance = TodoAppearance()
     @Published private(set) var appearanceError: String?
+    @Published private(set) var analysisRevision = 0
+    @Published private(set) var isAppearanceInteracting = false
     private var appearanceStorageError: String?
     private let appearanceRepository: AppearanceRepository?
     private var repository: TodoRepository?
@@ -17,11 +19,28 @@ final class TodoStore: ObservableObject {
     private var appearanceDirty = false
     private var defersAppearanceSave = false
     private let usesSharedStorage: Bool
+    private let analysisDirectory: URL?
+    private let analysisCache: AppearanceStore
+    private var analysisTask: Task<Void, Never>?
+    private var analysisGeneration = 0
+    private var analysisSystemDark = false
+    private var analysisNeedsInvalidation = false
+    private var rescanAnalysisPending = false
+    private var analysisObserver: PhotoAnalysisRequestObserver?
+    private var analysisPreferredName: String?
+    private var analysisPreferredAspect: Double?
 
-    init(repository: TodoRepository? = nil, appearanceRepository: AppearanceRepository? = nil) {
+    init(repository: TodoRepository? = nil, appearanceRepository: AppearanceRepository? = nil,
+         analysisDirectory: URL? = nil, analysisCache: AppearanceStore = .shared) {
         self.repository = repository
         self.appearanceRepository = appearanceRepository
         usesSharedStorage = repository == nil
+        self.analysisDirectory = analysisDirectory; self.analysisCache = analysisCache
+        if usesSharedStorage {
+            analysisObserver = PhotoAnalysisRequestObserver { [weak self] in
+                Task { @MainActor [weak self] in self?.resumePhotoAnalysis() }
+            }
+        }
     }
 
     func reload() {
@@ -56,19 +75,25 @@ final class TodoStore: ObservableObject {
         }
         appearanceError = appearanceStorageError
         guard accepted != appearance else { return true }
+        let previous = appearance.widget
         appearance = accepted
         appearanceDirty = true
         appearanceTask?.cancel()
         if !defersAppearanceSave { scheduleAppearanceSave() }
+        schedulePhotoAnalysis(invalidating: analysisContextChanged(previous, accepted.widget))
         return true
     }
     func beginAppearanceInteraction() {
         defersAppearanceSave = true
+        isAppearanceInteracting = true
+        cancelPhotoAnalysis()
         appearanceTask?.cancel(); appearanceTask = nil
     }
     func endAppearanceInteraction() {
         defersAppearanceSave = false
+        isAppearanceInteracting = false
         if appearanceDirty { scheduleAppearanceSave() }
+        schedulePhotoAnalysis()
     }
     private func scheduleAppearanceSave() {
         appearanceTask?.cancel()
@@ -84,6 +109,7 @@ final class TodoStore: ObservableObject {
     }
     func flushAppearance() {
         defersAppearanceSave = false
+        if isAppearanceInteracting { isAppearanceInteracting = false; schedulePhotoAnalysis() }
         guard appearanceDirty else { return }
         appearanceTask?.cancel(); appearanceTask = nil
         do { try saveAppearance(appearance) } catch { recordAppearanceStorageError(error) }
@@ -95,7 +121,10 @@ final class TodoStore: ObservableObject {
     }
     func reloadAppearance() {
         guard usesSharedStorage || appearanceRepository != nil else { return }
-        do { appearance = try activeAppearanceRepository().load(); appearanceStorageError = nil; appearanceError = nil }
+        do {
+            appearance = try activeAppearanceRepository().load(); appearanceStorageError = nil; appearanceError = nil
+            resumePhotoAnalysis()
+        }
         catch { recordAppearanceStorageError(error) }
     }
     func recoverAppearance() throws {
@@ -129,6 +158,75 @@ final class TodoStore: ObservableObject {
     private func recordAppearanceStorageError(_ error: Error) {
         appearanceStorageError = error.localizedDescription
         appearanceError = appearanceStorageError
+    }
+    func updateAnalysisSystemTheme(dark: Bool) {
+        guard dark != analysisSystemDark else { return }
+        analysisSystemDark = dark
+        schedulePhotoAnalysis(invalidating: appearance.widget.theme == .system && appearance.widget.photoOpacity < 1)
+    }
+    func prioritizePhotoAnalysis(photoName: String?, canvasAspect: Double) {
+        guard photoName != analysisPreferredName || canvasAspect != analysisPreferredAspect else { return }
+        analysisPreferredName = photoName; analysisPreferredAspect = canvasAspect
+        schedulePhotoAnalysis()
+    }
+    func resumePhotoAnalysis() {
+        if analysisTask != nil { rescanAnalysisPending = true; return }
+        schedulePhotoAnalysis(debounce: false)
+    }
+    func forgetPhotoAnalysis(_ names: [String]) {
+        cancelPhotoAnalysis()
+        let cache = analysisCache
+        Task(priority: .utility) { await PhotoAnalysisService.shared.removeAnalysis(for: names, cache: cache) }
+    }
+    private func cancelPhotoAnalysis() {
+        analysisGeneration += 1; analysisTask?.cancel(); analysisTask = nil
+    }
+    private func analysisContextChanged(_ previous: WidgetAppearance, _ next: WidgetAppearance) -> Bool {
+        previous.photoCrop != next.photoCrop || previous.photoOpacity != next.photoOpacity
+            || (previous.theme != next.theme && next.photoOpacity < 1)
+    }
+    private func analysisNames(_ style: WidgetAppearance) -> [String] {
+        guard style.backdrop == .photo, !style.materialEnabled else { return [] }
+        var names = style.photoRotation?.enabled == true ? style.photoRotation?.photos ?? [] : []
+        if let name = style.backgroundPhotoName, !names.contains(name) { names.append(name) }
+        if let today = style.photoName(at: .now) { names.removeAll { $0 == today }; names.insert(today, at: 0) }
+        return names
+    }
+    private func schedulePhotoAnalysis(invalidating: Bool = false, debounce: Bool = true) {
+        guard usesSharedStorage || analysisDirectory != nil else { return }
+        cancelPhotoAnalysis()
+        analysisNeedsInvalidation = analysisNeedsInvalidation || invalidating
+        let style = appearance.widget, names = analysisNames(appearance.widget)
+        guard !isAppearanceInteracting, !names.isEmpty else { return }
+        let generation = analysisGeneration, invalidate = analysisNeedsInvalidation
+        let cache = analysisCache, explicitDirectory = analysisDirectory, systemDark = analysisSystemDark
+        let preferredName = analysisPreferredName, preferredAspect = analysisPreferredAspect
+        analysisTask = Task(priority: .utility) { [weak self] in
+            var succeeded = false
+            do {
+                if debounce { try await Task.sleep(for: .milliseconds(400)) }
+                try Task.checkCancellation()
+                let directory = try explicitDirectory ?? TodoSharedStorage.sharedDirectory()
+                try await PhotoAnalysisService.shared.runBatch(style: style, systemDark: systemDark,
+                    invalidating: invalidate, directory: directory, cache: cache,
+                    preferredPhotoName: preferredName, preferredAspect: preferredAspect) { [weak self] reloadWidget in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.analysisGeneration == generation else { return }
+                        if reloadWidget { WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind) }
+                        else { self.analysisRevision += 1 }
+                    }
+                }
+                succeeded = true
+            } catch is CancellationError { }
+            catch { /* 不把分析失败写成样式校验错误；缺失分析继续安全回退。 */ }
+            guard let self, self.analysisGeneration == generation else { return }
+            if succeeded { self.analysisNeedsInvalidation = false; self.analysisRevision += 1 }
+            self.analysisTask = nil
+            if self.rescanAnalysisPending {
+                self.rescanAnalysisPending = false
+                self.schedulePhotoAnalysis(debounce: false)
+            }
+        }
     }
 
     private func accept(_ document: TodoDocument) {

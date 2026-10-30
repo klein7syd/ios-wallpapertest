@@ -1,7 +1,7 @@
 import Foundation
 
 /// 文字锚点：同时决定文字对齐与蒙层方向
-enum TextAnchor: String, Codable, CaseIterable, Identifiable {
+enum TextAnchor: String, Codable, CaseIterable, Identifiable, Sendable {
     case top, center, bottom
 
     var id: String { rawValue }

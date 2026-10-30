@@ -171,6 +171,61 @@ enum NativeUIProbe {
             editor.updateItems([]); editor.updateAppearance(TodoAppearance()); await editor.saveNow()
             let sharedPhotoFixture = output.appendingPathComponent("widget-photo-fixture", isDirectory: true)
             let widgetPhoto = try await WidgetPhotoStore().importPhoto(sample, sharedDirectory: sharedPhotoFixture)
+            let secondAnalysisPhoto = try await WidgetPhotoStore().importPhoto(sample, sharedDirectory: sharedPhotoFixture)
+            let analysisSuite = "NativeUIProbe.Analysis.\(UUID().uuidString)"
+            guard let analysisDefaults = UserDefaults(suiteName: analysisSuite) else { throw AppearanceError.unreadable }
+            defer { analysisDefaults.removePersistentDomain(forName: analysisSuite) }
+            let analysisCache = AppearanceStore(defaults: analysisDefaults,
+                requestDirectory: sharedPhotoFixture.appendingPathComponent("AnalysisRequests", isDirectory: true))
+            let analysisStore = TodoStore(repository: TodoRepository(directoryURL: sharedPhotoFixture),
+                appearanceRepository: AppearanceRepository(directory: sharedPhotoFixture),
+                analysisDirectory: sharedPhotoFixture, analysisCache: analysisCache)
+            analysisStore.beginAppearanceInteraction()
+            var analysisLook = TodoAppearance(); analysisLook.widget.backdrop = .photo
+            analysisLook.widget.backgroundPhotoName = widgetPhoto
+            analysisLook.widget.photoRotation = WidgetAlbumRotation(title: "分析调度", photos: [widgetPhoto, secondAnalysisPhoto], anchor: .now)
+            try require(analysisStore.setAppearance(analysisLook), "Photo analysis fixture is a valid editing state")
+            try await Task.sleep(for: .milliseconds(450))
+            try require(analysisStore.analysisRevision == 0 && analysisCache.knownRequests().isEmpty,
+                        "Continuous interaction never starts analysis even after the debounce duration")
+            analysisStore.endAppearanceInteraction()
+            try await Task.sleep(for: .milliseconds(150))
+            try require(analysisStore.analysisRevision == 0, "The 400ms delay begins after interaction ends")
+            analysisStore.beginAppearanceInteraction()
+            analysisLook.widget.backgroundCrop = PhotoCrop(zoom: 2, panX: 0.5)
+            try require(analysisStore.setAppearance(analysisLook), "A newer crop supersedes the pending generation")
+            analysisStore.endAppearanceInteraction()
+            let actualRequest = analysisLook.widget.analysisRequest(photoName: secondAnalysisPhoto, canvasAspect: 1.83, darkBackground: false)
+            analysisCache.registerMissing(actualRequest)
+            analysisStore.resumePhotoAnalysis()
+            for _ in 0..<70 {
+                if analysisCache.contains(actualRequest) && analysisCache.knownRequests().count == 8 { break }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            try require(analysisStore.analysisRevision > 0 && analysisCache.contains(actualRequest)
+                        && analysisCache.knownRequests().count == 8
+                        && analysisCache.knownRequests().allSatisfy { $0.crop == PhotoCrop(zoom: 2, panX: 0.5) },
+                        "Observable results refresh after debounce; a late actual-aspect miss rescans both album photos without stale-generation output")
+            analysisStore.beginAppearanceInteraction()
+            report["photo_analysis_interaction_debounce_generation_and_actual_aspect"] = "passed"
+            var snapshotStyle = analysisLook.widget
+            snapshotStyle.followsSystemText = false; snapshotStyle.textColor = WallpaperColor()
+            let snapshotRequest = snapshotStyle.analysisRequest(photoName: widgetPhoto, canvasAspect: 1.83, darkBackground: false)
+            let snapshotAnalysis = ImageAnalysis(meanLuma: 0.9, contrast: 0.5)
+            let snapshot = [snapshotRequest.cacheID + "." + snapshotStyle.readable.anchor.rawValue: snapshotAnalysis]
+            AppearanceStore.shared.clearMemoryCache()
+            let snapshotScrim = ReadableResolver.scrim(style: snapshotStyle, date: .now, scheme: .light,
+                canvasAspect: 1.83, preparedAnalyses: snapshot)
+            try require(abs(snapshotScrim.value - snapshotStyle.readable.autoScrim(analysis: snapshotAnalysis)) < 0.000000001,
+                        "A prepared Widget analysis snapshot survives another provider clearing the process cache")
+            let snapshotValues = Dictionary(uniqueKeysWithValues: TextAnchor.allCases.map { ($0, snapshotAnalysis) })
+            try require(AppearanceStore.shared.setAnalysis(snapshotValues, for: snapshotRequest), "Snapshot-isolation fixture warms a distinct global result")
+            let emptySnapshotScrim = ReadableResolver.scrim(style: snapshotStyle, date: .now, scheme: .light,
+                canvasAspect: 1.83, preparedAnalyses: [:])
+            let liveCacheScrim = ReadableResolver.scrim(style: snapshotStyle, date: .now, scheme: .light, canvasAspect: 1.83)
+            AppearanceStore.shared.removeAnalysis(for: widgetPhoto)
+            try require(abs(emptySnapshotScrim.value - 0.4) < 0.000000001 && liveCacheScrim.value > 0.4,
+                        "An explicitly empty entry snapshot falls back safely instead of borrowing mutable global cache")
             guard let decodedPhoto = WidgetPhotoCache.image(named: widgetPhoto, sharedDirectory: sharedPhotoFixture) else {
                 throw NSError(domain: "WidgetPhotoReadback", code: 1)
             }

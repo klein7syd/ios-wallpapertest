@@ -1,6 +1,6 @@
 {
   "TodoWallpaper/App/Info.plist": "88ac0204c8ffc3e0be07ad35e4078c5ba104781e157d43907618f157014bf36a",
-  "TodoWallpaper/App/TodoStore.swift": "58b6a764061e86258a0ad1b039bdb195a05ef5cd7ea9fea62336d9232ef4c19e",
+  "TodoWallpaper/App/TodoStore.swift": "5ba7eeab9da079f1b49e1fd076d56c58d9cd5ed5ba7f184ee0f1dba3820c3d7e",
   "TodoWallpaper/App/TodoWallpaper.entitlements": "74d082a37edd0beb507296d3e97832c8241925891dac15352ebe7fc6cc9c535b",
   "TodoWallpaper/Core/AppearanceRepository.swift": "e715988e96aca814c6bc2033492bb3831bcaa6b2cfc3754e5551d53adfb9ef77",
   "TodoWallpaper/Core/NativeTypography.swift": "472269840a681966a4cc85ff449d8e28e83c573c29a9db4b04e1b511bcf19666",

@@ -122,6 +122,39 @@ require('WallpaperColor.sRGB(UIColor(next))' in marker
 require('value.clampedForEditing()' in store and 'func setAppearance(_ value: TodoAppearance) -> Bool' in store
     and store.index('appearanceError = appearanceStorageError', store.index('func setAppearance')) < store.index('guard accepted != appearance'),
     '样式校验可修复数值且成功立即清校验错误，存储保护错误只在实际IO成功后清除')
+analysis_service = read('TodoWallpaper/App/PhotoAnalysisService.swift')
+analysis_cache = read('TodoWallpaper/Shared/AppearanceStore.swift')
+analysis_request = read('TodoWallpaper/Core/PhotoAnalysisRequest.swift')
+require('import UIKit' not in analysis_service and 'CGImageSourceCreateThumbnailAtIndex' in analysis_service
+    and 'kCGImageSourceThumbnailMaxPixelSize: 128' in analysis_service and 'let side = 32' in analysis_service
+    and 'qos: .utility' in analysis_service and 'Task.detached' not in analysis_service,
+    '统一分析服务使用后台utility串行ImageIO128缩图与一次CG32合成，不解码UIKit原图或并发分图')
+require('UIImage(data:' not in widget and 'analyzeAllAnchors' not in widget
+    and 'analyzeAllAnchors' not in read('TodoWallpaper/App/WidgetAlbumPicker.swift'),
+    '单图和相册提交统一管线，不在选图MainActor或相册导入中分析原图')
+require('canvasAspect' in analysis_request and 'opacity == 1 ? false' in analysis_request
+    and all(value in analysis_request for value in ['crop.zoom', 'crop.panX', 'crop.panY', 'opacity, canvasAspect']),
+    '分析请求包含实际裁剪、透明度、底色与画布比例，完全不透明时明暗共用')
+require(extension.count('AppearanceStore.shared.clearMemoryCache()') == 2
+    and 'registerMissing(request)' in extension and 'preparedAnalyses: entry.analyses' in extension
+    and 'PhotoAnalysisService' not in extension and 'ImageAnalyzer' not in extension,
+    'Provider每次起始清内存并登记真实比例缺失，entry携分析快照，Widget不执行分析')
+require('cachedAnalysis(for:' in readable_layer and 'cachedAnalysis(for:' in widget
+    and 'registerMissing' not in readable_layer and 'PhotoAnalysisService' not in readable_layer,
+    '真实内容与自动数值只读取已暖缓存或entry快照，body没有分析、写队列或磁盘读取')
+require('AnalysisRequests' in analysis_cache and 'AnalysisCache' in analysis_cache and '.atomic' in analysis_cache
+    and 'schemaVersion == 1' in analysis_cache and 'expectedVersion' in analysis_cache
+    and 'private let fileLock = NSLock()' in analysis_cache and 'memoryRevision' in analysis_cache,
+    '跨进程请求和三anchor结果均原子发布，短内存锁与后台IO锁分离并防删除后复活')
+require('PhotoAnalysisRequestObserver' in store and 'if usesSharedStorage {' in store
+    and 'rescanAnalysisPending = true; return' in store and '.milliseconds(400)' in store
+    and 'if succeeded { self.analysisNeedsInvalidation = false; self.analysisRevision += 1 }' in store
+    and 'runBatch(style:' in store and 'knownRequests()' not in store,
+    'App生命周期接请求事件，同批次晚到请求不重入取消，交互结束去抖并发布缓存命中结果')
+require('bash native-tools/check-photo-analysis.sh' in read('native-tools/check-native.sh')
+    and 'ranOnMainThread' in read('TodoWallpaper/Tests/PhotoAnalysisChecks.swift')
+    and 'photo_analysis_interaction_debounce_generation_and_actual_aspect' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
+    '完整native门禁执行独立CG分析和iOS生产交互调度回归，不仅检查源码')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')
