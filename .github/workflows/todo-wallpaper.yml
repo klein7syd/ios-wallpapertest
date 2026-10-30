@@ -2,7 +2,7 @@ name: Todo Wallpaper native app
 on:
   push:
     branches: [main]
-    paths: ['TodoWallpaper/**', 'native-tools/**', '.github/workflows/todo-wallpaper.yml']
+    paths: ['TodoWallpaper/**', 'native-tools/**', 'tools/**', '.github/workflows/todo-wallpaper.yml', 'AGENTS.md', 'ARCHITECTURE.md', 'FILE_MAP.md', 'KNOWN_ISSUES.md', 'README.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,13 +17,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Check persistence and native PNG rendering, then build app and Widget
+      - name: Read product version
+        id: product
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads(Path('native-tools/product-version.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print('version=' + metadata['version'], file=output)
+          PY
+      - name: Check handoff, persistence and native PNG rendering, then build app and Widget
         shell: bash
         run: bash native-tools/build-product.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: todo-wallpaper-0.5.1-${{ github.run_number }}
+          name: todo-wallpaper-${{ steps.product.outputs.version }}-${{ github.run_number }}
           path: TodoWallpaper/out/
           retention-days: 7
           if-no-files-found: error

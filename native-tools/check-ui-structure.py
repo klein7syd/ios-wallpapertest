@@ -197,6 +197,19 @@ require('mixed_gesture_endings_and_all_cancel_rollback' in read('TodoWallpaper/T
     and 'nudge_begin_end_coalescing_and_later_gesture_isolation' in read('TodoWallpaper/Tests/NativeUIProbe.swift')
     and 'production nudge edge/center cases' in read('TodoWallpaper/Tests/PhotoRepairRenderChecks.swift'),
     '实际原生门禁验证组合结束顺序、撤销合并与生产几何边界')
+handoff = read('tools/check_handoff.py')
+handoff_tests = read('tools/test_check_handoff.py')
+require('if count == 0:' in handoff and '检查了 {count} 条' in handoff and 'has_symbol' in handoff
+    and 'is_relative_to' in handoff and '未登记源码' in handoff,
+    '交接检查逐项实际计数并拒绝零条、缺声明、未登记和越界路径')
+require(all(name in handoff_tests for name in ['test_empty_map', 'test_empty_symbols', 'test_empty_source', 'test_empty_constants', 'test_counts_follow_added_file'])
+    and 'python3 tools/test_check_handoff.py' in read('native-tools/check-native.sh')
+    and 'bash tools/check_handoff.sh' in read('native-tools/check-native.sh'),
+    '完整native门禁执行交接空输入负向及动态计数回归，不硬编码成功数')
+require('steps.product.outputs.version' in read('.github/workflows/todo-wallpaper.yml')
+    and 'Todo Wallpaper $PRODUCT_VERSION ($PRODUCT_BUILD)' in read('native-tools/build-product.sh')
+    and 'CURRENT_PROJECT_VERSION="$UI_PRODUCT_BUILD"' in read('native-tools/check-ios-ui.sh'),
+    '版本和产物摘要读取元数据，模拟器与设备使用同次构建号')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

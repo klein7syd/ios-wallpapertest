@@ -979,5 +979,50 @@
         "delivery": "unsigned_IPA; physical_acceptance_pending"
       }
     ]
+  },
+  "known_issues_061": {
+    "scope": "5 sequential commits; native/macOS, Release App+Widget, Debug Simulator and UI gates per group; physical device unverified",
+    "groups": [
+      {
+        "group": 1,
+        "commit": "4b423ce36c1cec75a30ec59deeb344ad7cb0652d",
+        "run_id": 41051835229,
+        "conclusion": "success"
+      },
+      {
+        "group": 2,
+        "commit": "2a0e283fb5315aaa5a175b38009c1381f3e40d83",
+        "run_id": 41072835683,
+        "conclusion": "success",
+        "photo_analysis_checks": 86
+      },
+      {
+        "group": 3,
+        "commit": "1973efac5d6e414c9048b26ce1be969e519b347e",
+        "run_id": 41089037457,
+        "conclusion": "success"
+      },
+      {
+        "group": 4,
+        "commit": "dee27d479196b384ee1cbb8d56087904a51943b9",
+        "run_id": 41092594042,
+        "conclusion": "success",
+        "nudge_geometry_cases": 216
+      }
+    ],
+    "group5_final_evidence": "The workflow executing this source writes exact commit/version/build and successful gates into packaged status.json; Windows handoff adds DeliveryVerification.json. Do not infer final CI success from this pre-run source document.",
+    "new_checks": [
+      "transaction journal/rollback/commit/busy guard",
+      "retained current/task/undo/backup/recent assets and fail-closed GC",
+      "migration snapshot reuse",
+      "exact previous date-label output across three timezones",
+      "mixed recognizer endings and duplicate terminals",
+      "coalesced nudge undo and later gesture isolation",
+      "18 handoff positive/negative regressions"
+    ],
+    "physical_iPhone": "not_verified",
+    "signing_installation_upgrade": "not_verified",
+    "TextLegibility_readable": "unchanged_by_request",
+    "static_wallpaper_completion": "intentional_unchanged"
   }
 }

@@ -11,7 +11,7 @@
 
 ## Target 与目录
 - Target：`TodoWallpaper`（App）、`TodoWallpaperWidget`（扩展）。工程文件由 `native-tools/generate_product_project.py` 生成。
-- 目录：`App/`（页面与编辑器，仅 App）、`Core/`（模型与存储，双 Target）、`Shared/`（小组件共用视图，双 Target）、`Widget/`（Widget bundle）、`Wallpaper/`（壁纸子系统，仅 App）、`Tests/`（原生渲染与状态检查，App 的 Debug 编译条件）。
+- 目录：`App/`（页面与编辑器，仅 App）、`Core/`（模型与存储，双 Target）、`Shared/`（小组件共用视图，双 Target）、`Widget/`（Widget bundle）、`Wallpaper/`（壁纸子系统，仅 App）、`Tests/`（多数为独立 macOS 原生可执行检查；只有 NativeUIProbe 在 TODO_UI_CHECKS 的 Simulator Debug App 中编译）。
 - App Group：`TodoWidgetConstants.originalGroupID = "group.org.todowallpaper.app"`，定义在 `Core/TodoSharedStorage.swift`。
 
 ## 构建 / CI / 打包
@@ -21,7 +21,7 @@
 - 版本号：`native-tools/product-version.json` 的 `version`；构建号 = 1000 + GitHub run number。
 
 ## 编码约定（从源码归纳）
-- 注释：源码注释以英文为主，新增文档用中文；用户可见文案全部中文。
+- 注释：既有源码保留原注释，新增注释/文档用中文、变量名用英文；用户可见文案全部中文。
 - 命名：类型 UpperCamelCase，函数与变量 lowerCamelCase；常量集中在各类型的 `static let`。
 - 只用官方 API，不使用私有 API；不可用的系统能力在 README/KNOWN_ISSUES 里写明限制，不伪造。
 - Target Membership 在文档与新增文件注释里标注（Core/Shared 双 Target，其余单 Target）。
@@ -41,3 +41,9 @@
 10. 分析上下文含图片名、crop、透明度、实际画布比例与有效底色（opacity=1 共用明暗）；结果与缺失请求为 App Group 原子文件。主 App utility 串行分析，Widget 只读/登记缺失；每次 Provider 起始清内存且 entry 携分析快照，body 仅读内存或快照。
 11. CI 的 render 检查带像素断言，改布局/字体/颜色会让断言失败，需要同步更新 Tests。
 12. 调试页入口在 `#if DEBUG` 内，不要放到正式版。
+
+## 本轮维护入口
+- `tools/check_handoff.sh` 调用标准库 Python 检查器，五项均输出“检查了 N 条”，零条失败；`tools/test_check_handoff.py` 的正/负向回归已接入 native 门禁。引用检查不替代编译或常量值语义审查。
+- 照片/标记生产导入统一 `WidgetPhotoStore.shared`；相册事务在外观落盘后才提交。回收须保留当前、任务、两个编辑器撤销和备份引用，十分钟新文件/导入中/加载失败不删。
+- App reload/Widget Provider 使用 `TodoRepositorySnapshot`，不二次 load，也不做跨事务文档缓存。
+- 日期缓存跟随地区/日历并在系统通知后重建默认时区；照片组合手势全取消才回滚；微调的 begin/end 合并连点，仍为一个导出像素。

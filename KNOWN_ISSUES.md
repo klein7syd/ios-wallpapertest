@@ -1,71 +1,57 @@
 # KNOWN_ISSUES
 
-## a. 已知未修复（现象 → 涉及位置 → 根因 → 建议）
+## a. 本轮处理结论
 
-1. **壁纸"包含已完成"无视觉区分** — `Wallpaper/WallpaperRenderer.swift:drawContent`：`completed: false` 写死，标题与日期没套完成效果。建议把 `item.isCompleted` 传进 `drawText` 的 `strike` 与透明度。
+本轮请求涉及的已确认代码缺陷均已修复并移入历史踩坑。编译、原生检查、模拟器、签名安装与真机验收是不同证据，最后两项仍待用户设备验证。
+
+- **静态壁纸完成态：已确认无需修改。** `WallpaperGeometry.glyphKey` 与 `check-ui-structure.py` 明确要求静态装饰不应用旧完成视觉效果；保留该设计，不采用旧问题列表中恢复删除线/降透明度的建议。
+- **壁纸可读色：按要求保留。** `WallpaperRenderer.effectiveTextColor` 仍调用 `TextLegibility.readable`，本轮没有修改该函数或其调用行为。
+- **微调视觉跳变：未复现，需真机。** 216 个生产布局中心/边界场景验证可见移动不超过一个导出像素；已修复连续点按的撤销分组，未凭存储中心值变化推断画面跳变，也未加大步进。
+- **旧壁纸阴影：绘制与控件已不存在，无需恢复或再次删除。** 本轮仅清理 `drawText` 死参数和过时注释，持久化兼容字段保留。
 
 ## b. 真机未验证
 
-- 三个锚点下 `edgeInset` 负值能否真的贴近组件边缘（可能被 WidgetKit content margins 吃掉）。
-- 着色（accented/vibrant）模式与锁屏组件下是否确实无蒙层无阴影。
-- 阴影强度三档在真实壁纸上是否肉眼可区分。
-- 相册轮换跨日切换是否按 `photoName(at:)` 生效。
-- 免费账号签名 7 天过期后的覆盖安装与数据保留。
+- 三个锚点、负边距与 WidgetKit content margins 的真实贴边效果。
+- 真实 accented/vibrant 模式下的阴影/蒙层禁用，以及不同照片上三档阴影、黑/白/粉字的肉眼观感。共享渲染器覆盖锁屏 family 门禁，但扩展当前只注册主屏小/中/大规格。
+- 调裁剪、透明度后的约 0.5 秒自动数值刷新、大图流畅度、内存峰值与真实触摸帧率。
+- Photos 完整权限、iCloud 网络失败、取消按钮、批量导入的真实体验及长期图库回收。
+- 双指系统中断、连续微调撤销和系统地区/日历/时区设置切换后的显示。
+- 相册跨日后的实际 Widget 刷新、免费账号签名、覆盖安装及数据保留。
 
-## c. 系统限制
+## c. 系统限制与保守行为
 
-- 主屏幕组件背景由系统合成，`.glassEffect` 在组件里可能不可用；不得承诺与电池组件同款透明。
-- 组件刷新时机由系统调度，`policy = .after(...)` 只是请求，不保证准点。
-- 导出的壁纸是静态图片，圈不可点击。
-- 免费 Apple 账号签名 7 天过期，重签重装是常态。
+- 主屏组件背景由系统合成，公开 `.glassEffect` 不保证默认图标模式呈现电池组件同款透明效果。
+- `policy = .after(...)` 只请求系统刷新，不保证准点；App 挂起时缺失分析先回退基础值 0.4，重新打开后补算。
+- 导出的壁纸是静态图片，圆环不可点击；不绕过沙盒更换系统壁纸。
+- 免费 Apple 账号签名通常七天过期，需沿既有流程重签覆盖。
+- 图片被备份、撤销或禁用相册引用时继续保留；最近十分钟文件不删。任一权威文件或恢复归档损坏时整轮 GC 跳过，宁可少删。
 
 ## d. 历史踩坑（现象 → 根因 → 修复位置 → 不要改回去的原因）
 
-1. **用户选的颜色不生效、只有日期变色** → `safeColor` 调 `TextLegibility.readable(_:on:)` 按固定底色把颜色替换成黑白；日期行继承外层颜色没走替换 → 改为 `safeColor` 直接返回所选颜色（`TodoWidgetContent`）。不要再引入按底色的强制改写。
-2. **取鲜艳颜色报错并锁死撤销** → Display P3 分量 <0 或 >1，`WallpaperColor.isValid` 失败 → `StyleColorControl` 里 clamp 0…1。不要移除 clamp。
-3. **分隔线被糊粗** → 阴影套在包含分隔线的整个容器上 → 阴影改为逐文字加（`readableText`），分隔线画在行 overlay。不要改回整块阴影。
-4. **强度切了没反应** → `readableText` 没接 `intensity`，恒为 `.standard` → 扩展增加 `intensity` 并三处传入。
-5. **日期不跟随完成效果** → 日期无颜色修饰、固定 0.75 透明度 → `title()` 统一 `rowColor` / `rowFade`。
-6. **相册轮换的自动蒙层永远是 0.4** → 相册导入没调用分析 → `AlbumReader.prepare` 逐张 `analyzeAllAnchors`；移除照片时清缓存。
-7. **控件上下跳** → 颜色控件按条件出现/消失 → 改为常驻 + `disabled`。
-8. **面板拖不动，必须猛甩** → 每帧 `setTranslation(.zero)` 后仍做 3pt 吸附，慢速拖动被反复吸回中心 → 删除增量路径里的吸附。
-9. **早期用整块大半径阴影 / 整体压暗 / 固定 0.4 蒙层** → 糊、破坏照片、无法自适应 → 已由局部 `ScrimView` + 双层配方阴影 + 图片分析取代，不要退回去。
-10. **旧文字描边（多方向偏移叠文字 / 位图描边）** → 发虚、性能差、ImageRenderer 不渲染 → 全部删除，改为纯阴影方案。
-11. **旧 `header.topInset` 仍在生效** → 界面上已无控件能改它，迁移也只清了部分锚点 → `WidgetHeaderLayout.titleY = 0`，位置统一由 `edgeInset` 控制。
-13. **壁纸 `setShadow` 旧阴影** → 文字下方出现硬边发糊 → 已删除 `setShadow` 调用与 shadow 常量（`WallpaperRenderer`），签名参数保留但不再使用。不要重新加回去。
-14. **标记视图没有阴影** → 标记与文字在同一行时视觉不一致 → 第1组已给标记本身添加同配方阴影，并保留着色/锁屏禁用门禁，见 e 部分。
-12. **测试里的像素断言随布局变化失败** → CI 有 render 检查 → 改布局后同步更新 `Tests/`。
-
-## e. 第1组已修复（编译与真机证据分别记录）
-
-- 负边距曾通过 `abs` 扩大顶部/底部蒙层；现在负增量按 0 计，正增量仍扩展覆盖。
-- 原 a8：黑/白蒙层在渲染时根据原始亮度、对比度和当前文字深浅重算；旧 `suggestedScrim` 仅解码兼容，新缓存不写它。
-- 原 a11：标记本身与文字共用阴影及效果策略；真实 accented/vibrant 与锁屏 family 均禁用效果；摘要重复阴影已移除。
-- P3 颜色先真正转换到 sRGB，再夹取分量，不再把原色域数值直接解释为 sRGB。
-- 居中偏移范围由自然文字高度与画布高度动态确定，滑条、setter、锚点切换和渲染共用规则；历史顶部/底部 -40 值仍能加载。
-- 原 a14：`setAppearance` 对数值做规范化后重试并返回结果，成功立即清除校验错误；存储/未来版本错误须实际 IO 成功才清除。撤销检查接收结果，失败可重试。
-- 新增纯 Core 规则/历史数据检查及 iOS 原生颜色、像素、样式保护与撤销检查；源码检查不构成真机验收证据。
-
-## f. 第2组图片分析管线修复（本组原生/编译证据另记）
-
-- 原 a2：裁剪、缩放、透明度与有效明暗曾只改变显示、不重算 → 缺统一生命周期调度 → TodoStore 结束交互后 400ms 去抖，PhotoAnalysisService 按完整上下文重算整个相册 → 不要恢复选图单次分析或 body 内工作。
-- 原 a9：历史/缺失分析回退固定基础值 → 旧键不包含显示上下文且无补算闭环 → Provider 登记实际比例原子请求，App 启动/前台/公开通知串行补算，缺失时仍安全回退基础值 0.4 → 不要在 Widget 内同步计算。
-- 原 a10：Widget 长生命周期内存结果陈旧 → 缺失效入口 → 每次 Provider 起始清内存并将结果快照放入 entry → 不要依赖可被另一尺寸清空的全局缓存渲染已准备 entry。
-- 原 a15：选大图在 MainActor 解码并分析 → Task 继承视图隔离 → 统一 utility 串行队列只读取 1536px 已导入文件并用 ImageIO 降到 128px，再纯 CG 合成一次 32×32 → 不要重新引入 UIImage(data:) 原图分析或每图 detached 并发。
-- 新增原子 AnalysisCache 三锚点封套与 AnalysisRequests 队列，解决 defaults 异步可见性；旧 defaults 不复用，只清理兼容。内存短锁、独立文件锁和删除版本防止卡主线程或删除后复活；坏/未来缓存封套安全回退。
-- 单图失败不阻断分析批次；导入本身的单张失败回滚、原图读取与图片回收仍属第3组，尚未在此组修复。
-
-## 第3组历史踩坑
-
-- 相册读取原图且任一失败中断 → 无缩图请求及写入事务 → `AlbumReader` 改目标尺寸逐张读取，`WidgetPhotoStore` 记录/提交/回滚名称，单张跳过、全失败/过半失败/取消回滚 → 不能恢复原图整批驻留或删除已提交外观的图片。
-- App Group 图片只增不减 → 缺少跨编辑器引用集合 → `PhotoAssetMaintenance` 在共享 actor 内保守回收，保护当前、任务、备份及两个撤销栈，保留最近 10 分钟文件，加载失败整体跳过 → 不得仅凭当前预览判断孤立文件。
-- 迁移与调用方重复读取 todos → 仓库返回后再次 load → `TodoRepositorySnapshot` 供 App/Provider 复用校验结果 → 不得改为跨事务全局缓存，仍需锁和回执校验。
-
-iCloud 网络与取消按钮的真实 Photos 体验仍需真机；原生回归覆盖失败阈值、真实文件事务、回收保留及迁移幂等，不冒充相册权限验收。
-
-## 第4组历史踩坑
-
-- 日期每次建格式器 → 高频计算属性分配 → TodoSchedule 两种短格式缓存与系统设置通知失效 → 不得固定locale/calendar或改变浮动日期语义。
-- 双指一个取消丢掉全部操作 → 整次共享 cancelled 标志且无业务依据 → PhotoMotionView 记录是否有正常结束，只在全取消时回滚 → 不得恢复任一取消就全撤回，仍只提交一次。
-- 微调连续点按需要多次撤销 → 未经过交互分组 → coalescingContext 的显式 begin/end 合并500ms点按 → 保留一个导出像素步进；216个生产布局边界场景未复现可见跳变，iPhone触摸观感待验证，不把推测写成确认缺陷。
-- 壁纸旧阴影签名遗留 → 绘制早已删除但死参数仍在 → WallpaperRenderer 删除 shadow 参数，Geometry 清过时注释；界面无旧阴影控件 → 不得重新引入旧阴影；保留旧字段兼容。
+1. 用户选色不生效 → 小组件按底色强制替换颜色 → `TodoWidgetContent.safeColor` 直接采用所选颜色 → 不得恢复小组件自动黑白改色；壁纸的既有保护另行保留。
+2. 鲜艳取色报错并锁住撤销 → P3 越界分量直接解释为 sRGB → `StyleColorControl` / `WallpaperColor.sRGB` 先转换色域再夹取 → 不得只截断原色域数值或移除合法范围校验。
+3. 分隔线糊粗 → 容器整体加阴影 → `TodoWidgetContent` 逐文字/标记加阴影，行 overlay 画分隔线 → 不得把分隔线套回阴影容器。
+4. 强度切换无效 → 未向文字传 intensity → `readableText` 与调用方统一传强度 → 不得固定 `.standard`。
+5. 日期不跟随完成效果 → 日期独立颜色/透明度 → `TodoWidgetContent.title` 共用 rowColor/rowFade → 保持标题与日期一致。
+6. 相册蒙层恒定或与构图不符 → 选图单次原图分析、旧键不含上下文 → `TodoStore` / `PhotoAnalysisService` 整相册串行处理，按 crop/opacity/底色/实际比例存原始统计 → 不得退回仅按图片名缓存建议值。
+7. 控件上下跳 → 条件插入颜色控件 → `MarkerEditors` 保持控件并 disabled → 避免调节时重排工具区。
+8. 面板慢拖被吸回中心 → 每帧位移清零后仍吸附 → `WallpaperLiveCanvas` 增量路径不吸附 → 保留连续跟手，不能用阈值吞掉小位移。
+9. 大片阴影与整体压暗破坏照片 → 整块效果过强 → `ScrimView` 局部蒙层与逐内容配方 → 不恢复整块大半径阴影或固定遮罩。
+10. 旧文字描边发虚 → 多方向文字叠加/位图描边 → 共享层改用配方阴影 → 不恢复模拟描边。
+11. 无控件的 header.topInset 仍影响位置 → 旧字段参与布局 → `WidgetHeaderLayout.titleY = 0`，统一 edgeInset → 旧字段仅解码兼容。
+12. 旧壁纸文字阴影遗留 → 绘制早已删除但签名/注释残留 → `WallpaperRenderer.drawText` 删除 dead shadow 参数，Geometry 清注释 → 不重新绘制旧阴影，保留旧文件解码能力。
+13. 标记与文字观感不同 → 标记未套配方 → `TodoWidgetContent.mark` 加同配方/强度/门禁 → 保留 MarkerBitmapCache 和完成逻辑。
+14. 负 edgeInset 扩大蒙层 → 使用 abs → `ReadableRules.coverHeight` 只计 max(0, extraInset) → 负边距不得增加顶/底覆盖，居中偏移方向保留。
+15. 白蒙层自动强度反向 → 复用黑蒙层建议值 → `ReadableRules.scrim` 按当前文字深浅运行时映射 → 新分析只存亮度/对比度，旧 suggestedScrim 只兼容解码。
+16. 居中偏移固定 ±40 → 不知道自然文字高度 → `ReadableRules.insetRange`、共享 WidgetContentLayout 与几何 Preference → 滑条、setter、切换锚点和渲染必须共用边界。
+17. 异常数值锁住撤销/存储错误被隐藏 → 校验失败无修正、错误混用 → `TodoStore.setAppearance` 规范化重试并返回接收结果，存储错误实际 IO 成功才清除 → 不吞掉失败撤销或未来版本保护。
+18. Widget 长生命周期读旧分析 → 内存无失效边界 → Provider 起始清缓存、entry 携快照，缺失登记原子请求交 App 补算 → 不依赖可被其他尺寸清掉的全局缓存渲染 entry。
+19. 大图分析卡主线程 → Task 继承 MainActor 且解码原图 → `PhotoAnalysisService` utility 串行 ImageIO128/CG32，结束400ms去抖及删除版本保护 → 不在 body/Widget 同步分析或每图 detached 并发。
+20. 相册一张失败全部中断且残留文件 → 原图请求、无事务 → `AlbumReader` 目标1536逐张网络请求，单张计数跳过，全失败/过半/取消回滚，`WidgetPhotoStore` 名称日志和提交 → 不删除已持久化外观的图片，不恢复原图整批驻留。
+21. App Group 图片只增不减 → 无跨编辑器保留集合 → `PhotoAssetMaintenance` 与共享 photo actor 保留当前、任务、两个撤销栈及备份，十分钟保护、失败整体跳过、清理孤立分析 → 不仅凭当前预览决定删除。
+22. todos 重复读取 → 迁移已 load，调用方再次 load → `TodoRepositorySnapshot` 供 App reload/Provider 复用 → 保留锁与回执，不改为跨事务长期缓存。
+23. 日期标签反复创建格式器 → 计算属性分配 → `TodoSchedule` 两种格式缓存、NSLock、系统通知失效，locale/calendar autoupdatingCurrent，应用默认时区 → 保持旧文本和浮动日期组件不变。
+24. 双指一个取消丢掉全部操作 → 共享 cancelled 标志且无业务依据 → `PhotoMotionView` 记录正常结束，只在全取消回滚，最后结束提交一次 → 不恢复连坐或逐帧发布。
+25. 连续微调需多次撤销 → 点按绕过交互分组 → `coalescingContext` 显式 begin/end 合并500ms同键点按 → 保留一个导出像素，不让旧计时器截断新手势。
+26. 交接脚本空跑也 PASS → Bash 分列后再判断分隔符，跳过全部真实行 → `tools/check_handoff.py` 严格表格、路径、声明、覆盖及逐项非零计数，18个工具回归接 CI → 不硬编码成功数或只测试正例。
+27. 布局变化造成像素回归失败 → 真实 native 渲染门禁有像素断言 → 对应 `Tests/` 同步验证实际生产行为 → 不放宽/删除断言换取通过。

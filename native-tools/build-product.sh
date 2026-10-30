@@ -2,6 +2,8 @@
 set -euo pipefail
 mkdir -p TodoWallpaper/out
 PRODUCT_BUILD=$((1000 + GITHUB_RUN_NUMBER))
+PRODUCT_VERSION="$(python3 -c 'import json; print(json.load(open("native-tools/product-version.json"))["version"])')"
+export PRODUCT_BUILD
 { sw_vers; xcodebuild -version; xcrun --sdk iphoneos --show-sdk-version; } > TodoWallpaper/out/toolchain.txt
 # Collect both test and iOS compiler diagnostics in the same run, but never package
 # a deliverable if native checks fail. This avoids a second run just to discover UI errors.
@@ -32,8 +34,9 @@ import json,os,shutil
 from pathlib import Path
 out=Path('TodoWallpaper/out')
 report=json.loads((out/'package-verification.json').read_text())
-(out/'status.json').write_text(json.dumps({'stage':'native_photo_resource_and_editor_repairs','compilation':'succeeded','repository_and_migration_checks':'passed',
+(out/'status.json').write_text(json.dumps({'stage':'known_issues_061','compilation':'succeeded','repository_and_migration_checks':'passed',
     'wallpaper_render_checks':'passed_on_macos_production_renderer','ui_state_checks':'passed_compiled_production_state','iOS_Simulator_native_UI_render_checks':'passed','physical_iPhone_Display_Zoom':'not_verified','ui_structure_checks':'passed','iphone_scroll_visual_bug':'pending_device_retest','wallpaper_photos_and_touch_on_iphone':'not_verified',
+    'handoff_checks':'passed','handoff_negative_regressions':'passed','photo_analysis_checks':'passed','album_asset_and_migration_checks':'passed','gesture_nudge_and_schedule_regressions':'passed',
     'version':report['bundles'][0]['version'],'build':report['bundles'][0]['build'],'bundle_id':report['bundles'][0]['bundle_id'],
     'signing':'not_performed','iphone_installation':'not_verified','device_crud':'not_verified',
     'widget_interaction':'not_verified','app_group_migration_on_iphone':'not_verified',
@@ -41,4 +44,4 @@ report=json.loads((out/'package-verification.json').read_text())
     'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA']},indent=2))
 shutil.rmtree(out/'package')
 PY
-echo "Todo Wallpaper 0.5.1 ($PRODUCT_BUILD): native PNG checks passed, unsigned ARM64 app + Widget IPA; Windows signing and iPhone wallpaper tests pending." >> "$GITHUB_STEP_SUMMARY"
+echo "Todo Wallpaper $PRODUCT_VERSION ($PRODUCT_BUILD): native PNG checks passed, unsigned ARM64 app + Widget IPA; Windows signing and iPhone wallpaper tests pending." >> "$GITHUB_STEP_SUMMARY"

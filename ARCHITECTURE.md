@@ -33,15 +33,16 @@
 
 ## b. 持久化与数据格式
 
-App Group 容器下（`TodoSharedStorage.sharedDirectory()` 返回 `<group>/TodoWallpaper`）：
+App Group 主目录（`TodoSharedStorage.sharedDirectory()` 返回 `<group>/TodoWallpaper`；表中旧目录回执为明确例外）：
 
 | 文件 | 写入者 | 读取者 | 格式 | 备注 |
 | --- | --- | --- | --- | --- |
 | `todos-v1.json` | App / AppIntent | App / Widget | JSON，`schemaVersion = 1` | 有 `.backup.json` 与 `.lock` |
 | `appearance-v1.json` | App | App / Widget | JSON，`schemaVersion = 1` | 有 `.backup.json` 与 `.lock` |
 | `migration-ready-v1.json` | App | App / Widget | JSON 回执 | 迁移完成标记 |
-| `appgroup-migration-v1.json` | App | App | JSON 回执 | 旧目录迁移确认 |
+| `<旧私有目录>/appgroup-migration-v1.json` | App | App | JSON 回执 | 不在 App Group，避免重新导入旧数据 |
 | `WidgetPhotos/widget-photo-<UUID>.jpg` | App | Widget | JPEG | 最长边 1536 |
+| `PhotoImports/<UUID>.json` | App | App | 本次生成文件名数组 | 相册事务提交/回滚后移除，崩溃残留待安全回收 |
 | `MarkerImages/marker-image-<UUID>.png` | App | App / Widget | PNG | 最长边 512 |
 | `AnalysisCache/<完整上下文>.json` | App utility 批次 | App / Widget Provider | schemaVersion=1，request + 三锚点原始统计 | 单封套原子写入 |
 | `AnalysisRequests/<完整上下文>.json` | Widget Provider | App utility 批次 | PhotoAnalysisRequest | 原子发布后发公开 Darwin 通知 |
@@ -69,7 +70,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 `glassOpacity`(0…0.85, 0.22)、`darkGlass`(true)、`blurRadius`(0…45, 22)、`borderOpacity`(0…1, 0.25)、`highlight`(0…0.6, 0.12)、
 `padding`(8…48, 20)、`includeCompleted`(false)、`maximumItems`(Int, 8)、`fontSize`(Double, 18)、`font`/`weight`/`textColor`、
 `lineSpacing`(4)、`itemSpacing`(12)、`alignment`(.leading)、`completionStyle`(.strikeAndDim)。
-`validated()` 先把 `aspectRatio` 限制在 0.25…2，其余越界值按上表 `c(...)` 夹取（不抛错，除尺寸非法）。
+`validated()` 对非法尺寸、非有限或不在 0.25…2 的 aspectRatio 抛错；其余数值按 `c(...)` 夹取，不把非法比例悄悄改为另一构图。
 
 迁移：`ReadableSettingsMigration.take()` 主 App 启动时执行一次并删除旧键；`TodoMigration` 负责旧目录 → App Group 的一次性迁移，用 `migration-ready-v1.json` 与文件锁保证幂等。
 
@@ -112,7 +113,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 
 ## h. 日历/提醒导入
 
-`CalendarReader`（`EKEventStore`）分别调用 `requestFullAccessToEvents()` 与 `requestFullAccessToReminders()`，任一被拒抛 `CalendarImportError.permission`；不申请写入权限，也不读取 `EKAuthorizationStatus` 数值，只用返回的 Bool。事件按 90 天窗口过滤，转 `TodoImportCandidate`；提醒事项用 `dueDateComponents` 还原日期（缺 calendar 时补当前日历）。
+`CalendarReader`（`EKEventStore`）分别调用 `requestFullAccessToEvents()` 与 `requestFullAccessToReminders()`，任一被拒抛 `CalendarImportError.permission`；不申请写入权限，也不读取 `EKAuthorizationStatus` 数值，只用返回的 Bool。事件默认选择未来 7 天，用户可调整，最长 90 天；按选定窗口过滤，转 `TodoImportCandidate`；提醒事项用 `dueDateComponents` 还原日期（缺 calendar 时补当前日历）。
 
 ## i. 常量与阈值
 
@@ -128,7 +129,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 | 阴影不透明度倍率 | 0.5/0.8/1.1 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
 | 阴影半径缩放 | 0.7/0.85/1.0 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
 | 分析缩图 | 128px 解码 / 32×32 合成 | `App/PhotoAnalysisService.swift:PhotoAnalysisService` | 后台采样尺寸 |
-| 对比度归一 | 0.35 | `App/ImageAnalyzer.swift:ImageAnalyzer` | 标准差基准 |
+| 对比度归一 | 0.35 | `App/PhotoAnalysisService.swift:PhotoAnalysisService` | 标准差基准 |
 | 照片最长边 | 1536 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
 | 标记图最长边 | 512 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
 | 背景缓存最长边 | 1024 / 768 | `Shared/WidgetBackgroundView.swift:WidgetPhotoCache` | 解码与预生成 |
@@ -136,7 +137,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 | 外观去抖 | 800 ms | `App/TodoStore.swift:TodoStore` | 保存延迟 |
 | 吸附半径 | 4pt（已吸附 7pt） | `Core/EditorHistory.swift:StandardDetent` | PreciseSlider |
 | 相册上限 | 60 张 | `Core/PhotoComposition.swift:WidgetAlbumRotation` | 轮换数量 |
-| 日历窗口 | 90 天 | `App/CalendarImportView.swift:CalendarReader` | 导入范围 |
+| 日历窗口 | 默认 7 天 / 最大 90 天 | `App/CalendarImportView.swift:CalendarReader` | 导入范围 |
 | 最大行数 | 10 | `Core/TodoAppearance.swift:WidgetAppearance` | 小组件行数 |
 
 ### 阴影配方表（`Core/ReadableModels.swift` → `ShadowRecipes`）
@@ -191,3 +192,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 ## 第4组：日期缓存与交互结束语义
 
 TodoSchedule.label 由私有 ScheduleLabelFormatters 缓存两种短格式，在 NSLock 下使用，autoupdatingCurrent 的地区与日历配合系统通知失效；时区沿用旧格式器的应用默认值并在时区通知后重建；格式化不改浮动日期组件或JSON。PhotoMotionView 的组合会话最后一个结束才提交，有任何正常结束便保留当前状态，全取消才回滚。微调走 EditorUndoState.coalescingContext 的显式 begin/end，500ms 同键连点一组，其他交互/页面结束会取消旧定时器；WallpaperSettings.nudged 复用既有一个导出像素的计算公式。壁纸 drawText 不再保留死 shadow 参数，没有旧阴影控件或绘制；TextLegibility.readable 及静态完成态设计保留。
+
+## 构建与交接证据
+
+`check-native.sh` 先执行18个交接工具正/负向回归及严格文档引用检查，再执行原有结构、CG分析、数据迁移与生产壁纸渲染；`build-product.sh` 继续 Release App/Widget 与 Simulator Debug/UI 全门禁。版本、Artifact名及摘要均读取 product-version.json；设备和模拟器使用同一次CI构建号。最终 status.json 记录实际提交、版本和构建；真机未验证字段保留。历史 docs 版本说明是当时证据，当前模型以本文和源码为准。

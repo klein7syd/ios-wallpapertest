@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-# This is an isolated Simulator Debug build, not the IPA delivered to Windows.
+# 模拟器使用同一次流水线构建号；独立运行时读取元数据回退值。
+UI_PRODUCT_BUILD="${PRODUCT_BUILD:-$(python3 -c 'import json; print(json.load(open("native-tools/product-version.json"))["fallback_build"])')}"
 TODO_UI_CHECKS=1 python3 native-tools/generate_product_project.py
-xcodebuild build -project TodoWallpaper/TodoWallpaper.xcodeproj -scheme TodoWallpaper -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/todo-ui-simulator" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' 2>&1 | tee TodoWallpaper/out/ios-ui-compile.log
+xcodebuild build -project TodoWallpaper/TodoWallpaper.xcodeproj -scheme TodoWallpaper -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/todo-ui-simulator" CURRENT_PROJECT_VERSION="$UI_PRODUCT_BUILD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' 2>&1 | tee TodoWallpaper/out/ios-ui-compile.log
 UI_RUNTIME=$(xcrun simctl list runtimes --json | python3 -c 'import sys,json; r=[x for x in json.load(sys.stdin)["runtimes"] if x.get("isAvailable") and x["name"].startswith("iOS")]; assert r,"No available iOS simulator runtime"; print(sorted(r,key=lambda x:tuple(map(int,x["version"].split("."))))[-1]["identifier"])')
 UI_DEVICE_TYPE=$(xcrun simctl list devicetypes --json | python3 -c 'import sys,json; d=json.load(sys.stdin)["devicetypes"]; p=[x for x in d if x["name"]=="iPhone 13 Pro"]; p=p or [x for x in d if x["name"].startswith("iPhone")]; assert p; print(p[0]["identifier"])')
 UI_SIMULATOR=$(xcrun simctl create "Todo Wallpaper UI Checks" "$UI_DEVICE_TYPE" "$UI_RUNTIME")

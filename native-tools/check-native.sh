@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 # Compile and execute the production persistence code with independent files.
+# 交接检查与负向回归纳入同一个门禁，任何失败都保留非零退出。
+mkdir -p TodoWallpaper/out
+python3 tools/test_check_handoff.py 2>&1 | tee TodoWallpaper/out/handoff-regression-checks.log
+bash tools/check_handoff.sh | tee TodoWallpaper/out/handoff-checks.log
 python3 native-tools/check-ui-structure.py
 bash native-tools/check-photo-analysis.sh
 swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift TodoWallpaper/Tests/MediaInteractionChecks.swift TodoWallpaper/Tests/PhotoRepairChecks.swift TodoWallpaper/Tests/PhotoAssetMaintenanceChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"

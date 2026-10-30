@@ -2,7 +2,7 @@
 
 > 交接文档（当前代码现状）：[AGENTS.md](AGENTS.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [FILE_MAP.md](FILE_MAP.md) · [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 
-**Current delivery: 0.6.0 / 1069** — 原生 App + Widget 编译、原生 PNG 渲染检查与模拟器检查通过；Windows 签名安装与全部真机项仍未验证。
+**当前版本：0.6.1** — 实际构建号见交付包 status.json（1000 + CI run_number）。第1～4组已通过各自完整门禁；本版本最终编译/检查结论以生成包内证据为准。Windows 签名安装与本轮真机验收仍未验证。
 
 Public source-only personal project. Windows+iPhone, free Apple Account, macOS GitHub Actions compilation, Windows iPASide/R1 local signing. No credentials, signed packages, profiles or device identities are committed; no automatic public Releases.
 
@@ -43,10 +43,10 @@ Widget 每次 Provider 开始清空分析内存缓存，按真实 displaySize �
 
 | 本组验收项 | 当前证据范围 |
 | --- | --- |
-| 裁剪/透明度/主题后重算与自动数值刷新 | 已加入实际 CG 与 iOS 调度回归，待本组 macOS CI 执行；约 0.5 秒体验需真机 |
-| 相册全部分析、crop 后全部失效、换日选图对应统计 | 已加入纯 CG 批次与实际比例检查，跨日系统 Widget 刷新需真机 |
-| Widget 缓存清理、缺失请求与冷进程 entry | 已加入文件双实例、清内存与快照检查；实际跨进程通知和系统调度需真机 |
-| 现有 native 门禁 | 原门禁完整保留并追加新 runner，待本组完整 CI；不将源码检查视为真机验收 |
+| 裁剪/透明度/主题后重算与自动数值刷新 | 已通过第2组实际 CG 与 iOS 调度回归；约 0.5 秒体验需真机 |
+| 相册全部分析、crop 后全部失效、换日选图对应统计 | 已通过第2组纯 CG 批次与实际比例检查，跨日系统 Widget 刷新需真机 |
+| Widget 缓存清理、缺失请求与冷进程 entry | 已通过第2组文件双实例、清内存与快照检查；实际跨进程通知和系统调度需真机 |
+| 现有 native 门禁 | 原门禁完整保留并追加新 runner，第2组完整 CI 已通过；不将源码检查视为真机验收 |
 
 第2组的 CI 首次运行通过 86 项真实 CG 分析检查及原有 macOS 检查，但 SwiftUI 编辑页过长的修饰链超过编译器类型推断时限；已把原链分为私有子视图属性，让编译器分段检查，保留控件顺序、行为和所有既有断言。
 
@@ -71,3 +71,49 @@ Widget 每次 Provider 开始清空分析内存缓存，按真实 displaySize �
 4.4 旧 setShadow 绘制与界面控件已确认无需修改（源码中已不存在）；删除 drawText 遗留的未使用 shadow 参数及过时注释，旧持久化字段仍兼容。TextLegibility.readable 与静态壁纸完成态按要求不动。另把 WallpaperLiveCanvas 未变更的 x/y 改为 let，清除已有两条编译警告。
 
 检查变更原因：新增日期旧文本比较、原生UIKit组合手势和真实撤销上下文、生产布局微调回归及结构约束；没有放宽既有像素断言。WallpaperGeometry 受保护哈希的变化来自同公式微调函数和删除过时阴影注释，原有 glyphKey 完成态约束完整保留。
+
+## 第5组：文档、检查与版本
+
+5.1 已修复：原 Bash 在 IFS 分列后继续判断分隔符，导致前两项跳过所有真实行也 PASS。现在 Bash 只选择可运行的 Python 3.9+ 并转交标准库检查器（支持 Windows python3 商店占位回退，UTF-8 输出）；严格解析表格、检查文件/实际声明、所有 Swift 登记及常量引用，每项输出实际计数，任一零条失败。18个正/负向夹具覆盖空表/空源/空符号/空常量、漏行/文件/符号、注释伪声明、重复、畸形、路径越界和动态计数，已接 CI。检查仅验证引用，不宣称自动证明所有常量值语义一致。
+
+5.2 已修复：KNOWN_ISSUES 统一按四段记录历史，静态壁纸完成态改列有意设计，不恢复旧效果；微调视觉跳变未在216个生产几何场景复现，保留真机待验。已纠正测试 Target、旧目录回执、非法壁纸比例抛错、日历默认7天/最大90天及主要类型遗漏，ARCHITECTURE/FILE_MAP 同步新线程、事务、回收与快照流程。
+
+5.3 已修复：版本提升0.6.1，实际构建仍为1000+CI序号；Artifact名、构建摘要取元数据，Simulator与设备使用同次构建号。版本和最终CI提交以包内 status.json 为准。
+
+检查变更原因：仅追加严格交接门禁和工具回归，保留所有既有 native/结构/像素断言；没有通过固定成功数或放宽原检查获得通过。当前源码在Windows的完整交接输出如下（CI会再次运行同一脚本）：
+
+```text
+== 1. FILE_MAP 文件存在 ==
+检查了 66 条
+== 2. FILE_MAP 符号声明 ==
+检查了 144 条
+== 3. Swift 源码登记覆盖 ==
+检查了 66 条
+== 4. ARCHITECTURE 常量引用 ==
+检查了 20 条
+== 5. 交接文档齐全 ==
+检查了 5 条
+PASS: 交接引用与源码登记检查通过（不代替编译、常量值语义审查或真机验证）
+```
+
+### 本轮九项自测（证据分层）
+
+| 自测项 | 状态与范围 |
+| --- | --- |
+| 1 黑/白/粉字、蒙层色和阴影色一致，白蒙层暗强亮弱 | 已验证规则与模拟器像素；全部真实照片观感需真机 |
+| 2 标记阴影，着色/锁屏规格不加效果 | 已验证共享规则与模拟器像素；真实系统模式需真机；当前未新增锁屏组件 |
+| 3 裁剪/拖动/透明度后自动刷新、大图不卡 | 已验证后台分析、400ms结束去抖与revision通知；约0.5秒体验、内存与帧率需真机 |
+| 4 相册逐张分析、crop全部重算、跨日对应图片 | 已验证原生串行批次和日期状态；系统跨日刷新需真机 |
+| 5 单张失败跳过、过半失败回滚 | 已验证阈值和生产文件事务；Photos真实iCloud请求/取消入口仅编译检查，需真机 |
+| 6 孤立图回收、撤销引用保护 | 已验证真实文件目录、当前/任务/备份/撤销/最近导入保留及加载失败不删；长期真实图库流程需真机 |
+| 7 鲜艳颜色立即生效 | 已验证sRGB转换、状态接收和撤销；屏幕真实观感需真机 |
+| 8 日期文本与旧版一致 | 已验证三种时区下与旧DateFormatter逐字比较及通知失效；系统设置切换体验需真机 |
+| 9 现有native门禁 | 第1～4组完整CI已验证；第5组执行本源码后，最终结果见包内status.json及交付README.txt |
+
+### 分组验证记录
+
+- 第1组 `4b423ce`：[完整CI #71](https://github.com/klein7syd/ios-wallpapertest/actions/runs/41051835229) 通过。
+- 第2组 `2a0e283`：[完整CI #74](https://github.com/klein7syd/ios-wallpapertest/actions/runs/41072835683) 通过，含86项实际CG分析回归。
+- 第3组 `1973efa`：[完整CI #77](https://github.com/klein7syd/ios-wallpapertest/actions/runs/41089037457) 通过，含事务、回收和快照回归。
+- 第4组 `dee27d4`：[完整CI #79](https://github.com/klein7syd/ios-wallpapertest/actions/runs/41092594042) 通过，含日期、组合手势、撤销与216例微调几何；已清除旧x/y警告。
+- 第5组最终提交、实际构建、IPA校验和及完整检查结果由本源码CI生成到交付包，避免在源码文档里自引用提交号。
