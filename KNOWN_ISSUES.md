@@ -3,10 +3,6 @@
 ## a. 已知未修复（现象 → 涉及位置 → 根因 → 建议）
 
 1. **壁纸"包含已完成"无视觉区分** — `Wallpaper/WallpaperRenderer.swift:drawContent`：`completed: false` 写死，标题与日期没套完成效果。建议把 `item.isCompleted` 传进 `drawText` 的 `strike` 与透明度。
-6. **`TodoSchedule.label` 每次新建 `DateFormatter`** — `Core/TodoSchedule.swift:label`（计算属性）。
-7. **双指连坐回滚** — `App/PhotoMotionView.swift:finish`：任一识别器 `.cancelled` 会把整次交互回滚到 `initialCrop`。
-12. **壁纸 `drawText` 的 `shadow` 参数已成死参数** — `Wallpaper/WallpaperRenderer.swift:drawText` 签名仍保留 `shadow: CGColor? = nil`，但 `setShadow` 已删除、无人再传值。
-13. **壁纸微调步进过小、从边缘会跳变** — `Wallpaper/WallpaperEditorView.swift:nudge`：按 `layout.panel.midX / 390` 重算再叠 `dx / size.width`（约 0.2pt），且未包在 `interaction.begin/end` 里；`panelX` 被夹在 0…1 但 `midX` 只能落在 0.46…0.54，从边缘点一次会跳。
 
 ## b. 真机未验证
 
@@ -66,3 +62,10 @@
 - 迁移与调用方重复读取 todos → 仓库返回后再次 load → `TodoRepositorySnapshot` 供 App/Provider 复用校验结果 → 不得改为跨事务全局缓存，仍需锁和回执校验。
 
 iCloud 网络与取消按钮的真实 Photos 体验仍需真机；原生回归覆盖失败阈值、真实文件事务、回收保留及迁移幂等，不冒充相册权限验收。
+
+## 第4组历史踩坑
+
+- 日期每次建格式器 → 高频计算属性分配 → TodoSchedule 两种短格式缓存与系统设置通知失效 → 不得固定locale/calendar或改变浮动日期语义。
+- 双指一个取消丢掉全部操作 → 整次共享 cancelled 标志且无业务依据 → PhotoMotionView 记录是否有正常结束，只在全取消时回滚 → 不得恢复任一取消就全撤回，仍只提交一次。
+- 微调连续点按需要多次撤销 → 未经过交互分组 → coalescingContext 的显式 begin/end 合并500ms点按 → 保留一个导出像素步进；216个生产布局边界场景未复现可见跳变，iPhone触摸观感待验证，不把推测写成确认缺陷。
+- 壁纸旧阴影签名遗留 → 绘制早已删除但死参数仍在 → WallpaperRenderer 删除 shadow 参数，Geometry 清过时注释；界面无旧阴影控件 → 不得重新引入旧阴影；保留旧字段兼容。

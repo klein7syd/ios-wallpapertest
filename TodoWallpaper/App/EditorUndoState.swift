@@ -56,6 +56,18 @@ final class EditorUndoState<Value: Equatable>: ObservableObject {
             }
         })
     }
+    // 点按也显式 begin/end；同键连续点按沿用一组，结束后等待 500ms 再封口。
+    func coalescingContext(read: @escaping () -> Value) -> EditorInteractionContext {
+        let base = context(read: read)
+        return EditorInteractionContext(begin: { [weak self] key in
+            guard let self else { return }
+            if self.activeKey != key { base.begin(key) }
+            self.settle?.cancel(); self.settle = nil
+        }, end: { [weak self] in
+            guard let key = self?.activeKey else { return }
+            base.pulse(key)
+        })
+    }
     func undo(read: () -> Value, apply: (Value, Value) async throws -> Void) async throws {
         guard !isRestoring else { return }
         finish(read())

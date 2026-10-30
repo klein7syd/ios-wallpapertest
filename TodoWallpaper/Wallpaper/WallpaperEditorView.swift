@@ -270,9 +270,11 @@ struct WallpaperEditorView: View {
     }
     private func nudge(_ icon: String, dx: Double, dy: Double) -> some View {
         Button {
-            guard let layout = model.layout?.positioned(using: model.settings) else { return }
-            model.settings.panelX = min(1, max(0, Double(layout.panel.midX / 390) + dx / Double(model.settings.size.width)))
-            model.settings.panelY = min(1, max(0, Double(layout.panel.midY / layout.canvas.height) + dy / Double(model.settings.size.height)))
+            guard let layout = model.layout else { return }
+            let interaction = edits.coalescingContext(read: { editState })
+            interaction.begin("wallpaper.panel.nudge")
+            defer { interaction.end() }
+            model.settings = model.settings.nudged(in: layout, dx: dx, dy: dy)
         } label: { Image(systemName: icon) }.buttonStyle(.bordered).accessibilityLabel("面板移动一个像素 \(icon)")
     }
     @ViewBuilder private var textControls: some View {

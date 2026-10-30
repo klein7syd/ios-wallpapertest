@@ -187,3 +187,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 回收在启动、相册提交后、移除照片后进入同一 actor，导入活跃时跳过。`PhotoAssetGarbageCollector` 先验证 todos、appearance 及可恢复备份/恢复归档，再收集全部候选，任一读取失败不删除。保留当前全部引用（含禁用相册）、所有任务标记、两个编辑器撤销快照及备份；只处理正确目录中的规范 UUID 普通文件，拒绝符号链接，创建或修改不足 10 分钟均保留。删除失败留待后续重试。回收后通过 AppearanceStore 同步失效所有已删照片变体并清理无源分析键。损坏的历史恢复归档也会使回收跳过，优先数据可恢复性。
 
 迁移提供 `TodoRepositorySnapshot(repository, document)`；App reload、Provider read 直接使用已校验 document，既有 prepare/readyRepository 包装继续供 Intent 等使用。未增加跨事务缓存，迁移锁顺序、回执发布和每次事务文件锁不变。existingSnapshot 的 JSON 与原始 bytes 也来自同一次读取。
+
+## 第4组：日期缓存与交互结束语义
+
+TodoSchedule.label 由私有 ScheduleLabelFormatters 缓存两种短格式，在 NSLock 下使用，autoupdatingCurrent 的地区与日历配合系统通知失效；时区沿用旧格式器的应用默认值并在时区通知后重建；格式化不改浮动日期组件或JSON。PhotoMotionView 的组合会话最后一个结束才提交，有任何正常结束便保留当前状态，全取消才回滚。微调走 EditorUndoState.coalescingContext 的显式 begin/end，500ms 同键连点一组，其他交互/页面结束会取消旧定时器；WallpaperSettings.nudged 复用既有一个导出像素的计算公式。壁纸 drawText 不再保留死 shadow 参数，没有旧阴影控件或绘制；TextLegibility.readable 及静态完成态设计保留。

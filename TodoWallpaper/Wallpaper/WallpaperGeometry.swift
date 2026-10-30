@@ -34,7 +34,7 @@ extension WallpaperSettings {
         copy.size = WallpaperSize(); copy.canvasAspect = aspectRatio
         copy.customPosition = false; copy.panelX = 0.5; copy.panelY = 0.5
         copy.backgroundZoom = 1; copy.backgroundPanX = 0; copy.backgroundPanY = 0
-        // Contrast protection and shadow change only at the opaque-panel boundary.
+        // 文字对比保护只在不透明面板的边界切换；壁纸不绘制旧文字阴影。
         // Preserve that category so cached CTLine colors match the exported PNG,
         // without reshaping text for every opacity sample.
         copy.glassOpacity = glassOpacity >= 0.75 ? 0.85 : 0
@@ -43,6 +43,13 @@ extension WallpaperSettings {
         // Legacy completion effects are retained in JSON but never affect static wallpaper.
         copy.completionStyle = .check
         return copy
+    }
+    func nudged(in layout: WallpaperLayout, dx: Double, dy: Double) -> WallpaperSettings {
+        let positioned = layout.positioned(using: self)
+        var next = self
+        next.panelX = min(1, max(0, Double(positioned.panel.midX / layout.canvas.width) + dx / Double(size.width)))
+        next.panelY = min(1, max(0, Double(positioned.panel.midY / layout.canvas.height) + dy / Double(size.height)))
+        return next
     }
 }
 extension WallpaperLayout {

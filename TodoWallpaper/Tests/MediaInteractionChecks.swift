@@ -78,6 +78,28 @@ enum MediaInteractionChecks {
         oldItemJSON.removeValue(forKey: "schedule")
         let oldItem = try JSONDecoder().decode(TodoItem.self, from: JSONSerialization.data(withJSONObject: oldItemJSON))
         try require(oldItem.schedule == nil && oldItem.id == item.id, "Old task and old backup decoding remains compatible")
+        let previousZone = NSTimeZone.default
+        defer { NSTimeZone.default = previousZone; NotificationCenter.default.post(name: .NSSystemTimeZoneDidChange, object: nil) }
+        for zoneName in ["UTC", "Asia/Shanghai", "America/Los_Angeles"] {
+            guard let zone = TimeZone(identifier: zoneName) else { throw TodoDataError.invalidDocument }
+            NSTimeZone.default = zone
+            NotificationCenter.default.post(name: .NSSystemTimeZoneDidChange, object: nil)
+            NotificationCenter.default.post(name: NSLocale.currentLocaleDidChangeNotification, object: nil)
+            for timestamp in [0.0, 1_700_000_000, 1_741_500_000, 1_799_999_999] {
+                for includesTime in [false, true] {
+                    let value = TodoSchedule(date: Date(timeIntervalSince1970: timestamp), includesTime: includesTime)
+                    let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
+                    let bytes = try encoder.encode(value)
+                    let oldFormatter = DateFormatter(); oldFormatter.dateStyle = .short
+                    oldFormatter.timeStyle = includesTime ? .short : .none
+                    let expected = oldFormatter.string(from: value.date())
+                    for _ in 0..<10 { try require(value.label == expected, "Cached schedule text must exactly match the previous formatter after timezone/locale invalidation") }
+                    try require(try encoder.encode(value) == bytes, "Formatting does not mutate persisted calendar components")
+                    try value.validate()
+                }
+            }
+        }
+        print("PASS: cached date-only/timed schedule labels match previous DateFormatter exactly across 3 timezones and locale/timezone invalidations; persisted fields unchanged.")
         print("PASS: all-family photo crops, real preview/inspector allocation, calendar-day/DST rotation, additive style/task fields, footer height and date CRUD/Intent-field preservation.")
     }
 }

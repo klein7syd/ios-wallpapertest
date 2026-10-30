@@ -34,7 +34,7 @@
 | Core/TodoImport.swift | App + Widget | 见主要类型（职责待补充） | TodoImportCandidate, TodoImportIdentity |
 | Core/TodoItem.swift | App + Widget | TodoItem / TodoDocument / 排序规则 | TodoItem, TodoDocument, TodoDataError |
 | Core/TodoRepository.swift | App + Widget | todos-v1.json 读写与校验 | TodoRepository, Header |
-| Core/TodoSchedule.swift | App + Widget | 见主要类型（职责待补充） | TodoSchedule |
+| Core/TodoSchedule.swift | App + Widget | 见主要类型（职责待补充） | TodoSchedule, ScheduleLabelFormatters |
 | Core/TodoSharedStorage.swift | App + Widget | App Group 路径、迁移与锁 | TodoWidgetConstants, TodoSharedStorage, TodoRepositorySnapshot, TodoMigrationReceipt |
 | Core/VisualTypes.swift | App + Widget | 见主要类型（职责待补充） | WallpaperColor, WallpaperFont, WallpaperWeight |
 | Core/WidgetHeaderLayout.swift | App + Widget | 标题栏度量 | WidgetHeaderLayout |

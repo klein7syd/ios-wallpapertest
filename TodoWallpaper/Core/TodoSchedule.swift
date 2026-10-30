@@ -28,7 +28,37 @@ struct TodoSchedule: Codable, Equatable, Sendable {
         guard roundtrip.year == year, roundtrip.month == month, roundtrip.day == day else { throw TodoDataError.invalidDocument }
     }
     var label: String {
-        let formatter = DateFormatter(); formatter.dateStyle = .short; formatter.timeStyle = includesTime ? .short : .none
-        return formatter.string(from: date())
+        ScheduleLabelFormatters.shared.string(from: date(), includesTime: includesTime)
+    }
+}
+
+// Target Membership：App + Widget；格式对象跨线程共用，系统设置变化时失效。
+private final class ScheduleLabelFormatters {
+    static let shared = ScheduleLabelFormatters()
+    private let lock = NSLock()
+    private var formats: [Bool: DateFormatter] = [:]
+    private var observers: [NSObjectProtocol] = []
+    private init() {
+        for name in [NSLocale.currentLocaleDidChangeNotification, .NSSystemTimeZoneDidChange] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+                self?.invalidate()
+            })
+        }
+    }
+    deinit { for observer in observers { NotificationCenter.default.removeObserver(observer) } }
+    private func invalidate() { lock.lock(); formats.removeAll(); lock.unlock() }
+    func string(from date: Date, includesTime: Bool) -> String {
+        lock.lock(); defer { lock.unlock() }
+        let formatter: DateFormatter
+        if let cached = formats[includesTime] { formatter = cached }
+        else {
+            formatter = DateFormatter()
+            formatter.locale = .autoupdatingCurrent; formatter.calendar = .autoupdatingCurrent
+            // 与旧格式器一致使用应用默认时区，时区通知到来后重新创建。
+            formatter.timeZone = NSTimeZone.default
+            formatter.dateStyle = .short; formatter.timeStyle = includesTime ? .short : .none
+            formats[includesTime] = formatter
+        }
+        return formatter.string(from: date)
     }
 }
