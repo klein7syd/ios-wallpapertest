@@ -91,7 +91,6 @@ struct TodoWidgetView: View {
     }
 }
 
-@main
 struct TodoWallpaperWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: TodoWidgetConstants.kind, provider: TodoWidgetProvider()) { TodoWidgetView(entry: $0) }

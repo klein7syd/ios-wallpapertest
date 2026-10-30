@@ -21,3 +21,7 @@ swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
 "$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
 
 if [ "$REPOSITORY_CHECKS_PASSED" != true ]; then exit 1; fi
+
+# 连心协议与共享发布使用生产代码执行；不依赖真实密钥或外部网络。
+swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/App/LianxinService.swift TodoWallpaper/Tests/LianxinChecks.swift -o "$RUNNER_TEMP/lianxin-checks"
+"$RUNNER_TEMP/lianxin-checks" | tee TodoWallpaper/out/lianxin-checks.log

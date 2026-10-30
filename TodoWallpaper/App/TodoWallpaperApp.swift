@@ -29,6 +29,10 @@ struct TodoWallpaperApp: App {
                         navigation.selectPage(.widget)
                         return
                     }
+                    if ProcessInfo.processInfo.arguments.contains("--native-lianxin-screen") {
+                        navigation.selectPage(.lianxin)
+                        return
+                    }
                     if ProcessInfo.processInfo.arguments.contains("--native-about-screen") {
                         navigation.selectPage(.about)
                         return
@@ -64,6 +68,9 @@ struct TodoWallpaperApp: App {
                 NavigationStack { WidgetAppearanceEditor(store: store) }
                     .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
                     .tag(AppPage.widget)
+                LianxinView()
+                    .tabItem { Label("连心", systemImage: "heart") }
+                    .tag(AppPage.lianxin)
                 AboutView(store: store)
                     .tabItem { Label("关于", systemImage: "info.circle") }
                     .tag(AppPage.about)

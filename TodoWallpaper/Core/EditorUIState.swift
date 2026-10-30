@@ -2,15 +2,15 @@ import Foundation
 
 /// Transient presentation state only. Nothing here changes persisted task or draft data.
 enum AppPage: String, CaseIterable, Identifiable {
-    case todos, wallpaper, widget, about
+    case todos, wallpaper, widget, lianxin, about
     var id: String { rawValue }
     var title: String {
         switch self { case .todos: return "待办"; case .wallpaper: return "壁纸"
-        case .widget: return "小组件"; case .about: return "关于" }
+        case .lianxin: return "连心"; case .widget: return "小组件"; case .about: return "关于" }
     }
     var icon: String {
         switch self { case .todos: return "checklist"; case .wallpaper: return "photo"
-        case .widget: return "square.grid.2x2"; case .about: return "info.circle" }
+        case .lianxin: return "heart"; case .widget: return "square.grid.2x2"; case .about: return "info.circle" }
     }
 }
 enum WallpaperTool: String, CaseIterable, Identifiable {

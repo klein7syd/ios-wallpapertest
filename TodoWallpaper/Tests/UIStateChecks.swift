@@ -6,7 +6,7 @@ enum UIStateChecks {
             if !value() { throw NSError(domain: "UIStateChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
         }
         var navigation = AppNavigationState()
-        try require(AppPage.allCases.count == 4 && AppPage.allCases.contains(.widget), "Widget is a real fourth root page")
+        try require(AppPage.allCases.count == 5 && AppPage.allCases.contains(.widget) && AppPage.allCases.contains(.lianxin), "Widget and Lianxin are selectable root pages")
         try require(!navigation.isEditing && navigation.inspectorExpanded, "Launch starts on Todo with a ready wallpaper inspector")
         for page in AppPage.allCases {
             navigation.selectPage(page)
@@ -88,6 +88,6 @@ enum UIStateChecks {
         try require(WidgetPreviewFamily.small.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 2, "Small Widget retains proven row capacity")
         try require(WidgetPreviewFamily.medium.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 3, "Medium Widget retains proven row capacity")
         try require(WidgetPreviewFamily.large.rowLimit(appearance: WidgetAppearance(), accessibility: false) == 6, "Large Widget retains proven row capacity")
-        print("PASS: UI state — four persistent root tabs, editing with ordinary navigation, repeated collapse/tool switching, conditional marker controls, dormant value preservation, keyboard/small-screen allocation, three fixed-preview ratios and Widget row capacities. Not an iPhone visual/scroll test.")
+        print("PASS: UI state — five persistent root tabs, editing with ordinary navigation, repeated collapse/tool switching, conditional marker controls, dormant value preservation, keyboard/small-screen allocation, three fixed-preview ratios and Widget row capacities. Not an iPhone visual/scroll test.")
     }
 }

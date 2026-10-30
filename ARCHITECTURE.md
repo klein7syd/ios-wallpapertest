@@ -196,3 +196,13 @@ TodoSchedule.label 由私有 ScheduleLabelFormatters 缓存两种短格式，在
 ## 构建与交接证据
 
 `check-native.sh` 先执行18个交接工具正/负向回归及严格文档引用检查，再执行原有结构、CG分析、数据迁移与生产壁纸渲染；`build-product.sh` 继续 Release App/Widget 与 Simulator Debug/UI 全门禁。版本、Artifact名及摘要均读取 product-version.json；设备和模拟器使用同一次CI构建号。最终 status.json 记录实际提交、版本和构建；真机未验证字段保留。历史 docs 版本说明是当时证据，当前模型以本文和源码为准。
+
+## 连心（0.7.0）
+
+底栏新增第五页“连心”，这是用户明确要求的新业务入口。`LianxinView` → `LianxinModel` → `AIServiceProtocol`；生产 `LianxinAPIService` 使用用户完整 HTTPS Chat Completions 地址、模型和 Bearer 密钥，Mock 实现供离线检查。请求只含名字和用户提示词，不上传照片、不自动生成、不发送历史结果。拒绝跳转、URL 凭证/查询参数、空输入；90 秒资源超时、1 MB 响应上限、可取消；错误不回显服务端正文。
+
+密钥通过 Security 存入本设备钥匙串；私有 Application Support/Lianxin/profile-v1.json 保存名字、提示词、地址、模型和上次结果，不含密钥。底图通过共享照片 actor 缩图，但指定连心私有目录；同名 .source 保留原图供壁纸导出，成功保存新资料后才移除旧照片。
+
+用户编辑文案后点击发布，`LianxinPublication` 将 1–200 字、IDOL 名字、1536px 缩略底图一起原子写入 App Group 的 lianxin-published-v1.json。共享文件没有 API 地址、密钥或私有提示词。`LianxinWidget` 仅读该快照，不访问 AI；主屏小/中/大与锁屏圆形/矩形分别布局，小尺寸允许省略。原待办组件 kind 保持不变，WidgetBundle 同时注册两类组件。
+
+`LianxinWallpaperView` 注入独立 LianxinWallpaper/LianxinExports 目录复用 WallpaperEditorModel、实时画布和真实物理像素渲染器；不写待办数据，不覆盖待办草稿。文本通过 CoreText 处理中文/韩文混排，字号/面板宽度可调；布局隐藏或截断时禁用保存。只有用户点击保存才申请相册添加权限。

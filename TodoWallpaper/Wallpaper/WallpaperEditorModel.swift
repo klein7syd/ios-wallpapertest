@@ -35,7 +35,9 @@ final class WallpaperEditorModel: ObservableObject {
     @Published private(set) var draftBlocked = false
     private var photoURL: URL?
     private(set) var items: [TodoItem] = []
-    private let files = WallpaperDraftStore()
+    private let files: WallpaperDraftStore
+
+    init(files: WallpaperDraftStore = WallpaperDraftStore()) { self.files = files }
     private let renderer = WallpaperRenderService()
     private var previewTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
@@ -88,19 +90,32 @@ final class WallpaperEditorModel: ObservableObject {
 
     func importPhoto(_ selection: PhotosPickerItem) async {
         guard !busy, !draftBlocked else { return }
-        saveTask?.cancel()
         isImporting = true
         defer { isImporting = false }
         do {
             guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
-            let url = try await files.importPhoto(data)
-            var next = settings
-            next.backgroundZoom = 1; next.backgroundPanX = 0; next.backgroundPanY = 0
-            let live = try await renderer.loadPhoto(at: url)
-            try await files.save(WallpaperDraft(settings: next, photoFileName: url.lastPathComponent))
-            photoURL = url; photoName = url.lastPathComponent; livePhoto = live
-            settings = next
+            try await applyPhotoData(data)
         } catch { message = error.localizedDescription }
+    }
+
+    // 连心复用同一渲染与草稿流程，但使用独立目录，不覆盖待办壁纸。
+    func importPhotoData(_ data: Data) async throws {
+        guard ready, !busy, !draftBlocked else { throw WallpaperError.invalidDraft }
+        isImporting = true
+        defer { isImporting = false }
+        try await applyPhotoData(data)
+    }
+
+    private func applyPhotoData(_ data: Data) async throws {
+        saveTask?.cancel()
+        let url = try await files.importPhoto(data)
+        var next = settings
+        next.backgroundZoom = 1; next.backgroundPanX = 0; next.backgroundPanY = 0
+        let live = try await renderer.loadPhoto(at: url)
+        try await files.save(WallpaperDraft(settings: next, photoFileName: url.lastPathComponent))
+        photoURL = url; photoName = url.lastPathComponent; livePhoto = live
+        settings = next
+        schedulePreview()
     }
 
     func removePhoto() {

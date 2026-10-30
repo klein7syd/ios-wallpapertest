@@ -15,13 +15,13 @@
 | App/ShadowCompareView.swift | App | 阴影配方对比页 | ShadowCompareView |
 | App/SmoothValueSlider.swift | App | UISlider 包装，按显示帧合并回写 | SmoothValueSlider, Coordinator, FrameProxy |
 | App/TodoStore.swift | App | 待办/外观快照、去抖保存、后台分析调度与图片保留/回收入口 | TodoStore |
-| App/TodoWallpaperApp.swift | App | App 入口、四页 TabView、关于页（含 #if DEBUG 调试入口） | TodoWallpaperApp, EditorRequest, DisplayError |
+| App/TodoWallpaperApp.swift | App | App 入口、五页 TabView、关于页（含 #if DEBUG 调试入口） | TodoWallpaperApp, EditorRequest, DisplayError |
 | App/WidgetAlbumPicker.swift | App | PhotoKit目标尺寸逐张导入、失败计数、取消与事务提交 | PhotoAlbumRow, AlbumError, AlbumImageRequest, PreparedAlbum, AlbumReader |
 | App/WidgetAppearanceEditor.swift | App | 小组件编辑页：主题/标题/文字/标记/内容 五个工具页 | WidgetEditorTool, TaskMarkerState, WidgetEditState, WidgetAppearanceEditor |
 | App/WidgetPhotoStore.swift | App | 共享actor缩图写入、相册名称事务日志与保守回收 | WidgetPhotoStore |
 | Core/AppearanceRepository.swift | App + Widget | appearance-v1.json 读写与备份 | AppearanceRepository |
 | Core/EditorHistory.swift | App + Widget | 分组撤销、图片引用快照与标准点吸附 | EditorHistory, Step, EditorStandards |
-| Core/EditorUIState.swift | App + Widget | 四页导航、编辑工具、预览与检查器空间分配 | AppPage, WallpaperTool, AppNavigationState |
+| Core/EditorUIState.swift | App + Widget | 五页导航、编辑工具、预览与检查器空间分配 | AppPage, WallpaperTool, AppNavigationState |
 | Core/MarkerDrawing.swift | App + Widget | 标记位图绘制 | MarkerDrawing |
 | Core/MarkerImageReference.swift | App + Widget | 标记图片命名与读取 | MarkerImageReference |
 | Core/NativeTypography.swift | App + Widget | CTFont 构造与字体家族 | NativeTypography, FontBox |
@@ -70,3 +70,10 @@
 | Wallpaper/WallpaperRenderer.swift | App | 壁纸合成渲染 | WallpaperPhotoInfo, WallpaperTextBlock, WallpaperRow, WallpaperLayout, WallpaperRendered, WallpaperRenderer |
 | Wallpaper/WallpaperSettings.swift | App | 壁纸设置与尺寸 | WallpaperSize, WallpaperSettings, WallpaperDraft |
 | Widget/TodoWallpaperWidget.swift | Widget | Widget bundle：Provider、View、Timeline 策略 | TodoWidgetEntry, TodoWidgetProvider, TodoWidgetView |
+| App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService |
+| App/LianxinModel.swift | App | 连心状态、钥匙串密钥与私有目录持久化 | LianxinKeychain, LianxinStorage, LianxinModel |
+| App/LianxinView.swift | App | 连心底图话语卡片及 API/提示词设置 | LianxinView |
+| App/LianxinWallpaperView.swift | App | 独立连心壁纸预览、调节与相册导出 | LianxinWallpaperRequest, LianxinWallpaperView |
+| Core/LianxinPublication.swift | App + Widget | 用户明确发布的文案与底图原子快照 | LianxinPublication |
+| Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
+| Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
