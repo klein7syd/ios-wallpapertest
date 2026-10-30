@@ -16,7 +16,7 @@
 | App/SmoothValueSlider.swift | App | UISlider 包装，按显示帧合并回写 | SmoothValueSlider, Coordinator, FrameProxy |
 | App/TodoStore.swift | App | 外观与待办的内存状态、去抖保存、reloadTimelines | TodoStore |
 | App/TodoWallpaperApp.swift | App | App 入口、四页 TabView、关于页（含 #if DEBUG 调试入口） | TodoWallpaperApp, EditorRequest, DisplayError |
-| App/WidgetAlbumPicker.swift | App | 相册选择与批量导入（AlbumReader） | PhotoAlbumRow, AlbumError, AlbumReader |
+| App/WidgetAlbumPicker.swift | App | 相册选择与批量导入（AlbumReader） | PhotoAlbumRow, AlbumError, AlbumImageRequest, PreparedAlbum, AlbumReader |
 | App/WidgetAppearanceEditor.swift | App | 小组件编辑页：主题/标题/文字/标记/内容 五个工具页 | WidgetEditorTool, TaskMarkerState, WidgetEditState |
 | App/WidgetPhotoStore.swift | App | 把 Photos 数据缩到 512/1536 写入 App Group | WidgetPhotoStore |
 | Core/AppearanceRepository.swift | App + Widget | appearance-v1.json 读写与备份 | AppearanceRepository |
@@ -25,6 +25,7 @@
 | Core/MarkerDrawing.swift | App + Widget | 标记位图绘制 | MarkerDrawing |
 | Core/MarkerImageReference.swift | App + Widget | 标记图片命名与读取 | MarkerImageReference |
 | Core/NativeTypography.swift | App + Widget | CTFont 构造与字体家族 | NativeTypography, FontBox |
+| Core/PhotoAssetMaintenance.swift | App + Widget | 导入失败阈值、引用集合、保守孤立图片回收 | PhotoAssetReferences, PhotoImportProgress, PhotoAssetGarbageCollector |
 | Core/PhotoComposition.swift | App + Widget | PhotoCrop、相册轮换、每日时间线 | PhotoCrop, WidgetAlbumRotation, WidgetDayTimeline |
 | Core/PhotoAnalysisRequest.swift | App + Widget | 完整分析上下文、稳定缓存标识与不透明底色归一 | PhotoAnalysisRequest |
 | Core/ReadableModels.swift | App + Widget | 可读性规则、动态偏移边界、强度、阴影配方、原始图片分析 | TextAnchor, ReadableRules, ReadableContentGeometry, ImageAnalysis |
@@ -34,7 +35,7 @@
 | Core/TodoItem.swift | App + Widget | TodoItem / TodoDocument / 排序规则 | TodoItem, TodoDocument, TodoDataError |
 | Core/TodoRepository.swift | App + Widget | todos-v1.json 读写与校验 | TodoRepository, Header |
 | Core/TodoSchedule.swift | App + Widget | 见主要类型（职责待补充） | TodoSchedule |
-| Core/TodoSharedStorage.swift | App + Widget | App Group 路径、迁移与锁 | TodoWidgetConstants, TodoSharedStorage, TodoMigrationReceipt |
+| Core/TodoSharedStorage.swift | App + Widget | App Group 路径、迁移与锁 | TodoWidgetConstants, TodoSharedStorage, TodoRepositorySnapshot, TodoMigrationReceipt |
 | Core/VisualTypes.swift | App + Widget | 见主要类型（职责待补充） | WallpaperColor, WallpaperFont, WallpaperWeight |
 | Core/WidgetHeaderLayout.swift | App + Widget | 标题栏度量 | WidgetHeaderLayout |
 | Core/WidgetLayout.swift | App + Widget | 小组件行高、容量、间距计算 | WidgetLayoutMetrics, WidgetPreviewState |
@@ -52,6 +53,7 @@
 | Tests/MediaInteractionChecks.swift | App(Debug) | 见主要类型（职责待补充） | MediaInteractionChecks |
 | Tests/MigrationChecks.swift | App(Debug) | 见主要类型（职责待补充） | MigrationChecks |
 | Tests/NativeUIProbe.swift | App(Debug) | 见主要类型（职责待补充） | NativeUIProbe, ProbeTrackingSlider |
+| Tests/PhotoAssetMaintenanceChecks.swift | 独立 macOS 检查 | 导入阈值、回收与撤销/备份保留回归 | PhotoAssetMaintenanceChecks |
 | Tests/PhotoRepairChecks.swift | App(Debug) | 见主要类型（职责待补充） | PhotoRepairChecks |
 | Tests/PhotoAnalysisChecks.swift | 独立macOS检查 | 实际CG分析、文件后端、取消与相册批次可执行回归 | PhotoAnalysisChecks |
 | Tests/PhotoRepairRenderChecks.swift | App(Debug) | 见主要类型（职责待补充） | PhotoRepairRenderChecks |

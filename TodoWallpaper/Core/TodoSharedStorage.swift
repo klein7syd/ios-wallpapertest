@@ -24,12 +24,22 @@ enum TodoSharedStorage {
                       sharedDirectory: try sharedDirectory(), groupID: groupID)
     }
 
-    static func appRepository() throws -> TodoRepository { try migration().prepare() }
+    static func appSnapshot() throws -> TodoRepositorySnapshot { try migration().prepareSnapshot() }
+    static func widgetSnapshot() throws -> TodoRepositorySnapshot {
+        try TodoMigration.readySnapshot(sharedDirectory: sharedDirectory(), groupID: groupID)
+    }
+    static func appRepository() throws -> TodoRepository { try appSnapshot().repository }
     static func widgetRepository() throws -> TodoRepository {
         try TodoMigration.readyRepository(sharedDirectory: sharedDirectory(), groupID: groupID)
     }
     static func canRecover() -> Bool { (try? migration().recoveryRepository().canRecoverFromBackup()) ?? false }
     static func recover() throws { try migration().recoveryRepository().recoverFromBackup() }
+}
+
+// Target Membership：App + Widget；复用同一次加锁校验取得的内存快照，不跨后续事务缓存。
+struct TodoRepositorySnapshot {
+    let repository: TodoRepository
+    let document: TodoDocument
 }
 
 private struct TodoMigrationReceipt: Codable {
@@ -48,7 +58,9 @@ struct TodoMigration {
     private var readyURL: URL { sharedDirectory.appendingPathComponent("migration-ready-v1.json") }
     private var acknowledgementURL: URL { legacyDirectory.appendingPathComponent("appgroup-migration-v1.json") }
 
-    func prepare() throws -> TodoRepository {
+    func prepare() throws -> TodoRepository { try prepareSnapshot().repository }
+
+    func prepareSnapshot() throws -> TodoRepositorySnapshot {
         try FileManager.default.createDirectory(at: sharedDirectory, withIntermediateDirectories: true)
         let path = sharedDirectory.appendingPathComponent("migration-v1.lock").path
         let descriptor = Darwin.open(path, O_CREAT | O_RDWR | O_EXLOCK, S_IRUSR | S_IWUSR)
@@ -66,7 +78,7 @@ struct TodoMigration {
             let receipt = ready ?? TodoMigrationReceipt(groupID: groupID, origin: "verified-existing-shared", verifiedItemCount: document.items.count)
             if ready == nil { try Self.write(receipt, to: readyURL) }
             if acknowledged == nil { try Self.write(receipt, to: acknowledgementURL) }
-            return shared
+            return TodoRepositorySnapshot(repository: shared, document: document)
         }
 
         let source: Data
@@ -91,15 +103,18 @@ struct TodoMigration {
         try Self.write(receipt, to: readyURL)
         try Self.write(receipt, to: acknowledgementURL)
         // Stage-B main and backup files remain untouched in the private container.
-        return shared
+        return TodoRepositorySnapshot(repository: shared, document: document)
     }
 
     static func readyRepository(sharedDirectory: URL, groupID: String) throws -> TodoRepository {
+        try readySnapshot(sharedDirectory: sharedDirectory, groupID: groupID).repository
+    }
+    static func readySnapshot(sharedDirectory: URL, groupID: String) throws -> TodoRepositorySnapshot {
         let ready = sharedDirectory.appendingPathComponent("migration-ready-v1.json")
         guard try readReceipt(at: ready, groupID: groupID) != nil else { throw TodoDataError.migrationRequired }
         let repository = TodoRepository(directoryURL: sharedDirectory, requiresExistingFile: true)
-        _ = try repository.load()
-        return repository
+        let document = try repository.load()
+        return TodoRepositorySnapshot(repository: repository, document: document)
     }
 
     func recoveryRepository() throws -> TodoRepository {

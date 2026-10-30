@@ -42,6 +42,15 @@ struct AppearanceRepository {
             try write(data, to: fileURL)
         }
     }
+    func assetReferences() throws -> Set<String> {
+        try locked {
+            var names = PhotoAssetReferences.appearance(try read())
+            let archives = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent == "appearance-v1.backup.json" || $0.lastPathComponent.hasPrefix("appearance-preserved-") }
+            for url in archives { names.formUnion(PhotoAssetReferences.appearance(try decode(Data(contentsOf: url)))) }
+            return names
+        }
+    }
     private func write(_ data: Data, to url: URL) throws {
         #if os(iOS)
         try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])

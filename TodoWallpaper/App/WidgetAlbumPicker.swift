@@ -17,8 +17,53 @@ private enum AlbumError: LocalizedError {
         }
     }
 }
+// PhotoKit 可提前或多次回调；取消与 requestID 返回的竞态必须只恢复一次 continuation。
+private final class AlbumImageRequest: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<UIImage, Error>?
+    private var requestID: PHImageRequestID?
+    private var finished = false
+    private var cancelled = false
+    func image(_ asset: PHAsset) async throws -> UIImage {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { next in
+                lock.lock()
+                if cancelled { lock.unlock(); next.resume(throwing: CancellationError()); return }
+                continuation = next; lock.unlock()
+                let options = PHImageRequestOptions()
+                options.deliveryMode = .highQualityFormat; options.resizeMode = .exact
+                options.isNetworkAccessAllowed = true; options.version = .current
+                let id = PHImageManager.default().requestImage(for: asset,
+                    targetSize: CGSize(width: 1536, height: 1536), contentMode: .aspectFit, options: options) { [self] image, info in
+                    if (info?[PHImageCancelledKey] as? Bool) == true { complete(.failure(CancellationError())); return }
+                    if (info?[PHImageResultIsDegradedKey] as? Bool) == true { return }
+                    if let image { complete(.success(image)) }
+                    else { complete(.failure((info?[PHImageErrorKey] as? Error) ?? AlbumError.unreadable)) }
+                }
+                lock.lock(); requestID = id; let shouldCancel = cancelled; lock.unlock()
+                if shouldCancel { PHImageManager.default().cancelImageRequest(id) }
+            }
+        } onCancel: { self.cancel() }
+    }
+    private func complete(_ result: Result<UIImage, Error>) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true; let next = continuation; continuation = nil; lock.unlock()
+        next?.resume(with: result)
+    }
+    private func cancel() {
+        lock.lock(); cancelled = true; let id = requestID; lock.unlock()
+        complete(.failure(CancellationError()))
+        if let id { PHImageManager.default().cancelImageRequest(id) }
+    }
+}
+private struct PreparedAlbum: Sendable {
+    let transactionID: UUID
+    let rotation: WidgetAlbumRotation
+    let skipped: Int
+}
 private actor AlbumReader {
-    private let photos = WidgetPhotoStore()
+    private let photos = WidgetPhotoStore.shared
     func albums() async throws -> [PhotoAlbumRow] {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         guard status == .authorized else { throw AlbumError.permission }
@@ -38,7 +83,7 @@ private actor AlbumReader {
         }
         return result
     }
-    func prepare(_ album: PhotoAlbumRow, progress: @escaping @Sendable (Int, Int) -> Void) async throws -> WidgetAlbumRotation {
+    func prepare(_ album: PhotoAlbumRow, progress: @escaping @Sendable (Int, Int) -> Void) async throws -> PreparedAlbum {
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized,
               let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [album.id], options: nil).firstObject else { throw AlbumError.permission }
         let options = PHFetchOptions(); options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
@@ -46,29 +91,42 @@ private actor AlbumReader {
         options.fetchLimit = 60
         let assets = PHAsset.fetchAssets(in: collection, options: options)
         guard assets.count > 0 else { throw AlbumError.missing }
-        var names: [String] = []
-        for index in 0..<assets.count {
-            try Task.checkCancellation()
-            let asset = assets.object(at: index)
-            let data: Data = try await withCheckedThrowingContinuation { continuation in
-                let request = PHImageRequestOptions(); request.deliveryMode = .highQualityFormat
-                request.isNetworkAccessAllowed = true; request.version = .current
-                PHImageManager.default().requestImageDataAndOrientation(for: asset, options: request) { data, _, _, info in
-                    if let data { continuation.resume(returning: data) }
-                    else { continuation.resume(throwing: (info?[PHImageErrorKey] as? Error) ?? AlbumError.unreadable) }
-                }
+        let transaction = try await photos.beginBatch()
+        var state = PhotoImportProgress(total: assets.count)
+        do {
+            for index in 0..<assets.count {
+                try Task.checkCancellation()
+                do {
+                    let name = try await importAsset(assets.object(at: index), transaction: transaction)
+                    state.succeeded(name)
+                } catch is CancellationError { throw CancellationError() }
+                catch { state.skipped() }
+                progress(index + 1, assets.count)
             }
             try Task.checkCancellation()
-            let imported = try await photos.importPhoto(data)
-            // 提交相册后由 TodoStore 的统一后台队列按当前外观分析，今天图片优先。
-            names.append(imported)
-            progress(index + 1, assets.count)
+            try state.validateResult()
+            return PreparedAlbum(transactionID: transaction,
+                rotation: WidgetAlbumRotation(title: album.title, photos: state.names, anchor: .now), skipped: state.failed)
+        } catch {
+            await photos.rollbackBatch(transaction)
+            throw error
         }
-        return WidgetAlbumRotation(title: album.title, photos: names, anchor: .now)
     }
+    private func importAsset(_ asset: PHAsset, transaction: UUID) async throws -> String {
+        let image = try await AlbumImageRequest().image(asset)
+        try Task.checkCancellation()
+        let data = try autoreleasepool {
+            guard let data = image.jpegData(compressionQuality: 0.95) else { throw AlbumError.unreadable }
+            return data
+        }
+        return try await photos.importPhoto(data, transactionID: transaction)
+    }
+    func commit(_ album: PreparedAlbum) async throws { try await photos.commitBatch(album.transactionID) }
+    func rollback(_ album: PreparedAlbum) async { await photos.rollbackBatch(album.transactionID) }
 }
 struct WidgetAlbumPicker: View {
-    let onSelect: (WidgetAlbumRotation) -> Void
+    let onSelect: (WidgetAlbumRotation, Int) throws -> Void
+    let onCommitted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var rows: [PhotoAlbumRow] = []
     @State private var error: String?
@@ -108,13 +166,22 @@ struct WidgetAlbumPicker: View {
     private func select(_ album: PhotoAlbumRow) {
         preparing = true; error = nil; progress = "准备照片…"
         task = Task {
+            var prepared: PreparedAlbum?
+            var published = false
             do {
                 let result = try await reader.prepare(album) { current, total in
                     Task { @MainActor in progress = "\(current) / \(total) 张" }
                 }
-                try Task.checkCancellation(); onSelect(result); dismiss()
+                prepared = result
+                try Task.checkCancellation()
+                try onSelect(result.rotation, result.skipped)
+                // 外观已原子落盘后，即使页面退出也不得回滚其引用的照片。
+                published = true
+                try await reader.commit(result)
+                onCommitted(); dismiss()
             } catch is CancellationError { }
             catch { self.error = error.localizedDescription }
+            if !published, let prepared { await reader.rollback(prepared) }
             preparing = false
         }
     }
