@@ -8,11 +8,20 @@ import AppKit
 
 extension WallpaperColor {
     var swiftColor: Color { Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha) }
+    #if canImport(UIKit)
+    static func sRGB(_ color: UIColor) -> WallpaperColor? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let converted = color.cgColor.converted(to: space, intent: .relativeColorimetric, options: nil),
+              let values = converted.components, values.count >= 4 else { return nil }
+        var result = WallpaperColor(red: Double(values[0]), green: Double(values[1]), blue: Double(values[2]), alpha: Double(converted.alpha))
+        result.clampForEditing()
+        return result
+    }
+    #endif
     static func resolved(_ color: Color, dark: Bool) -> WallpaperColor {
         #if canImport(UIKit)
         let native = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 1
-        if native.getRed(&r, green: &g, blue: &b, alpha: &a) { return WallpaperColor(red: r, green: g, blue: b, alpha: a) }
+        if let result = sRGB(native) { return result }
         #else
         if let native = NSColor(color).usingColorSpace(.sRGB) {
             return WallpaperColor(red: native.redComponent, green: native.greenComponent, blue: native.blueComponent, alpha: native.alphaComponent)

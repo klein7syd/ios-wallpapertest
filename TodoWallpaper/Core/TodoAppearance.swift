@@ -172,12 +172,15 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         try header?.validate()
         if let readableScrimOverride, !(0...0.8).contains(readableScrimOverride) { throw AppearanceError.invalidStyle }
         if let readableHeightRatio, !(0.25...0.7).contains(readableHeightRatio) { throw AppearanceError.invalidStyle }
-        if let readableEdgeInset, !(-40...40).contains(readableEdgeInset) { throw AppearanceError.invalidStyle }
+        if let readableEdgeInset,
+           !readableEdgeInset.isFinite || (readable.anchor != .center && !(-40...40).contains(readableEdgeInset)) {
+            throw AppearanceError.invalidStyle
+        }
         try backgroundCrop?.validate(); try photoRotation?.validate()
         if let backgroundPhotoOpacity, !backgroundPhotoOpacity.isFinite || !(0...1).contains(backgroundPhotoOpacity) { throw AppearanceError.invalidStyle }
         if let backgroundPhotoName, !WidgetPhotoReference.isValid(backgroundPhotoName) { throw AppearanceError.invalidStyle }
         guard (12...20).contains(fontSize), (-10...40).contains(spacing), (1...10).contains(maximumItems),
-              maximumTitleLines == nil || (1...2).contains(maximumTitleLines!),
+              maximumTitleLines.map({ (1...2).contains($0) }) ?? true,
               textColor.isValid, panelColor.isValid, completedTextColor?.isValid != false else { throw AppearanceError.invalidStyle }
     }
     func rows(_ items: [TodoItem], capacity: Int) -> [TodoItem] {
@@ -190,6 +193,61 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         let recent = items.filter(\.isCompleted).max { $0.updatedAt < $1.updatedAt }
         guard let recent, limit > 1 || pending.isEmpty else { return Array(pending.prefix(limit)) }
         return Array(pending.prefix(limit - 1)) + [recent]
+    }
+}
+
+extension TodoAppearance {
+    /// 只修复样式的数值边界；版本、Emoji 与文件引用仍须通过原校验。
+    func clampedForEditing() -> TodoAppearance {
+        var next = self
+        next.markerStyle.clampForEditing()
+        next.widget.markerStyle.clampForEditing()
+        next.widget.panelColor.clampForEditing(); next.widget.textColor.clampForEditing()
+        next.widget.completedTextColor?.clampForEditing()
+        next.widget.fontSize = ReadableRules.finiteClamp(next.widget.fontSize, to: 12...20, fallback: 15)
+        next.widget.spacing = ReadableRules.finiteClamp(next.widget.spacing, to: -10...40, fallback: 5)
+        next.widget.maximumItems = min(10, max(1, next.widget.maximumItems))
+        next.widget.maximumTitleLines = next.widget.maximumTitleLines.map { min(2, max(1, $0)) }
+        next.widget.readableScrimOverride = next.widget.readableScrimOverride.map { ReadableRules.finiteClamp($0, to: 0...0.8, fallback: 0.4) }
+        next.widget.readableHeightRatio = next.widget.readableHeightRatio.map { ReadableRules.finiteClamp($0, to: 0.25...0.7, fallback: 0.45) }
+        if let inset = next.widget.readableEdgeInset {
+            next.widget.readableEdgeInset = next.widget.readable.anchor == .center
+                ? (inset.isFinite ? inset : 0)
+                : ReadableRules.finiteClamp(inset, to: ReadableDefaults.edgeInsetRange, fallback: 0)
+        }
+        next.widget.backgroundPhotoOpacity = next.widget.backgroundPhotoOpacity.map { ReadableRules.finiteClamp($0, to: 0...1, fallback: 1) }
+        if var crop = next.widget.backgroundCrop {
+            crop.zoom = ReadableRules.finiteClamp(crop.zoom, to: 1...4, fallback: 1)
+            crop.panX = ReadableRules.finiteClamp(crop.panX, to: -1...1, fallback: 0)
+            crop.panY = ReadableRules.finiteClamp(crop.panY, to: -1...1, fallback: 0)
+            next.widget.backgroundCrop = crop
+        }
+        if var header = next.widget.header {
+            header.color.clampForEditing()
+            header.fontSize = ReadableRules.finiteClamp(header.fontSize, to: 12...32, fallback: 17)
+            header.horizontalPosition = ReadableRules.finiteClamp(header.horizontalPosition, to: 0...1, fallback: 0)
+            header.topInset = ReadableRules.finiteClamp(header.topInset, to: 0...24, fallback: 0)
+            next.widget.header = header
+        }
+        return next
+    }
+}
+extension WallpaperColor {
+    mutating func clampForEditing() {
+        red = ReadableRules.finiteClamp(red, to: 0...1, fallback: 1)
+        green = ReadableRules.finiteClamp(green, to: 0...1, fallback: 1)
+        blue = ReadableRules.finiteClamp(blue, to: 0...1, fallback: 1)
+        alpha = ReadableRules.finiteClamp(alpha, to: 0...1, fallback: 1)
+    }
+}
+extension MarkerStyle {
+    mutating func clampForEditing() {
+        size = ReadableRules.finiteClamp(size, to: 8...48, fallback: 18)
+        emojiSize = ReadableRules.finiteClamp(emojiSize, to: 8...48, fallback: 22)
+        gap = ReadableRules.finiteClamp(gap, to: 0...32, fallback: 10)
+        verticalOffset = ReadableRules.finiteClamp(verticalOffset, to: -16...16, fallback: 0)
+        lineWidth = ReadableRules.finiteClamp(lineWidth, to: 0.3...6, fallback: 1.5)
+        fill.clampForEditing(); stroke.clampForEditing(); completedColor.clampForEditing()
     }
 }
 struct TodoAppearance: Codable, Equatable, Sendable {

@@ -25,7 +25,7 @@
 | Core/MarkerImageReference.swift | App + Widget | 标记图片命名与读取 | MarkerImageReference |
 | Core/NativeTypography.swift | App + Widget | CTFont 构造与字体家族 | NativeTypography, FontBox |
 | Core/PhotoComposition.swift | App + Widget | PhotoCrop、相册轮换、每日时间线 | PhotoCrop, WidgetAlbumRotation, WidgetDayTimeline |
-| Core/ReadableModels.swift | App + Widget | 可读性标准值、强度、阴影配方、ImageAnalysis | TextAnchor, ShadowLayer, ShadowRecipe |
+| Core/ReadableModels.swift | App + Widget | 可读性规则、动态偏移边界、强度、阴影配方、原始图片分析 | TextAnchor, ReadableRules, ReadableContentGeometry, ImageAnalysis |
 | Core/TextLegibility.swift | App + Widget | 亮度、对比度、可读色（壁纸仍在用） | TextLegibility |
 | Core/TodoAppearance.swift | App + Widget | TodoAppearance / WidgetAppearance / 标记与颜色模型 | MarkerKind, TodoMarker, EmojiInput |
 | Core/TodoImport.swift | App + Widget | 见主要类型（职责待补充） | TodoImportCandidate, TodoImportIdentity |
@@ -38,10 +38,10 @@
 | Core/WidgetLayout.swift | App + Widget | 小组件行高、容量、间距计算 | WidgetLayoutMetrics, WidgetPreviewState |
 | Core/WidgetPhotoReference.swift | App + Widget | 小组件照片命名与读取 | WidgetPhotoReference |
 | Shared/AppearanceStore.swift | App + Widget | 亮度分析缓存与旧设置迁移 | AppearanceStore, Key, AppGroup |
-| Shared/ReadableLayer.swift | App + Widget | ScrimView、TextStyleModifier、ReadableTone、蒙层取值 | ScrimView, TextStyleModifier, ReadableLayer |
+| Shared/ReadableLayer.swift | App + Widget | 蒙层、文字/标记阴影、色调、模式门禁与内容几何偏好 | ScrimView, TextStyleModifier, ReadableTone, ReadableGeometryPreference |
 | Shared/SetTodoCompletionIntent.swift | App + Widget | 小组件点按完成的 AppIntent | SetTodoCompletionIntent |
 | Shared/TodoMarkerView.swift | App + Widget | 标记视图与位图缓存 | TodoMarkerView, MarkerBitmapCache |
-| Shared/TodoWidgetContent.swift | App + Widget | 小组件内容层：标题栏、行、阴影、锚点对齐 | TodoWidgetContent, WidgetMeasureCache |
+| Shared/TodoWidgetContent.swift | App + Widget | 小组件内容层与共享自然高度：标题栏、行、阴影、锚点对齐 | TodoWidgetContent, WidgetContentLayout, WidgetMeasureCache |
 | Shared/WidgetBackgroundView.swift | App + Widget | 背景层：照片、裁剪、不透明度、蒙层、准备缓存 | WidgetBackgroundView, WidgetPhotoCache, WidgetGlassBackground |
 | Tests/D34Checks.swift | App(Debug) | 见主要类型（职责待补充） | D34Checks |
 | Tests/EditorRefinementChecks.swift | App(Debug) | 见主要类型（职责待补充） | EditorRefinementChecks |

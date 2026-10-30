@@ -3,6 +3,7 @@ import SwiftUI
 import UIKit
 import CryptoKit
 import CoreText
+import WidgetKit
 
 /// Compiled only into the CI Simulator Debug app, never the delivered device IPA.
 @MainActor
@@ -59,6 +60,54 @@ enum NativeUIProbe {
             sliderDriver.flush(); sliderDriver.end()
             try require(sliderPublications == 1 && sliderBegins == 1 && sliderEnds == 1, "600 native slider samples coalesce into one test frame and one undo group")
             report["native_slider_600_samples_one_forced_frame_model_publications"] = sliderPublications
+            guard let convertedP3 = WallpaperColor.sRGB(UIColor(displayP3Red: 0.6, green: 0.4, blue: 0.3, alpha: 0.5)) else {
+                throw NSError(domain: "NativeUIProbe.P3Conversion", code: 1)
+            }
+            try require(abs(convertedP3.red - 0.6345) < 0.01 && abs(convertedP3.green - 0.3887) < 0.01
+                        && abs(convertedP3.blue - 0.2801) < 0.01 && abs(convertedP3.alpha - 0.5) < 0.001,
+                        "Display P3 is color-converted into sRGB, not reinterpreted as unchanged RGB components")
+            let repairStore = makeStore()
+            repairStore.beginAppearanceInteraction()
+            let repairHistory = EditorUndoState<TodoAppearance>()
+            repairHistory.synchronize(repairStore.appearance)
+            var invalidLook = repairStore.appearance
+            invalidLook.defaultMarker = TodoMarker(kind: .emoji, emoji: "invalid")
+            try require(!repairStore.setAppearance(invalidLook) && repairStore.appearanceError != nil,
+                        "Semantic appearance errors remain visible and cannot corrupt the current state")
+            var numericLook = repairStore.appearance; numericLook.widget.textColor.red = 1.2
+            numericLook.widget.fontSize = 99
+            try require(repairStore.setAppearance(numericLook) && repairStore.appearanceError == nil
+                        && repairStore.appearance.widget.fontSize == 20 && repairStore.appearance.widget.textColor.red == 1,
+                        "Numeric validation repairs and accepts the edit, clearing the previous error immediately")
+            repairHistory.observe(repairStore.appearance)
+            try await repairHistory.undo(read: { repairStore.appearance }) { previous, _ in
+                guard repairStore.setAppearance(previous) else { throw AppearanceError.invalidStyle }
+            }
+            try require(repairStore.appearance.widget.fontSize == 15 && !repairHistory.canUndo && !repairHistory.isRestoring,
+                        "A repaired editing value can be undone through the production store without locking the session")
+            let storageFixture = output.appendingPathComponent("appearance-error-fixture", isDirectory: true)
+            try FileManager.default.createDirectory(at: storageFixture, withIntermediateDirectories: true)
+            let storageRepository = AppearanceRepository(directory: storageFixture)
+            var futureLook = TodoAppearance(); futureLook.schemaVersion = 99
+            let futureBytes = try JSONEncoder().encode(futureLook)
+            try futureBytes.write(to: storageRepository.fileURL)
+            let protectedStore = TodoStore(repository: TodoRepository(directoryURL: storageFixture), appearanceRepository: storageRepository)
+            protectedStore.beginAppearanceInteraction(); protectedStore.reloadAppearance()
+            let protectedError = protectedStore.appearanceError
+            try require(protectedError != nil && protectedStore.setAppearance(protectedStore.appearance)
+                        && protectedStore.appearanceError == protectedError,
+                        "A same-value valid setter cannot hide a future-schema storage protection error")
+            var protectedEdit = protectedStore.appearance; protectedEdit.widget.fontSize = 100
+            try require(protectedStore.setAppearance(protectedEdit) && protectedStore.appearanceError == protectedError,
+                        "Successful numeric repair clears only validation errors, preserving unresolved storage errors")
+            protectedStore.flushAppearance()
+            let retainedFutureBytes = try Data(contentsOf: storageRepository.fileURL)
+            try require(protectedStore.appearanceError != nil && retainedFutureBytes == futureBytes,
+                        "Failed persistence never overwrites a future-schema file or hides its recovery state")
+            try JSONEncoder().encode(TodoAppearance()).write(to: storageRepository.fileURL)
+            protectedStore.reloadAppearance()
+            try require(protectedStore.appearanceError == nil, "An actual successful reload clears the storage error")
+            report["readability_numeric_repair_undo_and_srgb"] = "passed"
             var position = 0
             let session = EditorUndoState<Int>()
             session.synchronize(position)
@@ -130,6 +179,72 @@ enum NativeUIProbe {
             let photoImage = try render(WidgetBackgroundView(style: photoStyle, sharedDirectory: sharedPhotoFixture)
                 .frame(width: 170, height: 170), name: "widget-photo-background", directory: output)
             let photoBytes = [UInt8](try pixels(photoImage))
+            func effectBackground(mode: WidgetRenderingMode, family: WidgetFamily, scrim: Double, name: String) throws -> Data {
+                let image = try render(WidgetBackgroundView(style: photoStyle, sharedDirectory: sharedPhotoFixture,
+                    scrim: scrim, scrimAnchor: .bottom, effectsFamily: family)
+                    .frame(width: 170, height: 170)
+                    .environment(\.widgetRenderingMode, mode),
+                    name: name, directory: output, scale: 1)
+                return try pixels(image)
+            }
+            var excludedModes = [("vibrant", WidgetRenderingMode.vibrant, WidgetFamily.systemSmall),
+                                 ("accessory", WidgetRenderingMode.fullColor, WidgetFamily.accessoryRectangular)]
+            if #available(iOS 18.0, *) { excludedModes.append(("accented", .accented, .systemSmall)) }
+            for (tag, mode, family) in excludedModes {
+                let base = try effectBackground(mode: mode, family: family, scrim: 0, name: "readable-\(tag)-base")
+                let guarded = try effectBackground(mode: mode, family: family, scrim: 0.7, name: "readable-\(tag)-guarded")
+                try require(base == guarded, "Actual background pixels disable photo scrims in tinted and lock-screen families")
+            }
+            let fullBase = try effectBackground(mode: .fullColor, family: .systemSmall, scrim: 0, name: "readable-full-base")
+            let fullScrim = try effectBackground(mode: .fullColor, family: .systemSmall, scrim: 0.7, name: "readable-full-scrim")
+            try require(fullBase != fullScrim, "Full-color home-screen photos still receive the configured scrim")
+            var scrimPixels: [Data] = []
+            for inset in [-12.0, 0, 12] {
+                let image = try render(ScrimView(anchor: .bottom, strength: 0.6, heightRatio: 0.45, extraInset: inset)
+                    .frame(width: 100, height: 200).background(.white), name: "readable-inset-\(Int(inset))", directory: output, scale: 1)
+                scrimPixels.append(try pixels(image))
+            }
+            try require(scrimPixels[0] == scrimPixels[1] && scrimPixels[1] != scrimPixels[2],
+                        "Native negative scrim inset matches zero; positive inset extends coverage")
+            var markerLook = TodoAppearance()
+            markerLook.widget.followsSystemText = false
+            markerLook.widget.header = WidgetHeaderAppearance(showsTitle: false, showsSummary: false)
+            markerLook.widget.showsFooter = false
+            markerLook.widget.markerStyle.followsTextColor = false
+            markerLook.widget.markerStyle.stroke = WallpaperColor(red: 1, green: 0, blue: 0)
+            let markerOnly = TodoItem(id: UUID(), title: "", isCompleted: false, createdAt: .now, updatedAt: .now)
+            var markerShadowPixels: [Data] = []
+            for family in [WidgetFamily.systemSmall, .accessoryRectangular] {
+                let image = try render(TodoWidgetContent(document: TodoDocument(items: [markerOnly]), appearance: markerLook,
+                    error: nil, family: .small, interactive: false, effectsFamily: family).frame(width: 138, height: 138).background(.white)
+                    .environment(\.widgetRenderingMode, .fullColor),
+                    name: "readable-marker-shadow-\(family.rawValue)", directory: output, scale: 3)
+                markerShadowPixels.append(try pixels(image))
+            }
+            try require(markerShadowPixels[0] != markerShadowPixels[1],
+                        "The production marker receives a shadow at home and excludes it on the lock screen")
+            var centeredLook = TodoAppearance()
+            centeredLook.widget.readableAnchor = .center; centeredLook.widget.readableEdgeInset = 130
+            let centeredDocument = TodoDocument(items: [TodoItem(id: UUID(), title: "居中跨尺寸测试", isCompleted: false, createdAt: .now, updatedAt: .now)])
+            let smallLayout = WidgetContentLayout.make(document: centeredDocument, appearance: centeredLook, family: .small,
+                width: 138, height: 138, bodyUnit: 15, headerUnit: 17, footerUnit: 11)
+            let largeLayout = WidgetContentLayout.make(document: centeredDocument, appearance: centeredLook, family: .large,
+                width: 332, height: 350, bodyUnit: 15, headerUnit: 17, footerUnit: 11)
+            try require(smallLayout.inset == 40 && largeLayout.inset > 40,
+                        "The shared native layout reduces a saved large centered offset for the smaller family")
+            let centeredBackground = try render(WidgetBackgroundView(style: centeredLook.widget, scrim: 0.6,
+                scrimAnchor: .center, scrimExtraInset: 130, contentDocument: centeredDocument,
+                contentAppearance: centeredLook, contentFamily: .small,
+                contentMargins: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                .frame(width: 170, height: 170).environment(\.dynamicTypeSize, .large),
+                name: "readable-centered-small-effective", directory: output, scale: 1)
+            let centeredReference = try render(WidgetBackgroundView(style: centeredLook.widget, scrim: 0.6,
+                scrimAnchor: .center, scrimExtraInset: 40).frame(width: 170, height: 170)
+                .environment(\.dynamicTypeSize, .large), name: "readable-centered-small-reference", directory: output, scale: 1)
+            let centeredPixels = try pixels(centeredBackground), referencePixels = try pixels(centeredReference)
+            try require(centeredPixels == referencePixels,
+                        "A large saved inset cannot move the small Widget scrim away from its actual text offset")
+            report["readability_centered_family_offsets"] = ["small": smallLayout.inset, "large": largeLayout.inset]
             let center = ((photoImage.height / 2) * photoImage.width + photoImage.width / 2) * 4
             try require(Int(photoBytes[center+2]) > Int(photoBytes[center]) + 50, "Actual Widget background pixels contain the selected blue photo")
             // Exercise the exact pre-staged image path used by the extension,

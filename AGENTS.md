@@ -32,11 +32,11 @@
 1. 编译通过 ≠ 真机通过；`docs/VALIDATION.json` 记录的是历史证据，不要用编译结果冒充真机结论。
 2. 用户没 Mac：所有真机验证都要先出 Windows 包再让用户装。
 3. 文字颜色不要再用 `TextLegibility.readable` 改写（壁纸渲染除外），否则用户选了颜色却看不到变化。
-4. 阴影只加在文字上，不要套在包含分隔线的容器上，否则线会被糊粗。
+4. 阴影只加在文字与标记本身，不要套在包含分隔线的容器上，否则线会被糊粗；着色模式与锁屏 family 统一禁用阴影和蒙层。
 5. 可读性强度的倍率要同时传给蒙层和阴影，`readableText` 有 `intensity` 参数，不传就是 `.standard`。
 6. 行分隔线画在行的 overlay 上、不参与布局；不要改成分隔视图，否则行距会不均。
 7. `header.topInset` 已不参与布局（`WidgetHeaderLayout.titleY = 0`），位置由 `readableEdgeInset` 控制。
-8. 颜色写入前必须把 P3 越界分量 clamp 到 0…1，否则 `validate` 失败会静默丢弃修改并锁死撤销。
+8. 颜色先通过 CoreGraphics 从 P3 转换到 sRGB，再 clamp 到 0…1；`setAppearance` 会重试规范化数值并返回是否接收，撤销须检查返回值。
 9. 拖动面板时不能在增量路径里做吸附（每帧位移只有 1~2pt，会被反复吸回中心）。
 10. 分析缓存键是「图片名 + 锚点」，主 App 写、Widget 读；Widget 进程内不会自动失效（已知问题）。
 11. CI 的 render 检查带像素断言，改布局/字体/颜色会让断言失败，需要同步更新 Tests。

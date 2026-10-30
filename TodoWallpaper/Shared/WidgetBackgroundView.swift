@@ -1,5 +1,6 @@
 import SwiftUI
 import ImageIO
+import WidgetKit
 
 /// Widget photos are local App Group assets, never a screenshot of the Home Screen.
 /// Read once per reference so ordinary sliders don't repeatedly decode an image.
@@ -15,10 +16,29 @@ struct WidgetBackgroundView: View {
     var scrimHeightRatio: Double = ReadableDefaults.scrimHeightRatio
     var scrimColor: Color = .black
     var scrimExtraInset: Double = 0
+    var contentGeometry: ReadableContentGeometry?
+    var contentDocument: TodoDocument?
+    var contentAppearance: TodoAppearance?
+    var contentFamily: WidgetPreviewFamily = .medium
+    var contentMargins = EdgeInsets()
+    var effectsFamily: WidgetFamily?
+    @ScaledMetric(relativeTo: .body) private var bodyUnit = 15.0
+    @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
+    @ScaledMetric(relativeTo: .caption2) private var footerUnit = 11.0
     @Environment(\.colorScheme) private var systemScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.widgetFamily) private var family
     var body: some View {
         GeometryReader { geometry in
             let image = preparedPhoto ?? (style.backdrop == .photo && !preparedOnly ? WidgetPhotoCache.image(named: style.photoName(at: date), sharedDirectory: sharedDirectory) : nil)
+            let measured = contentGeometry ?? contentAppearance.map {
+                WidgetContentLayout.make(document: contentDocument, appearance: $0, family: contentFamily,
+                    width: max(0, geometry.size.width - contentMargins.leading - contentMargins.trailing),
+                    height: max(0, geometry.size.height - contentMargins.top - contentMargins.bottom),
+                    bodyUnit: bodyUnit, headerUnit: headerUnit, footerUnit: footerUnit).geometry
+            }
+            let effectiveInset = measured.map { ReadableRules.inset(scrimExtraInset, anchor: scrimAnchor,
+                canvasHeight: $0.canvasHeight, textHeight: $0.textHeight) } ?? scrimExtraInset
             ZStack {
                 if style.materialEnabled {
                     WidgetGlassBackground()
@@ -32,8 +52,8 @@ struct WidgetBackgroundView: View {
                             .position(x: frame.midX, y: frame.midY).opacity(style.photoOpacity)
                     }
                 }
-                if scrim > 0 {
-                    ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor, extraInset: scrimExtraInset)
+                if scrim > 0 && ReadableRules.permitsEffects(isFullColor: renderingMode == .fullColor, isAccessory: (effectsFamily ?? family).isReadableAccessory) {
+                    ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor, extraInset: effectiveInset)
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
 

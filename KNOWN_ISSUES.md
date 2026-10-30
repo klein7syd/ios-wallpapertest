@@ -9,14 +9,11 @@
 5. **相册导入整张读入且单张失败即中断** — `App/WidgetAlbumPicker.swift:AlbumReader.prepare`：用 `requestImageDataAndOrientation` 取原图，任一 `throw` 直接退出，已写入文件不回滚。
 6. **`TodoSchedule.label` 每次新建 `DateFormatter`** — `Core/TodoSchedule.swift:label`（计算属性）。
 7. **双指连坐回滚** — `App/PhotoMotionView.swift:finish`：任一识别器 `.cancelled` 会把整次交互回滚到 `initialCrop`。
-8. **白蒙层的自动强度未区分** — `App/ImageAnalyzer.swift:suggestedScrim(meanLuma:contrast:)` 只按"越亮越强"，深色文字的白蒙层需要反向映射。
 9. **轮换到未分析的那张图时回退固定值** — `Shared/AppearanceStore.swift:analysis(for:anchor:)` 命中不了缓存时，`Core/ReadableModels.swift:ReadableSettings.autoScrim` 回退 `ReadableDefaults.scrim = 0.4`。相册导入时每张都算过，只有历史数据或绕过导入路径时才会缺。
 10. **Widget 进程内分析缓存不失效** — `Shared/AppearanceStore.swift:AppearanceStore.analysis` 的进程内字典在 Widget 扩展里没有失效入口。
-11. **标记视图没有阴影** — `Shared/TodoWidgetContent.swift:mark` 调用 `TodoMarkerView` 时没有加 `.readableText`，标记在复杂背景上缺少托底。
 12. **壁纸 `drawText` 的 `shadow` 参数已成死参数** — `Wallpaper/WallpaperRenderer.swift:drawText` 签名仍保留 `shadow: CGColor? = nil`，但 `setShadow` 已删除、无人再传值。
 13. **壁纸微调步进过小、从边缘会跳变** — `Wallpaper/WallpaperEditorView.swift:nudge`：按 `layout.panel.midX / 390` 重算再叠 `dx / size.width`（约 0.2pt），且未包在 `interaction.begin/end` 里；`panelX` 被夹在 0…1 但 `midX` 只能落在 0.46…0.54，从边缘点一次会跳。
-14. **`setAppearance` 校验失败仍静默丢弃** — `App/TodoStore.swift:setAppearance` 第 47 行 catch 后只设 `appearanceError` 并 `return`，本次修改不生效；`appearanceError` 要到下一次成功 `saveAppearance`（第 81 行）或 `reloadAppearance`（第 86 行）才清空。
-15. **选图时的亮度分析在主线程** — `App/WidgetAppearanceEditor.swift` 的 `.onChange(of: selectedPhoto)` 里 `Task { … analyzeAllAnchors … }` 继承视图的 MainActor，解码大图并做三次 48×48 渲染都在主线程。
+15. **选图时的亮度分析在主线程** — `App/WidgetAppearanceEditor.swift` 的 `.onChange(of: selectedPhoto)` 里 `Task { … analyzeAllAnchors … }` 继承视图的 MainActor，解码大图并做三次 32×32 取样仍在主线程；48×48 仅属于传入非空裁剪的合成分支。
 
 ## b. 真机未验证
 
@@ -47,5 +44,15 @@
 10. **旧文字描边（多方向偏移叠文字 / 位图描边）** → 发虚、性能差、ImageRenderer 不渲染 → 全部删除，改为纯阴影方案。
 11. **旧 `header.topInset` 仍在生效** → 界面上已无控件能改它，迁移也只清了部分锚点 → `WidgetHeaderLayout.titleY = 0`，位置统一由 `edgeInset` 控制。
 13. **壁纸 `setShadow` 旧阴影** → 文字下方出现硬边发糊 → 已删除 `setShadow` 调用与 shadow 常量（`WallpaperRenderer`），签名参数保留但不再使用。不要重新加回去。
-14. **标记视图没有阴影** → 标记与文字在同一行时视觉不一致 → 尚未修复，见 a 部分第 11 条。
+14. **标记视图没有阴影** → 标记与文字在同一行时视觉不一致 → 第1组已给标记本身添加同配方阴影，并保留着色/锁屏禁用门禁，见 e 部分。
 12. **测试里的像素断言随布局变化失败** → CI 有 render 检查 → 改布局后同步更新 `Tests/`。
+
+## e. 第1组已修复（编译与真机证据分别记录）
+
+- 负边距曾通过 `abs` 扩大顶部/底部蒙层；现在负增量按 0 计，正增量仍扩展覆盖。
+- 原 a8：黑/白蒙层在渲染时根据原始亮度、对比度和当前文字深浅重算；旧 `suggestedScrim` 仅解码兼容，新缓存不写它。
+- 原 a11：标记本身与文字共用阴影及效果策略；真实 accented/vibrant 与锁屏 family 均禁用效果；摘要重复阴影已移除。
+- P3 颜色先真正转换到 sRGB，再夹取分量，不再把原色域数值直接解释为 sRGB。
+- 居中偏移范围由自然文字高度与画布高度动态确定，滑条、setter、锚点切换和渲染共用规则；历史顶部/底部 -40 值仍能加载。
+- 原 a14：`setAppearance` 对数值做规范化后重试并返回结果，成功立即清除校验错误；存储/未来版本错误须实际 IO 成功才清除。撤销检查接收结果，失败可重试。
+- 新增纯 Core 规则/历史数据检查及 iOS 原生颜色、像素、样式保护与撤销检查；源码检查不构成真机验收证据。

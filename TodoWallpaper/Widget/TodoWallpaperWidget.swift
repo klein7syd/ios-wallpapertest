@@ -46,19 +46,23 @@ struct TodoWidgetProvider: TimelineProvider {
 struct TodoWidgetView: View {
     let entry: TodoWidgetEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.widgetContentMargins) private var contentMargins
     private var style: WidgetAppearance { entry.appearance.widget }
     @Environment(\.colorScheme) private var defaultScheme
     private var scheme: ColorScheme { style.theme == .system ? defaultScheme : style.theme == .dark ? .dark : .light }
     private var previewFamily: WidgetPreviewFamily { family == .systemLarge ? .large : family == .systemMedium ? .medium : .small }
     var body: some View {
-        let readable = ReadableResolver.scrim(style: style, date: entry.date, scheme: scheme)
+        let readable = ReadableResolver.scrim(style: style, date: entry.date, scheme: scheme, renderingMode: renderingMode, family: family)
         TodoWidgetContent(document: entry.document, appearance: entry.appearance,
-            error: entry.error, family: previewFamily)
+            error: entry.error, family: previewFamily, effectsFamily: family)
             .containerBackground(for: .widget) {
                 WidgetBackgroundView(style: style, date: entry.date, preparedPhoto: entry.background, preparedOnly: true,
                                      scrim: readable.value, scrimAnchor: style.readable.anchor,
                                      scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color,
-                                     scrimExtraInset: style.readable.edgeInset)
+                                      scrimExtraInset: style.readable.edgeInset,
+                                      contentDocument: entry.document, contentAppearance: entry.appearance,
+                                      contentFamily: previewFamily, contentMargins: contentMargins, effectsFamily: family)
             }
             .environment(\.colorScheme, scheme)
     }
