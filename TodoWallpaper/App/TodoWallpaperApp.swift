@@ -133,7 +133,7 @@ struct TodoListView: View {
                     }
                     .overlay {
                         if store.items.isEmpty {
-                            ContentUnavailableView("还没有待办", systemImage: "checklist", description: Text("点右上角 +，记下第一件事。"))
+                            ContentUnavailableView("还没有待办", systemImage: "checklist", description: Text("点下方“新增待办”，记下第一件事。"))
                         }
                     }
                 }
@@ -147,11 +147,15 @@ struct TodoListView: View {
                     Button { importCalendar = true } label: { Label("从日历或提醒事项导入", systemImage: "calendar.badge.plus") }
                         .disabled(!store.hasLoaded || store.loadError != nil)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { editor = EditorRequest(item: nil) } label: {
-                        Label("新增待办", systemImage: "plus")
-                    }.disabled(!store.hasLoaded || store.loadError != nil)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button { editor = EditorRequest(item: nil) } label: {
+                    Label("新增待办", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44)
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(!store.hasLoaded || store.loadError != nil)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(.bar)
             }
             .sheet(isPresented: $importCalendar) { CalendarImportView(store: store) }
             .sheet(item: $editor, onDismiss: {
