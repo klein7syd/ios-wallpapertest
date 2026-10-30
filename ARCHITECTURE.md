@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-本文只描述当前代码现状。凡是未能从源码确认的地方标「待确认」。
+本文只描述当前代码现状，所有条目均可追溯到源码。
 
 ## a. 模块总览
 
@@ -53,7 +53,21 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 `WidgetHeaderAppearance`：`text`(≤40 无换行)、`fontSize`(12…32)、`color`、`followsTextColor`、`showsTitle`、`showsSummary`、`horizontalPosition`(0…1)、`topInset`(0…24，已不参与布局)。
 `ReadableSettings`：`anchor`、`intensity`、`scrimOverride: Double?`、`heightRatio`、`shadowPreset`、`edgeInset`。
 `WidgetAlbumRotation`：`title`(≤100)、`photos`(1…60)、`anchor: Date`、`enabled`。
-`MarkerStyle` / `PhotoCrop` / `WallpaperSettings` 的字段与默认值：待确认（未逐字段核对）。
+`MarkerStyle`（`Core/TodoAppearance.swift`）：`size`(8…48, 18)、`emojiSize`(8…48, 22)、`gap`(0…32, 10)、
+`verticalOffset`(-16…16, 0)、`lineWidth`(0.3…6, 1.5)、`followsTextColor`(Bool, true)、`fill`/`stroke`(WallpaperColor)、
+`completedColor`(默认绿 0.2/0.75/0.4)、`completion`(MarkerCompletion, .checkShapes)、`completionEmoji`(默认 ✅，需 EmojiInput 校验)。
+全部字段非可选；`validate()` 逐项检查上述范围与颜色合法性。
+
+`PhotoCrop`（`Core/PhotoComposition.swift`）：`zoom`(1…4, 1)、`panX`(-1…1, 0)、`panY`(-1…1, 0)；
+三个字段都要求 `isFinite`；非可选。裁剪框由 `frame(source:canvas:)` 计算。
+
+`WallpaperSettings`（`Wallpaper/WallpaperSettings.swift`）：`size`(WallpaperSize, 1890×4096)、`canvasAspect`(Double?, 9/19.5)、
+`backgroundZoom`(1…4, 1)、`backgroundPanX`/`backgroundPanY`(-1…1, 0)、`customPosition`(false)、`panelX`/`panelY`(0…1, 0.5)、
+`panelWidth`(0.3…0.96, 0.88)、`automaticHeight`(true)、`panelHeight`(0.12…0.94, 0.38)、`cornerRadius`(0…80, 24)、
+`glassOpacity`(0…0.85, 0.22)、`darkGlass`(true)、`blurRadius`(0…45, 22)、`borderOpacity`(0…1, 0.25)、`highlight`(0…0.6, 0.12)、
+`padding`(8…48, 20)、`includeCompleted`(false)、`maximumItems`(Int, 8)、`fontSize`(Double, 18)、`font`/`weight`/`textColor`、
+`lineSpacing`(4)、`itemSpacing`(12)、`alignment`(.leading)、`completionStyle`(.strikeAndDim)。
+`validated()` 先把 `aspectRatio` 限制在 0.25…2，其余越界值按上表 `c(...)` 夹取（不抛错，除尺寸非法）。
 
 迁移：`ReadableSettingsMigration.take()` 主 App 启动时执行一次并删除旧键；`TodoMigration` 负责旧目录 → App Group 的一次性迁移，用 `migration-ready-v1.json` 与文件锁保证幂等。
 
@@ -75,7 +89,7 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 - `ScrimView`：底部/顶部用 `LinearGradient`，三个 stop（1.0 / 0.45 / 0 倍强度），高度 = `高度 × heightRatio + |extraInset|`；居中用 `RadialGradient`（中心 `.center`，`endRadius = 高度 × 0.55`，按 `extraInset` 偏移）。
 - `TextStyleModifier`：按 `ReadabilityIntensity` 取 `shadowOpacityMultiplier`（0.5/0.8/1.1）与 `shadowRadiusScale`（0.7/0.85/1.0）；配方来自 `ShadowRecipes`，默认 `lightTextRecipe = I`、`darkTextRecipe = J`。
-- 套了阴影的：标题栏文字、任务标题、日期、"N 未完成"、底部说明。未套的：行分隔线（overlay 绘制）、标记视图（待确认是否应加）。
+- 套了阴影的：标题栏文字、任务标题、日期、"N 未完成"、底部说明。未套的：行分隔线（画在行 overlay，不参与阴影链）、标记视图（`TodoMarkerView` 调用处没有加 `readableText`）。
 - 颜色判断：`ReadableTone.resolve` 用线性亮度阈值 **0.179** 判定深浅并给出 `scrimColor`；`TodoWidgetContent.foreground` 与 `ReadableResolver.scrim` 都走它。第三处历史实现 `TextLegibility.readable` 仍在壁纸渲染中使用（未统一）。
 - 强度与 Scrim 优先级：`scrimOverride`（手动）> `autoScrim(analysis:) = suggestedScrim × 强度倍率`（clamp 0…0.8）> 无分析时 `ReadableDefaults.scrim = 0.4`。
 - `edgeInset`：顶部/底部锚点作为该方向的 padding（可为负）；居中锚点作为 `offset(y:)`。与 `header.topInset` 无耦合，后者已不参与布局。
@@ -95,32 +109,32 @@ UserDefaults（App Group）：`readable.analysis.<图片名>.<锚点>` 存 `Imag
 
 ## h. 日历/提醒导入
 
-`CalendarReader` 用 EventKit 读事件与提醒（`requestFullAccessToEvents` / `requestFullAccessToReminders`，具体权限常量待确认），过滤 90 天窗口，转 `TodoImportCandidate`，提醒事项用 `dueDateComponents` 还原日期（缺 calendar 时补当前日历）。
+`CalendarReader`（`EKEventStore`）分别调用 `requestFullAccessToEvents()` 与 `requestFullAccessToReminders()`，任一被拒抛 `CalendarImportError.permission`；不申请写入权限，也不读取 `EKAuthorizationStatus` 数值，只用返回的 Bool。事件按 90 天窗口过滤，转 `TodoImportCandidate`；提醒事项用 `dueDateComponents` 还原日期（缺 calendar 时补当前日历）。
 
 ## i. 常量与阈值
 
-| 名称 | 值 | 位置 | 含义 |
+| 名称 | 值 | 所在文件:函数 | 含义 |
 | --- | --- | --- | --- |
-| 亮度阈值 | 0.179 | `ReadableTone.resolve` | 深浅文字分界 |
-| 默认 scrim | 0.4 | `ReadableDefaults.scrim` | 无分析时回退 |
-| 渐变比例 | 0.45 | `ReadableDefaults.scrimHeightRatio` | 蒙层覆盖高度 |
-| Scrim 范围 | 0…0.8 | `ReadableDefaults.scrimRange` | 手动滑条 |
-| 高度比范围 | 0.25…0.7 | `ReadableDefaults.heightRatioRange` | 渐变范围滑条 |
-| edgeInset | -40…40 | `ReadableDefaults.edgeInsetRange` | 位置偏移 |
-| 强度倍率 | 0.7/1.0/1.3 | `ReadabilityIntensity.multiplier` | 蒙层 |
-| 阴影不透明度倍率 | 0.5/0.8/1.1 | `ReadabilityIntensity.shadowOpacityMultiplier` | 阴影 |
-| 阴影半径缩放 | 0.7/0.85/1.0 | `ReadabilityIntensity.shadowRadiusScale` | 阴影 |
-| 分析缩图 | 32×32 | `ImageAnalyzer` | 采样尺寸 |
-| 对比度归一 | 0.35 | `ImageAnalyzer` | 标准差基准 |
-| 照片最长边 | 1536 | `WidgetPhotoStore` | 导入缩放 |
-| 标记图最长边 | 512 | `WidgetPhotoStore` | 导入缩放 |
-| 背景缓存最长边 | 1024 / 768 | `WidgetPhotoCache` | 解码与预生成 |
-| 照片上传上限 | 80 MB | `WidgetPhotoStore` | 数据保护 |
-| 外观去抖 | 800 ms | `TodoStore.scheduleAppearanceSave` | 保存延迟 |
-| 吸附半径 | 4pt（已吸附 7pt） | `StandardDetent` | PreciseSlider |
-| 相册上限 | 60 张 | `WidgetAlbumRotation.validate` | 轮换数量 |
-| 日历窗口 | 90 天 | `CalendarReader` | 导入范围 |
-| 最大行数 | 10 | `maximumItems` 校验 | 小组件行数 |
+| 亮度阈值 | 0.179 | `Shared/ReadableLayer.swift:ReadableTone.resolve` | 深浅文字分界 |
+| 默认 scrim | 0.4 | `Core/ReadableModels.swift:ReadableDefaults` | 无分析时回退 |
+| 渐变比例 | 0.45 | `Core/ReadableModels.swift:ReadableDefaults` | 蒙层覆盖高度 |
+| Scrim 范围 | 0…0.8 | `Core/ReadableModels.swift:ReadableDefaults` | 手动滑条 |
+| 高度比范围 | 0.25…0.7 | `Core/ReadableModels.swift:ReadableDefaults` | 渐变范围滑条 |
+| edgeInset | -40…40 | `Core/ReadableModels.swift:ReadableDefaults` | 位置偏移 |
+| 强度倍率 | 0.7/1.0/1.3 | `Core/ReadableModels.swift:ReadabilityIntensity` | 蒙层 |
+| 阴影不透明度倍率 | 0.5/0.8/1.1 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
+| 阴影半径缩放 | 0.7/0.85/1.0 | `Core/ReadableModels.swift:ReadabilityIntensity` | 阴影 |
+| 分析缩图 | 32×32 | `App/ImageAnalyzer.swift:ImageAnalyzer` | 采样尺寸 |
+| 对比度归一 | 0.35 | `App/ImageAnalyzer.swift:ImageAnalyzer` | 标准差基准 |
+| 照片最长边 | 1536 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
+| 标记图最长边 | 512 | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 导入缩放 |
+| 背景缓存最长边 | 1024 / 768 | `Shared/WidgetBackgroundView.swift:WidgetPhotoCache` | 解码与预生成 |
+| 照片上传上限 | 80 MB | `App/WidgetPhotoStore.swift:WidgetPhotoStore` | 数据保护 |
+| 外观去抖 | 800 ms | `App/TodoStore.swift:TodoStore` | 保存延迟 |
+| 吸附半径 | 4pt（已吸附 7pt） | `Core/EditorHistory.swift:StandardDetent` | PreciseSlider |
+| 相册上限 | 60 张 | `Core/PhotoComposition.swift:WidgetAlbumRotation` | 轮换数量 |
+| 日历窗口 | 90 天 | `App/CalendarImportView.swift:CalendarReader` | 导入范围 |
+| 最大行数 | 10 | `Core/TodoAppearance.swift:WidgetAppearance` | 小组件行数 |
 
 ## j. 线程与并发
 

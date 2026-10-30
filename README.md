@@ -1,6 +1,8 @@
 # Todo Wallpaper · Native iOS
 
-**Current delivery: 0.5.1 / 1029** — [real CI success](https://github.com/klein7syd/ios-wallpapertest/actions/runs/40481159418). Device App+Widget, native persistence/render/state checks and iOS Simulator passed. Windows signing/install, real iPhone FPS, PhotoKit access and Home Screen material remain pending.
+> 交接文档（当前代码现状）：[AGENTS.md](AGENTS.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [FILE_MAP.md](FILE_MAP.md) · [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
+
+**Current delivery: 0.6.0 / 1069** — 原生 App + Widget 编译、原生 PNG 渲染检查与模拟器检查通过；Windows 签名安装与全部真机项仍未验证。
 
 Public source-only personal project. Windows+iPhone, free Apple Account, macOS GitHub Actions compilation, Windows iPASide/R1 local signing. No credentials, signed packages, profiles or device identities are committed; no automatic public Releases.
 
