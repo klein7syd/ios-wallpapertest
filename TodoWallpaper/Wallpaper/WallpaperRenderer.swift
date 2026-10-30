@@ -352,7 +352,7 @@ enum WallpaperRenderer {
 
     private static func drawText(_ block: WallpaperTextBlock, in context: CGContext, x: CGFloat,
                                  top: CGFloat, width: CGFloat, canvasHeight: CGFloat,
-                                 alignment: WallpaperAlignment, strike: Bool = false, strikeColor: CGColor? = nil, shadow: CGColor? = nil) {
+                                 alignment: WallpaperAlignment, strike: Bool = false, strikeColor: CGColor? = nil) {
         context.saveGState()
         context.clip(to: CGRect(x: x, y: canvasHeight - top - block.height, width: width, height: block.height).insetBy(dx: -2, dy: -2))
         defer { context.restoreGState() }

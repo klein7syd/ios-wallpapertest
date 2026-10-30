@@ -13,7 +13,7 @@ class PhotoMotionView: UIView, UIGestureRecognizerDelegate {
     var onFinish: (PhotoCrop) -> Void = { _ in }
     private var active = Set<ObjectIdentifier>()
     private var initialCrop = PhotoCrop()
-    private var cancelled = false
+    private var hasSuccessfulEnd = false
     var isTracking: Bool { !active.isEmpty }
     lazy var panRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panGesture(_:)))
     lazy var pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchGesture(_:)))
@@ -42,14 +42,18 @@ class PhotoMotionView: UIView, UIGestureRecognizerDelegate {
         }
     }
     func begin(_ gesture: UIGestureRecognizer) {
-        if active.isEmpty { initialCrop = crop; cancelled = false; onBegin() }
+        if active.isEmpty { initialCrop = crop; hasSuccessfulEnd = false; onBegin() }
         active.insert(ObjectIdentifier(gesture))
     }
     func finish(_ gesture: UIGestureRecognizer) {
-        if gesture.state == .cancelled || gesture.state == .failed { cancelled = true }
-        active.remove(ObjectIdentifier(gesture))
+        finish(gesture, cancelled: gesture.state == .cancelled || gesture.state == .failed)
+    }
+    // 独立结束事件用于组合手势；只有全部取消才撤回，重复结束不得再次提交。
+    func finish(_ gesture: UIGestureRecognizer, cancelled: Bool) {
+        guard active.remove(ObjectIdentifier(gesture)) != nil else { return }
+        hasSuccessfulEnd = hasSuccessfulEnd || !cancelled
         guard active.isEmpty else { return }
-        if cancelled { crop = initialCrop; updateLayers() }
+        if !hasSuccessfulEnd { crop = initialCrop; updateLayers() }
         onFinish(crop)
     }
     @objc func panGesture(_ gesture: UIPanGestureRecognizer) {

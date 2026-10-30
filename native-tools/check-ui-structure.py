@@ -177,6 +177,26 @@ require('TodoSharedStorage.appSnapshot()' in store and 'accept(snapshot.document
 require('PhotoAssetMaintenanceChecks.swift' in read('native-tools/check-native.sh')
     and 'album_transaction_rollback_commit_busy_and_undo_retention' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
     '门禁执行真实文件回收、导入事务和编辑器保留回归')
+schedule = read('TodoWallpaper/Core/TodoSchedule.swift')
+motion = read('TodoWallpaper/App/PhotoMotionView.swift')
+renderer = read('TodoWallpaper/Wallpaper/WallpaperRenderer.swift')
+require('ScheduleLabelFormatters.shared.string' in schedule and 'formatter.locale = .autoupdatingCurrent' in schedule
+    and 'formatter.calendar = .autoupdatingCurrent' in schedule and 'currentLocaleDidChangeNotification' in schedule
+    and 'private let lock = NSLock()' in schedule,
+    '日期短格式双缓存跟随系统设置并加锁，label不反复创建格式器')
+require('hasSuccessfulEnd = hasSuccessfulEnd || !cancelled' in motion and 'if !hasSuccessfulEnd' in motion
+    and 'guard active.remove(ObjectIdentifier(gesture)) != nil' in motion,
+    '组合照片手势全取消才回滚，正常结束保留当前值且重复回调不二次提交')
+require('interaction.begin("wallpaper.panel.nudge")' in wallpaper and 'defer { interaction.end() }' in wallpaper
+    and 'coalescingContext' in wallpaper and 'func nudged(in layout:' in read('TodoWallpaper/Wallpaper/WallpaperGeometry.swift')
+    and 'dx / Double(size.width)' in read('TodoWallpaper/Wallpaper/WallpaperGeometry.swift'),
+    '微调显式begin/end合并点按并保留一个导出像素步进')
+require('setShadow(' not in renderer and 'shadow: CGColor?' not in renderer and 'TextLegibility.readable' in renderer,
+    '壁纸删除旧阴影绘制和死参数，保留规定的可读色调用')
+require('mixed_gesture_endings_and_all_cancel_rollback' in read('TodoWallpaper/Tests/NativeUIProbe.swift')
+    and 'nudge_begin_end_coalescing_and_later_gesture_isolation' in read('TodoWallpaper/Tests/NativeUIProbe.swift')
+    and 'production nudge edge/center cases' in read('TodoWallpaper/Tests/PhotoRepairRenderChecks.swift'),
+    '实际原生门禁验证组合结束顺序、撤销合并与生产几何边界')
 protected = json.loads(read('docs/UI-PROTECTED-SOURCES.json'))
 require(all('__pycache__' not in path and Path(path).suffix in {'.swift','.py','.cmd','.ps1','.plist','.entitlements'} for path in protected),
     'Protected manifest contains source/config only, no generated caches')

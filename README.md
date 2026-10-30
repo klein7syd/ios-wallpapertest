@@ -59,3 +59,15 @@ Widget 每次 Provider 开始清空分析内存缓存，按真实 displaySize �
 3.3 已修复：迁移和 ready 路径返回仓库与已验证文档快照，App reload/Provider 不再第二次 load；不引入长期缓存、不改变锁顺序和幂等回执。新增迁移快照回归。
 
 检查变更原因：追加 PhotoAssetMaintenanceChecks 原生失败阈值与真实目录保留/失败关闭检查，NativeUIProbe 执行生产 actor 的事务日志、回滚、提交后取消保护和导入时禁止 GC，并验证编辑器历史引用回调。结构门禁追加实际生产入口约束，未删除旧断言。受保护的存储/迁移文件与 TodoStore 因新增这些调用而更新审查哈希；壁纸渲染完成态与 TextLegibility 未改变。所有 Photos 权限/iCloud 网络和内存峰值体验仍需真机，不以测试替代。
+
+## 第4组：日期、手势与微调
+
+4.1 已修复：TodoSchedule.label 原先每次创建 DateFormatter；现在缓存日期/日期时间两种短格式，NSLock 内使用，locale/calendar/timeZone 为 autoupdatingCurrent；地区/时区通知在缓存对象生命周期注册并失效。日期组件、date()/validate() 与 JSON 不变，回归逐字比较旧实现并覆盖时区/地区通知。
+
+4.2 已修复：检索 PhotoMotionView、MEDIA-MOTION-050 与既有 Tests，没有“任一取消就全回滚”的产品依据。改为只在所有已开始识别器都取消/失败时回滚，任一个正常结束即保留当前值；最后一个结束只提交一次，重复结束忽略。真实 UIKit 层会话回归覆盖两种混合顺序、全取消、全成功和单手取消，保留逐帧零提交约束。
+
+4.3 已修复撤销合并：微调显式使用 interaction.begin/end，500ms 内同键点按合为一组；切工具、离开、撤销或下一种手势会结束旧组，旧定时器不会截断新手势。步进已确认无需修改：仍是一个导出像素；抽出原公式供生产和检查共用，没有凭猜测加大。生产布局在 2048/4096 输出、三种面板宽、九个中心/边界与四方向共216例检查可见移动不超过1像素；未在这些几何场景复现跳变，Windows环境无法作iPhone触摸视觉复现，仍需真机。
+
+4.4 旧 setShadow 绘制与界面控件已确认无需修改（源码中已不存在）；删除 drawText 遗留的未使用 shadow 参数及过时注释，旧持久化字段仍兼容。TextLegibility.readable 与静态壁纸完成态按要求不动。另把 WallpaperLiveCanvas 未变更的 x/y 改为 let，清除已有两条编译警告。
+
+检查变更原因：新增日期旧文本比较、原生UIKit组合手势和真实撤销上下文、生产布局微调回归及结构约束；没有放宽既有像素断言。WallpaperGeometry 受保护哈希的变化来自同公式微调函数和删除过时阴影注释，原有 glyphKey 完成态约束完整保留。

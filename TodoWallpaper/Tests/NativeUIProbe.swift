@@ -125,6 +125,25 @@ enum NativeUIProbe {
             try require(session.canUndo && position == 2 && !session.isRestoring, "Failed restore keeps a retryable session")
             try await session.undo(read: { position }) { previous, _ in position = previous }
             try require(position == 0, "Failed restore can be retried")
+            var tapValue = 0
+            let tapSession = EditorUndoState<Int>(); tapSession.synchronize(tapValue)
+            let taps = tapSession.coalescingContext(read: { tapValue })
+            for next in 1...3 {
+                taps.begin("wallpaper.panel.nudge"); tapValue = next; tapSession.observe(tapValue); taps.end()
+            }
+            try await Task.sleep(for: .milliseconds(600))
+            try await tapSession.undo(read: { tapValue }) { before, _ in tapValue = before }
+            try require(tapValue == 0 && !tapSession.canUndo, "A burst of begin/end nudge taps coalesces to one undo")
+            taps.begin("wallpaper.panel.nudge"); tapValue = 4; tapSession.observe(tapValue); taps.end()
+            let regular = tapSession.context(read: { tapValue }); regular.begin("slider")
+            tapValue = 5; tapSession.observe(tapValue)
+            try await Task.sleep(for: .milliseconds(600))
+            tapValue = 6; tapSession.observe(tapValue); regular.end()
+            try await tapSession.undo(read: { tapValue }) { before, _ in tapValue = before }
+            try require(tapValue == 4, "A pending nudge timer cannot end a later slider gesture")
+            try await tapSession.undo(read: { tapValue }) { before, _ in tapValue = before }
+            try require(tapValue == 0 && !tapSession.canUndo, "Separate tap bursts retain their own undo baseline")
+            report["nudge_begin_end_coalescing_and_later_gesture_isolation"] = "passed"
             let editor = WallpaperEditorModel()
             await editor.start(items: [], appearance: TodoAppearance())
             try require(editor.ready && !editor.draftBlocked, "CI draft is readable")
@@ -442,6 +461,30 @@ enum NativeUIProbe {
             let motion = PhotoMotionView(frame: CGRect(x: 0, y: 0, width: 170, height: 170))
             motion.setPhoto(decodedPhoto)
             var displayCommits = 0; motion.onFinish = { _ in displayCommits += 1 }
+            for endings in [[true, false], [false, true], [true, true], [false, false]] {
+                motion.crop = PhotoCrop()
+                var began = 0, ended = 0
+                motion.onBegin = { began += 1 }; motion.onFinish = { _ in ended += 1 }
+                motion.begin(motion.panRecognizer); motion.begin(motion.pinchRecognizer)
+                let changed = PhotoCrop(zoom: 2, panX: 0.4, panY: -0.3)
+                motion.crop = changed; motion.updateLayers()
+                try require(ended == 0, "Changing retained layers does not publish a partial gesture")
+                motion.finish(motion.panRecognizer, cancelled: endings[0])
+                try require(motion.isTracking && ended == 0, "First recognizer end waits for its partner")
+                motion.finish(motion.pinchRecognizer, cancelled: endings[1])
+                let allCancelled = endings.allSatisfy { $0 }
+                try require(motion.crop == (allCancelled ? PhotoCrop() : changed) && began == 1 && ended == 1 && !motion.isTracking,
+                    "Mixed pan/pinch endings commit if either succeeds, and all-cancel restores the original exactly once")
+                motion.finish(motion.pinchRecognizer, cancelled: false)
+                try require(ended == 1, "Duplicate terminal callbacks cannot submit a second undo")
+            }
+            for cancelled in [true, false] {
+                motion.crop = PhotoCrop(); motion.begin(motion.panRecognizer)
+                motion.crop = PhotoCrop(zoom: 3); motion.finish(motion.panRecognizer, cancelled: cancelled)
+                try require(motion.crop.zoom == (cancelled ? 1 : 3), "Single-recognizer cancellation retains its previous rollback behavior")
+            }
+            motion.onFinish = { _ in displayCommits += 1 }
+            report["mixed_gesture_endings_and_all_cancel_rollback"] = "passed"
             let motionStarted = Date.timeIntervalSinceReferenceDate
             for index in 0..<600 {
                 motion.crop = PhotoCrop(zoom: 2, panX: Double(index % 100) / 50 - 1, panY: 0)
