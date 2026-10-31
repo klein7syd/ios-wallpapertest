@@ -10,6 +10,54 @@ concurrency:
   group: r1-baseline-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  trace-rescue:
+    runs-on: macos-26
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        source-run: [41219502218, 41219564607]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ matrix.source-run }}
+          path: input
+      - name: Verify and export existing Time Profiler data without repeating measurements
+        shell: bash
+        run: |
+          mkdir -p rescue
+          python3 - <<'PY'
+          import subprocess,pathlib,json,xml.etree.ElementTree as ET
+          out=pathlib.Path('rescue')
+          traces=[p for p in pathlib.Path('input').rglob('*.trace') if p.is_dir()]
+          assert traces,'No recorded traces'
+          for index,trace in enumerate(traces):
+              stem=str(index)
+              toc=out/(stem+'-toc.xml')
+              p=subprocess.run(['xcrun','xctrace','export','--input',str(trace),'--toc','--output',str(toc)],capture_output=True,text=True,timeout=90)
+              (out/(stem+'-export.log')).write_text(p.stdout+p.stderr)
+              assert p.returncode==0,'Trace cannot be exported: '+p.stderr
+              schemas=sorted({e.get('schema') for e in ET.parse(toc).getroot().iter('table') if e.get('schema')})
+              (out/(stem+'-schemas.json')).write_text(json.dumps(schemas))
+              for schema in schemas:
+                  if schema not in ['time-profile','cpu-profile'] and 'signpost' not in schema:continue
+                  target=out/(stem+'-'+schema+'.xml')
+                  query='/trace-toc/run[@number="1"]/data/table[@schema="'+schema+'"]'
+                  p=subprocess.run(['xcrun','xctrace','export','--input',str(trace),'--xpath',query,'--output',str(target)],capture_output=True,text=True,timeout=120)
+                  (out/(stem+'-'+schema+'.log')).write_text(p.stdout+p.stderr)
+                  assert p.returncode==0,'Cannot export '+schema
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trace-rescue-${{ matrix.source-run }}
+          path: rescue/
+          retention-days: 7
+          if-no-files-found: error
   compile-baseline:
     runs-on: macos-26
     timeout-minutes: 12
