@@ -12,6 +12,7 @@ struct LianxinProfile: Codable, Equatable, Sendable {
     var prompt = ""
     var endpoint = ""
     var model = ""
+    var sharedPhotoName: String?
     var photoName: String?
     var message = ""
     var messageIdol = ""

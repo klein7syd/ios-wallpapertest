@@ -14,6 +14,37 @@ private struct WallpaperEditState: Equatable {
 
 struct WallpaperEditorView: View {
     @ObservedObject var store: TodoStore
+    @EnvironmentObject private var lianxinModel: LianxinModel
+    @AppStorage(ContentMode.key) private var contentMode = "todo"
+    @State private var hasSyncedPhoto = false
+    @State private var appliedSharedPhoto: String?
+    private var isLianxin: Bool { contentMode == "lianxin" }
+    private var contentItems: [TodoItem] { isLianxin ? WallpaperContentSource.lianxin(lianxinModel.publication).items : store.items }
+    private var editingAppearance: TodoAppearance {
+        var root = store.appearance
+        if isLianxin { root.widget = root.style(in: .lianxin); root.defaultMarker = TodoMarker(kind: .none) }
+        return root
+    }
+    @discardableResult private func setEditingAppearance(_ value: TodoAppearance) -> Bool {
+        var root = store.appearance
+        if isLianxin { root.lianxin = value.widget } else { root = value }
+        return store.setAppearance(root)
+    }
+    private var textFits: Bool { !isLianxin || (model.layout?.hiddenCount == 0 && model.layout?.rows.isEmpty == false && model.layout?.rows.allSatisfy { !$0.block.truncated } == true && !lianxinModel.profile.message.isEmpty && lianxinModel.profile.message.count <= 200) }
+    private func syncPhoto() async {
+        guard isLianxin, model.ready, !model.busy else { return }
+        let name = store.appearance.lianxin?.photoName(at: .now)
+        guard !hasSyncedPhoto || name != appliedSharedPhoto else { return }
+        do {
+            if let data = try await lianxinModel.wallpaperPhotoData() { try await model.importPhotoData(data) }
+            else { model.removePhoto() }
+            appliedSharedPhoto = name; hasSyncedPhoto = true
+        } catch { model.message = "连心底图暂未更新，请重试。" }
+    }
+    private func removeBackdrop() {
+        model.removePhoto()
+        if isLianxin { Task { await lianxinModel.setPhoto(nil) } }
+    }
     @Binding var navigation: AppNavigationState
     @ObservedObject var model: WallpaperEditorModel
     @Environment(\.scenePhase) private var scenePhase
@@ -34,22 +65,22 @@ struct WallpaperEditorView: View {
     @State private var pixelHeight = "4096"
     private var tool: WallpaperTool { navigation.wallpaperTool }
     private var dataReady: Bool { store.hasLoaded && store.loadError == nil }
-    private var canExport: Bool { dataReady && model.ready && !model.busy && !model.draftBlocked && store.appearanceError == nil && model.previewError == nil }
+    private var canExport: Bool { dataReady && model.ready && !model.busy && !model.draftBlocked && store.appearanceError == nil && model.previewError == nil && textFits }
     private var appearance: Binding<TodoAppearance> {
-        Binding(get: { store.appearance }, set: { store.setAppearance($0); model.updateAppearance(store.appearance) })
+        Binding(get: { editingAppearance }, set: { setEditingAppearance($0); model.updateAppearance(editingAppearance) })
     }
     private var editState: WallpaperEditState {
         WallpaperEditState(settings: model.settings, photoName: model.photoName, previewScale: previewScale,
-            marker: store.appearance.defaultMarker, markerStyle: store.appearance.markerStyle,
-            taskMarkers: Dictionary(uniqueKeysWithValues: store.items.compactMap { item in item.marker.map { (item.id, $0) } }),
-            widgetStyle: store.appearance.widget)
+            marker: editingAppearance.defaultMarker, markerStyle: editingAppearance.markerStyle,
+            taskMarkers: Dictionary(uniqueKeysWithValues: contentItems.compactMap { item in item.marker.map { (item.id, $0) } }),
+            widgetStyle: editingAppearance.widget)
     }
     private var layoutScale: Binding<Double> {
         Binding(get: { model.settings.fontSize / 18 }, set: { scale in
             model.settings = model.settings.withStandardScale(scale)
-            var next = store.appearance
+            var next = editingAppearance
             next.markerStyle = EditorStandards.marker(next.markerStyle, scale: scale)
-            store.setAppearance(next); model.updateAppearance(store.appearance)
+            setEditingAppearance(next); model.updateAppearance(editingAppearance)
         })
     }
     private var editorInteraction: EditorInteractionContext {
@@ -78,6 +109,9 @@ struct WallpaperEditorView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" }.disabled(model.busy)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                         .disabled(!edits.canUndo || model.busy || model.draftBlocked)
@@ -98,18 +132,37 @@ struct WallpaperEditorView: View {
                     Button("完成") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                 }
             }
-            .task { await model.start(items: store.items, appearance: store.appearance); syncOutputFields() }
+            .task {
+                if isLianxin { await lianxinModel.load(); await lianxinModel.prepareStyle(store) }
+                await model.start(items: contentItems, appearance: editingAppearance)
+                if isLianxin {
+                    model.settings.usesTaskMarkers = true
+                    if navigation.wallpaperTool == .marker { navigation.selectTool(.text) }
+                    await syncPhoto()
+                }
+                syncOutputFields()
+            }
+            .onChange(of: model.busy) { _, busy in if !busy { Task { await syncPhoto() } } }
+            .onChange(of: store.appearance.lianxin?.photoName(at: .now)) { _, _ in Task { await syncPhoto() } }
             .onChange(of: model.ready) { _, ready in
                 if ready { syncOutputFields(); edits.synchronize(editState) }
             }
             .onAppear { isVisible = true; configureAssetRetention(); if model.ready { edits.synchronize(editState) } }
             .onChange(of: editState) { _, state in if model.ready && isVisible { edits.observe(state) } }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
-            .onChange(of: store.items) { _, items in model.updateItems(items) }
-            .onChange(of: store.appearance) { _, value in model.updateAppearance(value) }
+            .onChange(of: contentItems) { _, items in model.updateItems(items) }
+            .onChange(of: editingAppearance) { _, value in model.updateAppearance(value) }
             .onChange(of: selectedPhoto) { _, selection in
                 guard let selection else { return }
-                Task { await model.importPhoto(selection); selectedPhoto = nil }
+                Task {
+                    if isLianxin {
+                        do {
+                            guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
+                            await lianxinModel.setPhoto(data); await syncPhoto()
+                        } catch { model.message = error.localizedDescription }
+                    } else { await model.importPhoto(selection) }
+                    selectedPhoto = nil
+                }
             }
             .onChange(of: scenePhase) { _, phase in if phase != .active { Task { await model.saveNow() } } }
             .onDisappear { edits.finish(editState); isVisible = false; store.flushAppearance(); Task { await model.saveNow() } }
@@ -147,7 +200,7 @@ struct WallpaperEditorView: View {
         Task {
             do {
                 try await edits.undo(read: { editState }) { previous, expected in
-                    var next = store.appearance
+                    var next = editingAppearance
                     if previous.marker != expected.marker { next.defaultMarker = previous.marker }
                     if previous.markerStyle != expected.markerStyle { next.markerStyle = previous.markerStyle }
                     if previous.widgetStyle != expected.widgetStyle { next.widget = previous.widgetStyle }
@@ -161,8 +214,8 @@ struct WallpaperEditorView: View {
                     }
                     try store.updateMarkers(changes)
                     if previous.previewScale != expected.previewScale { previewScale = previous.previewScale }
-                    if next != store.appearance { store.setAppearance(next); model.updateAppearance(store.appearance) }
-                    model.updateItems(store.items)
+                    if next != editingAppearance { setEditingAppearance(next); model.updateAppearance(editingAppearance) }
+                    model.updateItems(contentItems)
                 }
                 syncOutputFields()
             } catch { model.message = "未能撤销：\(error.localizedDescription)" }
@@ -170,6 +223,7 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
+            if !textFits { Text("请将话语缩至200字以内，并调整字号/面板宽度使全部文字及创作标注完整显示。").font(.caption).foregroundStyle(.red) }
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +
                     (tool == .marker ? (selectedMarkerTask?.id.uuidString ?? ".uniform") : "")) {
@@ -196,7 +250,7 @@ struct WallpaperEditorView: View {
     }
     private var toolSelector: some View {
         HStack(spacing: 6) {
-            EditorToolPicker(choices: WallpaperTool.allCases,
+            EditorToolPicker(choices: WallpaperTool.allCases.filter { !isLianxin || $0 != .marker },
                 selection: Binding(get: { tool }, set: { next in
                     edits.finish(editState)
                     withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.selectTool(next) }
@@ -234,7 +288,7 @@ struct WallpaperEditorView: View {
             HStack {
                 Button("重置裁剪") { model.settings.backgroundZoom = 1; model.settings.backgroundPanX = 0; model.settings.backgroundPanY = 0 }
                 Spacer()
-                Button("默认背景") { model.removePhoto() }
+                Button("默认背景") { removeBackdrop() }
             }
             if model.sourceIsSoft { Text("原图或当前裁剪的有效像素不足。").font(.caption).foregroundStyle(.secondary) }
         }
@@ -294,7 +348,7 @@ struct WallpaperEditorView: View {
         StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
         if advanced {
             PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
-            if model.settings.filtered(store.items).contains(where: { model.settings.marker(for: $0, appearance: store.appearance).kind != .none }) {
+            if model.settings.filtered(contentItems).contains(where: { model.settings.marker(for: $0, appearance: editingAppearance).kind != .none }) {
                 PreciseSlider(title: "标记与文字间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
             }
         } else {
@@ -313,20 +367,20 @@ struct WallpaperEditorView: View {
     }
     private var markerTasks: [TodoItem] {
         let ids = model.layout?.rows.map { $0.item.id } ??
-            Array(model.settings.filtered(store.items).prefix(model.settings.maximumItems)).map(\.id)
-        return ids.compactMap { id in store.items.first { $0.id == id } }
+            Array(model.settings.filtered(contentItems).prefix(model.settings.maximumItems)).map(\.id)
+        return ids.compactMap { id in contentItems.first { $0.id == id } }
     }
     private var selectedMarkerTask: TodoItem? {
         guard model.settings.inheritsTaskMarkers else { return nil }
-        return MarkerEditorTarget.selected(items: store.items, visibleIDs: markerTasks.map(\.id), preferredID: markerTaskID)
+        return MarkerEditorTarget.selected(items: contentItems, visibleIDs: markerTasks.map(\.id), preferredID: markerTaskID)
     }
     private var wallpaperMarkerChoice: Binding<TodoMarker> {
         Binding(get: {
-            if let task = selectedMarkerTask { return model.settings.marker(for: task, appearance: store.appearance) }
-            return store.appearance.defaultMarker
+            if let task = selectedMarkerTask { return model.settings.marker(for: task, appearance: editingAppearance) }
+            return editingAppearance.defaultMarker
         }, set: { value in
             if let task = selectedMarkerTask {
-                do { try store.edit(id: task.id, title: task.title, marker: value); model.updateItems(store.items) }
+                do { try store.edit(id: task.id, title: task.title, marker: value); model.updateItems(contentItems) }
                 catch { model.message = error.localizedDescription }
             } else {
                 // Choosing a uniform wallpaper marker must visibly change the canvas,
@@ -353,7 +407,7 @@ struct WallpaperEditorView: View {
         }
         if let task = selectedMarkerTask, task.marker != nil {
             Button("恢复默认标记") {
-                do { try store.edit(id: task.id, title: task.title, marker: nil); model.updateItems(store.items) }
+                do { try store.edit(id: task.id, title: task.title, marker: nil); model.updateItems(contentItems) }
                 catch { model.message = error.localizedDescription }
             }
         }
@@ -427,7 +481,7 @@ struct WallpaperEditorView: View {
         ratioWidth = "\(model.settings.size.width)"; ratioHeight = "\(model.settings.size.height)"; syncPixels()
     }
     private func applyWidgetStyle() {
-        var next = store.appearance
+        var next = editingAppearance
         next.widget.font = model.settings.font; next.widget.weight = model.settings.weight
         next.widget.textColor = model.settings.textColor; next.widget.followsSystemText = false
         next.widget.theme = model.settings.darkGlass ? .dark : .light; next.widget.backdrop = .solid
@@ -440,7 +494,7 @@ struct WallpaperEditorView: View {
         next.widget.markerStyle.completion = completion
         next.widget.markerStyle.completionEmoji = completionEmoji
         next.widget.markerStyle.completedColor = completionColor
-        store.setAppearance(next); store.flushAppearance()
+        setEditingAppearance(next); store.flushAppearance()
         model.message = store.appearanceError ?? "已将文字、字体、标记与主题应用到小组件，并请求系统刷新。单项 Emoji 保持优先。"
     }
 }

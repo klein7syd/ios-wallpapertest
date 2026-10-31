@@ -567,6 +567,22 @@ enum NativeUIProbe {
                 ("small", .xSmall, .extraSmall), ("standard", .large, .large), ("large", .xxxLarge, .extraExtraExtraLarge),
                 ("a11y", .accessibility3, .accessibilityExtraLarge), ("a11y-max", .accessibility5, .accessibilityExtraExtraExtraLarge)
             ]
+            var lianxinImages = 0
+            for family in WidgetPreviewFamily.allCases {
+                for type in [DynamicTypeSize.large, .xxxLarge, .accessibility3] {
+                    for (index, text) in ["晚安", String(repeating: "心", count: 200), "中文与한국어一起，잘 자요。", "🧑🏽‍💻❤️📚"].enumerated() {
+                        var style = WidgetAppearance(); style.showsFooter = false
+                        let content = LianxinPublication(idol: "角色", text: text, photo: nil, date: .now, example: index % 2 == 0)
+                        let image = try render(LianxinWidgetContent(content: content, style: style, family: family)
+                            .padding(16).frame(width: family.width, height: family.height).background(.white)
+                            .environment(\.colorScheme, .light).environment(\.dynamicTypeSize, type),
+                            name: "lianxin-\(family.id)-\(lianxinImages)", directory: output, scale: 2)
+                        try require(image.width > 0 && image.height > 0, "连心真实共享视图按组件边界渲染")
+                        lianxinImages += 1
+                    }
+                }
+            }
+            report["lianxin_shared_content_matrix"] = lianxinImages
             var measuredFonts: [String: Double] = [:]; var matrix = 0
             appearance.widget.markerStyle.emojiSize = 48; appearance.widget.markerStyle.gap = 32
             for (name, type, category) in types {
