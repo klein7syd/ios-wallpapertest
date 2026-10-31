@@ -62,7 +62,7 @@ struct LianxinWallpaperView: View {
         guard !prepared else { return }
         var appearance = TodoAppearance()
         appearance.defaultMarker = TodoMarker(kind: .none)
-        let item = TodoItem(id: request.id, title: request.content.text + "\n—— " + request.content.idol + " · AI 创作",
+        let item = TodoItem(id: request.id, title: request.content.text + "\n—— " + request.content.idol + " · " + request.content.contentLabel,
                             marker: TodoMarker(kind: .none), isCompleted: false, createdAt: .now, updatedAt: .now)
         await model.start(items: [item], appearance: appearance)
         guard !model.draftBlocked else { return }
