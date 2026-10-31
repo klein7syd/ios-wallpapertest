@@ -207,3 +207,10 @@ TodoSchedule.label 由私有 ScheduleLabelFormatters 缓存两种短格式，在
 用户编辑文案后点击发布，`LianxinPublication` 将 1–200 字、IDOL 名字、1536px 缩略底图一起原子写入 App Group 的 lianxin-published-v1.json。共享文件没有 API 地址、密钥或私有提示词。`LianxinWidget` 仅读该快照，不访问 AI；主屏小/中/大与锁屏圆形/矩形分别布局，小尺寸允许省略。原待办组件 kind 保持不变，WidgetBundle 同时注册两类组件。
 
 `LianxinWallpaperView` 注入独立 LianxinWallpaper/LianxinExports 目录复用 WallpaperEditorModel、实时画布和真实物理像素渲染器；不写待办数据，不覆盖待办草稿。文本通过 CoreText 处理中文/韩文混排，字号/面板宽度可调；布局隐藏或截断时禁用保存。只有用户点击保存才申请相册添加权限。
+
+## 连心向导更新（0.7.1）
+LianxinProviderPreset（App与macOS检查，避免与Widget的LianxinProvider重名）提供7家核实预设及custom。LianxinSetupView用于页面顶部与齿轮设置，最终地址展示、系统浏览器、PasteButton、新输入遮盖/显示和只显示已存尾号。LianxinProfile增加可选providerID/connectedSignature/exampleContent，旧JSON继续解码；无providerID按custom处理，不改旧地址模型。
+
+LianxinKeychain服务名保持不变，account从api-key迁移到api-key.<providerID>；LianxinCredentialMigration通过可注入协议执行同一策略，写入成功才删除旧键，已存在目标不覆盖。profile仍不含密钥。连接测试共用生成的ephemeral网络安全实现；已有核实列表先GET验证，无列表用max_tokens=1（OpenRouter公开列表先1token验证）。任何连接字段变更会让签名失效，重新测试后保存。模型列表不保证所有模型可用。
+
+体验模式LianxinGeneration先选Mock分支，完全不调用注入的网络服务、不构造真实请求；LianxinPublication可选example字段让旧快照兼容，内容标签贯穿卡片/分享/组件/壁纸。HTTP错误体仅在上限内分类余额错误，不回显；URLSession禁止重定向、Cookie/缓存关闭、1MB响应上限和取消行为保留。

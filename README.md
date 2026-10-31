@@ -134,6 +134,31 @@ PASS: 交接引用与源码登记检查通过（不代替编译、常量值语�
 
 ## 本轮第1组：逐项换行
 
-每项独立测量与分配行高；自动小号最多2行，中大号最多3行，显式1/2/3/4行。修改旧容量检查的固定行高乘法为逐项高度累加，因为原公式不再描述生产布局；保留不溢出断言，并新增270组内容/尺寸/放大/紧凑/行数矩阵及末项缩行、旧nil/1/2往返检查。没有删除门禁。待办列表原为最多3行，支持换行，未修改；壁纸本来用CoreText自动折行、maximumLines默认上限与省略策略，为有意设计，未修改。
+每项独立测量与分配行高；自动小号最多2行，中大号最多3行，显式1/2/3/4行。修改旧容量检查的固定行高乘法为逐项高度累加，因为原公式不再描述生产布局；保留不溢出断言，并新增90组（每组含五类内容）内容/尺寸/放大/紧凑/行数矩阵及末项缩行、旧nil/1/2往返检查。没有删除门禁。待办列表原为最多3行，支持换行，未修改；壁纸本来用CoreText自动折行、maximumLines默认上限与省略策略，为有意设计，未修改。
 
 自测1/2：原生检查验证中文、无空格英文、Emoji、日期、所有组件大小、Dynamic Type预算、紧凑和行数1–4的逐项容量/高度；实际触摸与系统组件显示需真机，模拟器结果见本轮artifact。
+
+## 第2组：连心连接向导（核实日期2026-10-31）
+
+七家预设加自定义；首次未连接时顶部显示向导，完成后从齿轮设置进入。系统浏览器打开官方密钥页，系统PasteButton粘贴，默认遮盖且可显示新输入内容；保存后清空输入框，仅显示尾号。测试后可选模型，自定义支持域名/BaseURL补全，旧特殊完整路径原样保留；http明确报错。按服务商的钥匙串account隔离，旧api-key经可重复迁移写入custom成功后才删除旧值，原地址、模型与话语保留。错误只映射安全的人话提示；体验模式不调用网络服务，示例标识随共享组件与壁纸保留。
+
+官方核实来源（逐项核对接口、推荐模型与密钥入口；不使用第三方整理）：
+- DeepSeek： https://api-docs.deepseek.com/ 和 https://api-docs.deepseek.com/api/list-models/ ，推荐deepseek-flash，聊天/chat/completions，列表/models；官方首页链接至platform.deepseek.com/api_keys。
+- 百炼： https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/ 和 https://help.aliyun.com/zh/model-studio/get-api-key 。北京旧dashscope域名官方明确仍可用，预设qwen-plus；新域名需要业务空间ID。北京新列表接口同样需要WorkspaceId（ https://help.aliyun.com/zh/model-studio/list-models ），无法从旧账号密钥推导，故预设用1token聊天验证，不猜填/models。其他地域用自定义。
+- Kimi： https://platform.kimi.com/docs/get-api-key 和 https://platform.kimi.com/docs/api/chat 。官方跳转后的新控制台为 https://platform.kimi.com/console/api-keys ，示例模型kimi-k3.1-pro，聊天仍为api.moonshot.cn/v1/chat/completions；未能核实可直接使用的模型列表API，使用1token测试与预填可修改模型。
+- 智谱： https://docs.bigmodel.cn/cn/guide/start/quick-start 和 https://docs.bigmodel.cn/cn/guide/models/text/glm-4.7 。模型glm-4.7、标准api/paas/v4/chat/completions与官方链接bigmodel.cn/usercenter/proj-mgmt/apikeys已核实；未核实通用模型列表端点，使用1token测试。个人/团队套餐密钥与标准API不通用。
+- 硅基流动： https://docs.siliconflow.cn/docs/userguide/quickstart 、 https://docs.siliconflow.cn/docs/userguide/capabilities/text-generation 、 https://docs.siliconflow.cn/docs/api/models-get 。核实DeepSeek-V3.2模型、v1/chat/completions、v1/models和cloud.siliconflow.cn/account/ak。
+- OpenAI： https://developers.openai.com/api/reference/resources/chat 、 https://developers.openai.com/api/docs/models/gpt-4.1-mini 、 https://developers.openai.com/api/reference/resources/models/methods/list 、 https://developers.openai.com/api/docs/quickstart 。核实gpt-4.1-mini、v1/chat/completions、v1/models和platform.openai.com/api-keys。
+- OpenRouter： https://openrouter.ai/developers 、 https://openrouter.ai/openai/gpt-4.1-mini 、 https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties 、 https://openrouter.ai/settings/keys 。核实openai/gpt-4.1-mini、api/v1/chat/completions、api/v1/models。公开列表不证明密钥有效，先1token请求验证再获取列表；列表可能包含未开通模型，生成以服务商权限为准。
+
+所有候选预设的聊天/密钥/推荐模型均已核实，没有凭记忆补入数据。无已核实列表API时明示回退；模型目录会变化，需定期复核。不调用真实付费API作为自动检查。
+
+自测清单（本次构建最终结果以artifact为准）：
+1. 待办多语言/日期/Emoji，三种尺寸及行数1–4：已验证原生测量与预算；真实系统组件视觉需真机。
+2. 长项减少容量、不溢出：已验证90组矩阵和末项缩行；模拟器现有渲染门禁继续执行。
+3. 选服务商/模型/Mock连接/生成到发布：已验证协议策略、Mock分发及原子发布；系统浏览器、PasteButton真实操作仅编译检查，需真机；未进行真实付费连接。
+4. 错密钥、余额、地址：已验证错误映射与禁止回显正文；真实服务商返回需真机。
+5. 体验不联网：已验证生产分发传入NetworkTrap调用次数为0，示例输出带非AI标识。
+6. 升级保留：已验证旧JSON字段与假凭证后端迁移、幂等/隔离/失败保留；真实钥匙串覆盖安装需真机。
+
+本轮没有放宽或删除检查。第1组调整固定行高乘法为逐项累加的原因见上；第2组在原连心检查基础上追加向导检查，不移除原URL、密钥及隔离测试。

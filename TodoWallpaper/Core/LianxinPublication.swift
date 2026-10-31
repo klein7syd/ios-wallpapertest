@@ -8,6 +8,8 @@ struct LianxinPublication: Codable, Equatable {
     let text: String
     let photo: Data?
     let date: Date
+    var example: Bool?
+    var contentLabel: String { example == true ? "示例内容，非 AI 生成" : "AI 创作" }
 
     func validate() throws {
         guard schemaVersion == 1, !idol.isEmpty, idol.count <= 100,
