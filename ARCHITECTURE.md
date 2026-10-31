@@ -237,3 +237,8 @@ WallpaperContentSource将待办或连心话语适配为生产渲染内容，连�
 LianxinModel.currentContent 是当前有效内容，所有预览及 WallpaperEditorModel 读取同一份值。资料编辑先校验，400ms 防抖写入原 lianxin-published-v1.json 并请求刷新连心 kind；名称/正文无效时保留上一份有效内容。样式变化同样触发同步，照片继续由共享样式引用，旧嵌入照片兼容。WidgetKit 实际显示时间由系统调度，不能保证桌面1秒刷新。
 WallpaperRenderer 接收可选 LianxinPublication，用同一 CoreText 管线取消待办每项行数上限，署名/可选标注作为独立 WallpaperSupplement 计入面板高度。布局报告 lianxinOverflow，UI与实际导出服务双重阻止放不下的导出；实时/精确预览/PNG共用布局。PNG只写新像素与创作Description，不复制源照片元数据。
 systemMaterial 只保留兼容解码，渲染始终普通背景。创作标注默认关闭，widget槽位及wallpaper草稿分别可选开启；复制分享始终后缀，PNG始终元数据。主页底部与关于页保留AI说明。LianxinFieldStyle和FocusState覆盖主页面/连接向导，交互滑动与键盘完成收起。
+
+## 连心反馈第2组（角色与双语）
+LianxinProfile 的角色字段、verifiedProfile（含确认时间）、最近名字/团体、说话语言和翻译参数均为可选，旧JSON保持兼容并默认中文/不翻译。LianxinRoleRules按团体、示例、定位、粉丝名、性格、口头禅优先组装2000字角色预算，用户输入覆盖已确认资料；空字段省略，未知个人事实禁止编造。system固定顺序为任务、角色、写作、语言、格式，user仍逐字原文，无temperature/照片。
+LianxinRoleView仅主动点击核对TA时通过LianxinProfileChecking发一个请求；LianxinRoleResult宽容解析已知公开字段。未确认结果只在内存pendingRole，低置信/未识别不预填，确认才回填私有profile并立即保存。LianxinLanguageRules处理语言冲突与自定义语言长度；LianxinGeneratedMessage宽容JSON/围栏/前后说明，失败保留整段原文并提示译文失败。LianxinSamples提供中/韩/日/英对应模板，Mock分支先于网络分派。
+共享LianxinPublication只新增可选translation（≤200字），原文/译文编辑均走同一个400ms同步器；复制分享包含两者与创作后缀。角色信息、核对结果、语言参数、提示词、接口和密钥均不进入内容共享文件。组件/壁纸译文排版在第3组复用现有布局继续接入。

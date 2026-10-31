@@ -24,7 +24,7 @@ struct LianxinView: View {
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
-    private enum Field: Hashable { case user, idol, prompt, message }
+    private enum Field: Hashable { case prompt, message, translation }
     @FocusState private var focused: Field?
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -47,9 +47,9 @@ struct LianxinView: View {
                         Button("连接我自己的AI") { model.exampleMode = false }
                     }
                     previews
+                    LianxinRoleView(model: model)
+                    LianxinLanguageView(model: model)
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("你的称呼（最多100字）", text: limited(\.userName, 100)).focused($focused, equals: .user)
-                        TextField("IDOL 名字（最多100字）", text: limited(\.idolName, 100)).focused($focused, equals: .idol)
                         TextField("提示词（最多12000字）", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
                     }.textFieldStyle(LianxinFieldStyle()).disabled(model.busy)
                     actions
@@ -79,11 +79,11 @@ struct LianxinView: View {
     private var page: some View {
         scrollContent
             .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemGroupedBackground).onTapGesture { focused = nil })
+            .background(Color(uiColor: .systemGroupedBackground).onTapGesture { dismissKeyboard() })
             .buttonBorderShape(.roundedRectangle(radius: 14))
             .navigationTitle("连心")
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = nil } }
+                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { dismissKeyboard() } }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { openSettings() } label: { Label("连心设置", systemImage: "gearshape") }
                         .disabled(!model.loaded || model.busy || loadingPhoto)
@@ -110,7 +110,13 @@ struct LianxinView: View {
                 .lineLimit(3...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message)
             Text("\(model.profile.message.count)/200 字 · 自动同步；小号组件可能只展示部分文字。")
                 .font(.caption).foregroundStyle(.secondary)
-            if !canOutput { Text("话语需为 1–200 字，小组件保留上一次有效内容。").font(.caption).foregroundStyle(.secondary) }
+            if model.profile.translationEnabled == true {
+                TextField("译文（可编辑）", text: Binding(get: { model.profile.translation ?? "" }, set: { model.profile.translation = $0 }), axis: .vertical)
+                    .lineLimit(3...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .translation)
+                Text("\(model.profile.translation?.count ?? 0)/200 字 · 译文自动同步")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if !canOutput { Text("原文需为 1–200 字、译文最多200字，小组件保留上一次有效内容。").font(.caption).foregroundStyle(.secondary) }
             if let error = model.syncError {
                 HStack { Text(error).font(.caption); Button("重试") { model.scheduleSync() } }
             } else if let date = model.syncedAt {
@@ -123,7 +129,12 @@ struct LianxinView: View {
         }.disabled(model.busy || loadingPhoto)
     }
 
-    private var canOutput: Bool { !model.profile.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.profile.message.count <= 200 }
+    private var canOutput: Bool { !model.profile.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.profile.message.count <= 200 && (model.profile.translationEnabled != true || (model.profile.translation?.count ?? 0) <= 200) }
+
+    private func dismissKeyboard() {
+        focused = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 
     private func limited(_ path: WritableKeyPath<LianxinProfile, String>, _ limit: Int) -> Binding<String> {
         Binding(get: { model.profile[keyPath: path] }, set: { model.profile[keyPath: path] = String($0.prefix(limit)) })
