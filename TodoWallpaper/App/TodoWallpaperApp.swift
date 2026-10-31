@@ -12,7 +12,9 @@ struct TodoWallpaperApp: App {
     #if TODO_UI_CHECKS
     @State private var didRunUIProbe = false
     @MainActor init() {
-        if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
+        if ProcessInfo.processInfo.arguments.contains("--native-mode-performance") {
+            _store = StateObject(wrappedValue: ModePerformanceFixture.makeStore())
+        } else if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
             _store = StateObject(wrappedValue: NativeUIProbe.makeStore())
             UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--native-advanced"), forKey: EditorStandards.advancedKey)
         }
@@ -25,6 +27,12 @@ struct TodoWallpaperApp: App {
             .onChange(of: contentMode) { _, value in if value == "lianxin" { Task { await lianxinModel.load(); await lianxinModel.prepareStyle(store) } } }
             .task {
                 #if TODO_UI_CHECKS
+                if ProcessInfo.processInfo.arguments.contains("--native-mode-performance") {
+                    guard !didRunUIProbe else { return }; didRunUIProbe = true
+                    await ModePerformanceFixture.run(store: store, lianxin: lianxinModel, todo: wallpaperModel, heart: lianxinWallpaperModel,
+                        getMode: { contentMode }, setMode: { contentMode = $0 }, selectPage: { navigation.selectPage($0) })
+                    return
+                }
                 if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
                     guard !didRunUIProbe else { return }
                     didRunUIProbe = true
@@ -68,10 +76,15 @@ struct TodoWallpaperApp: App {
                 TodoListView(store: store)
                     .tabItem { Label("待办", systemImage: "checklist") }
                     .tag(AppPage.todos)
-                WallpaperEditorView(store: store, navigation: $navigation, model: contentMode == "lianxin" ? lianxinWallpaperModel : wallpaperModel).id(contentMode)
+                RetainedModeEditors(selection: ContentMode(rawValue: contentMode) ?? .todo, pageIsActive: navigation.page == .wallpaper) { mode, active in
+                    WallpaperEditorView(store: store, mode: mode, active: active, selectedContentMode: $contentMode, navigation: $navigation,
+                        model: mode == .lianxin ? lianxinWallpaperModel : wallpaperModel)
+                }
                     .tabItem { Label("壁纸", systemImage: "photo") }
                     .tag(AppPage.wallpaper)
-                NavigationStack { WidgetAppearanceEditor(store: store) }.id(contentMode)
+                RetainedModeEditors(selection: ContentMode(rawValue: contentMode) ?? .todo, pageIsActive: navigation.page == .widget) { mode, active in
+                    NavigationStack { WidgetAppearanceEditor(store: store, mode: mode, active: active, selectedContentMode: $contentMode) }
+                }
                     .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
                     .tag(AppPage.widget)
                 LianxinView(model: lianxinModel, store: store, wallpaper: lianxinWallpaperModel, navigation: $navigation)

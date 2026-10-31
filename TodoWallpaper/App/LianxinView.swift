@@ -20,8 +20,6 @@ struct LianxinView: View {
     @ObservedObject var wallpaper: WallpaperEditorModel
     @Binding var navigation: AppNavigationState
     @State private var family = WidgetPreviewFamily.small
-    @State private var hasSyncedPhoto = false
-    @State private var lastPreviewPhoto: String?
     @AppStorage("editor.contentMode") private var contentMode = "todo"
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
@@ -184,11 +182,7 @@ struct LianxinView: View {
         do {
             try await Task.sleep(for: .milliseconds(350)); try Task.checkCancellation()
             await wallpaper.start(items: previewItems, appearance: previewAppearance, content: model.publication)
-            if !hasSyncedPhoto || store.appearance.lianxin?.photoName(at: .now) != lastPreviewPhoto {
-                if let data = try await model.wallpaperPhotoData() { try await wallpaper.importPhotoData(data) }
-                else { wallpaper.removePhoto() }
-                lastPreviewPhoto = store.appearance.lianxin?.photoName(at: .now); hasSyncedPhoto = true
-            }
+            try await wallpaper.syncSharedPhoto(reference: store.appearance.lianxin?.photoName(at: .now)) { try await model.wallpaperPhotoData() }
         } catch is CancellationError { }
         catch { model.notice = "壁纸预览暂未更新，请重试。" }
     }

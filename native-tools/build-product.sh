@@ -34,7 +34,8 @@ import json,os,shutil
 from pathlib import Path
 out=Path('TodoWallpaper/out')
 report=json.loads((out/'package-verification.json').read_text())
-(out/'status.json').write_text(json.dumps({'stage':'known_issues_061','compilation':'succeeded','repository_and_migration_checks':'passed',
+(out/'status.json').write_text(json.dumps({'stage':'lianxin_feedback_090','compilation':'succeeded','repository_and_migration_checks':'passed',
+    'mode_switch_measurements':'passed_on_Simulator_production_actions','mode_instruments_profile':'separate_strict_ci_job_not_implied_by_this_artifact',
     'wallpaper_render_checks':'passed_on_macos_production_renderer','ui_state_checks':'passed_compiled_production_state','iOS_Simulator_native_UI_render_checks':'passed','physical_iPhone_Display_Zoom':'not_verified','ui_structure_checks':'passed','iphone_scroll_visual_bug':'pending_device_retest','wallpaper_photos_and_touch_on_iphone':'not_verified',
     'handoff_checks':'passed','handoff_negative_regressions':'passed','photo_analysis_checks':'passed','album_asset_and_migration_checks':'passed','gesture_nudge_and_schedule_regressions':'passed',
     'version':report['bundles'][0]['version'],'build':report['bundles'][0]['build'],'bundle_id':report['bundles'][0]['bundle_id'],
