@@ -15,13 +15,23 @@ struct LianxinView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !model.loaded { Button("重新读取连心资料") { Task { await model.load() } } }
-                    if !model.configurationComplete && !model.exampleMode {
-                        LianxinSetupView(model: model)
+                    if model.connected {
+                        Button("已连接：\(model.provider.name)") { openSettings() }.font(.caption)
+                    } else if !model.exampleMode {
+                        HStack {
+                            Button("连接 AI（约 1 分钟）") { openSettings() }
+                            Button("先体验") { model.exampleMode = true; model.generate() }
+                        }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 16))
                     }
                     if model.exampleMode {
                         Label("体验模式：示例内容，非 AI 生成", systemImage: "sparkles").font(.footnote)
                         Button("连接我自己的AI") { model.exampleMode = false }
                     }
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField("你的称呼", text: $model.profile.userName)
+                        TextField("IDOL 名字", text: $model.profile.idolName)
+                        TextField("提示词", text: $model.profile.prompt, axis: .vertical).lineLimit(4...10)
+                    }.textFieldStyle(.roundedBorder)
                     card
                     Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成。连接自己的AI后，语气与情境由你的提示词决定。" : "由你的提示词决定语气与情境。这里的话语是 AI 创作，不代表本人真实言论。")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -132,16 +142,6 @@ struct LianxinView: View {
     private var settings: some View {
         NavigationStack {
             Form {
-                Section("与你连心的人") {
-                    TextField("你的称呼（最多 100 字）", text: $model.profile.userName)
-                    TextField("IDOL 名字（最多 100 字）", text: $model.profile.idolName)
-                }
-                Section {
-                    TextField("例如：用温柔、略带暧昧的语气，对刚下班的我说一句晚安。", text: $model.profile.prompt, axis: .vertical)
-                        .lineLimit(5...12)
-                } header: { Text("你的提示词") } footer: {
-                    Text("由你决定关系、语气、情境、语言和长度，最多 12000 字。留空时不会发起生成。")
-                }
                 Section("连接AI向导") { LianxinSetupView(model: model) }
 
             }

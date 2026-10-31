@@ -70,7 +70,7 @@
 | Wallpaper/WallpaperRenderer.swift | App | 壁纸合成渲染 | WallpaperPhotoInfo, WallpaperTextBlock, WallpaperRow, WallpaperLayout, WallpaperRendered, WallpaperRenderer |
 | Wallpaper/WallpaperSettings.swift | App | 壁纸设置与尺寸 | WallpaperSize, WallpaperSettings, WallpaperDraft |
 | Widget/TodoWallpaperWidget.swift | Widget | Widget bundle：Provider、View、Timeline 策略 | TodoWidgetEntry, TodoWidgetProvider, TodoWidgetView |
-| App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService |
+| App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService, LianxinWritingRules |
 | App/LianxinModel.swift | App | 连心状态、钥匙串密钥与私有目录持久化 | LianxinKeychain, LianxinStorage, LianxinModel, LianxinSystemCredentials |
 | App/LianxinView.swift | App | 连心底图话语卡片及 API/提示词设置 | LianxinView |
 | App/LianxinWallpaperView.swift | App | 独立连心壁纸预览、调节与相册导出 | LianxinWallpaperRequest, LianxinWallpaperView |

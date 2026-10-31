@@ -18,7 +18,7 @@ enum LianxinChecks {
         try require(request.httpMethod == "POST" && request.value(forHTTPHeaderField: "Authorization") == "Bearer test-only-placeholder", "POST 与用户密钥")
         guard let body = request.httpBody, let object = try JSONSerialization.jsonObject(with: body) as? [String: Any],
               let messages = object["messages"] as? [[String: String]], let content = messages.first?["content"] else { throw LianxinError.invalidResponse }
-        try require(content.contains(profile.prompt) && content.contains(profile.userName) && content.contains(profile.idolName), "提示词与中韩混排不丢失")
+        try require(messages.count == 2 && messages[0]["role"] == "system" && messages[1]["role"] == "user" && messages[1]["content"] == profile.prompt && content.contains(profile.userName) && content.contains(profile.idolName), "提示词与中韩混排不丢失")
         try require(object["model"] as? String == profile.model && object["stream"] as? Bool == false, "用户模型与非流式响应")
         try require(!String(decoding: body, as: UTF8.self).contains("test-only-placeholder") && object["photo"] == nil, "正文不含密钥或照片")
         for endpoint in ["http://example.invalid", "https://user:secret@example.invalid/api", "https://example.invalid/api?key=secret", "https://example.invalid/#key", "not-a-url"] {
@@ -34,6 +34,12 @@ enum LianxinChecks {
         for response in [#"{"choices":[]}"#, #"{"choices":[{"message":{"content":null}}]}"#, #"{"choices":[{"message":{"content":" "}}]}"#, "bad-json"] {
             try rejects { _ = try LianxinAPIService.decode(Data(response.utf8), status: 200) }
         }
+        var unnamed = profile; unnamed.idolName = ""; unnamed.userName = ""
+        try require(!LianxinWritingRules.system(unnamed).contains("创作对象：") && !LianxinWritingRules.system(unnamed).contains("读者的称呼："), "空名字不产生占位")
+        let examples = (0..<4).map { index -> String in var value = profile; value.exampleIndex = index; return LianxinWritingRules.example(value) }
+        try require(Set(examples).count == 4 && examples.allSatisfy { $0.contains(profile.userName) && $0.contains(profile.idolName) }, "轮换模板代入双方名字")
+        unnamed.connectedSignature = "custom|" + unnamed.endpoint + "|" + unnamed.model
+        try require(LianxinWritingRules.connected(profile: unnamed, hasKey: true) && !LianxinWritingRules.connected(profile: unnamed, hasKey: false), "连接不依赖名字提示词，清密钥变未连接")
         let mock = MockLianxinService(text: "测试返回")
         try require(try await mock.generate(profile: profile, key: "") == "测试返回", "可替换 AI 服务")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("lianxin-check-" + UUID().uuidString)

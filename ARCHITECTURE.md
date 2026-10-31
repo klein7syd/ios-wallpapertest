@@ -214,3 +214,6 @@ LianxinProviderPreset（App与macOS检查，避免与Widget的LianxinProvider重
 LianxinKeychain服务名保持不变，account从api-key迁移到api-key.<providerID>；LianxinCredentialMigration通过可注入协议执行同一策略，写入成功才删除旧键，已存在目标不覆盖。profile仍不含密钥。连接测试共用生成的ephemeral网络安全实现；已有核实列表先GET验证，无列表用max_tokens=1（OpenRouter公开列表先1token验证）。任何连接字段变更会让签名失效，重新测试后保存。模型列表不保证所有模型可用。
 
 体验模式LianxinGeneration先选Mock分支，完全不调用注入的网络服务、不构造真实请求；LianxinPublication可选example字段让旧快照兼容，内容标签贯穿卡片/分享/组件/壁纸。HTTP错误体仅在上限内分类余额错误，不回显；URLSession禁止重定向、Cookie/缓存关闭、1MB响应上限和取消行为保留。
+
+## 连心本轮第1组
+生成改为system中文硬规则（含非空名字/称呼）与原文user提示词；空名字省略句子，长度上限和网络安全保持。体验四模板按持久化索引轮换且代入名字。已连接取决于密钥与连接签名，测试或生成成功即可；主页面连接卡片只打开齿轮，已连接时设置默认收起。称呼、名字和提示词已移到主页面，后续第2组继续重排。原生检查从旧单条user断言改为双角色与user原文等值断言，是新产品协议要求，未放宽安全检查。模型能否遵守创作内容需真实服务商验收。

@@ -104,8 +104,8 @@ final class LianxinModel: ObservableObject {
     var provider: LianxinProviderPreset { LianxinProviderPreset.preset(profile.providerID) }
     private var credentialAccount: String { LianxinSetupRules.account(provider.id) }
     private var signature: String { provider.id + "|" + profile.endpoint + "|" + profile.model }
-    var connected: Bool { !key.isEmpty && profile.connectedSignature == signature }
-    var configurationComplete: Bool { connected && profile.setupFinished == true }
+    var connected: Bool { LianxinWritingRules.connected(profile: profile, hasKey: !key.isEmpty) }
+    var configurationComplete: Bool { connected }
     var keySuffix: String { String(key.suffix(4)) }
 
 
@@ -232,6 +232,8 @@ final class LianxinModel: ObservableObject {
                 var updated = input
                 updated.message = text; updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
                 updated.exampleContent = isExample
+                if isExample { updated.exampleIndex = ((input.exampleIndex ?? 0) % 4) + 1 }
+                else { updated.connectedSignature = signature }
                 try await storage.save(updated)
                 profile = updated
             } catch is CancellationError { }

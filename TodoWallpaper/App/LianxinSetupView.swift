@@ -9,6 +9,19 @@ struct LianxinSetupView: View {
     @Environment(\.openURL) private var openURL
     private var finalAddress: String { (try? LianxinSetupRules.endpoint(model.profile.endpoint)) ?? "请填写有效的HTTPS地址" }
     var body: some View {
+        Group {
+            if model.connected && !choosing {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("已连接：\(model.provider.name) · \(model.profile.model)").font(.headline)
+                    Button("更换服务商") { choosing = true }
+                    Button("重新测试") { Task { await model.testConnection() } }
+                    Button("清除密钥", role: .destructive) { _ = model.saveKey("") }
+                    if let notice = model.connectionNotice { Text(notice).font(.caption) }
+                }.disabled(model.busy)
+            } else { wizard }
+        }
+    }
+    private var wizard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label(model.connected ? "已连接：\(model.provider.name) · \(model.profile.model)" : "连接AI，跟着做就好", systemImage: model.connected ? "checkmark.circle.fill" : "wand.and.stars")
                 .font(.headline)

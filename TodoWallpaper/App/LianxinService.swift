@@ -6,6 +6,7 @@ struct LianxinProfile: Codable, Equatable, Sendable {
     var setupFinished: Bool?
     var connectedSignature: String?
     var exampleContent: Bool?
+    var exampleIndex: Int?
     var userName = ""
     var idolName = ""
     var prompt = ""
@@ -57,7 +58,7 @@ struct LianxinAPIService: AIServiceProtocol {
         guard let components = URLComponents(string: address), components.scheme?.lowercased() == "https",
               let host = components.host, !host.isEmpty, components.user == nil, components.password == nil,
               components.query == nil, components.fragment == nil, let url = components.url else { throw LianxinError.invalidEndpoint }
-        let fields = [profile.userName, profile.idolName, profile.prompt, profile.model]
+        let fields = [profile.prompt, profile.model]
         guard fields.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
               profile.userName.count <= 100, profile.idolName.count <= 100,
               profile.prompt.count <= 12000, profile.model.count <= 200 else { throw LianxinError.missingInput }
@@ -69,7 +70,7 @@ struct LianxinAPIService: AIServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "model": profile.model.trimmingCharacters(in: .whitespacesAndNewlines), "stream": false,
-            "messages": [["role": "user", "content": "创作对象：\(profile.idolName)\n对方的称呼：\(profile.userName)\n以下是我的创作提示词，请按它决定语气、关系、情境、语言和长度，直接输出话语：\n\(profile.prompt)"]]
+            "messages": [["role": "system", "content": LianxinWritingRules.system(profile)], ["role": "user", "content": profile.prompt]]
         ])
         return request
     }
@@ -162,7 +163,32 @@ extension LianxinAPIService: LianxinConnectionService {
 // 体验模式由独立分支分发，不构造网络请求，也不接收真实密钥。
 enum LianxinGeneration {
     static func generate(example: Bool, profile: LianxinProfile, key: String, service: any AIServiceProtocol) async throws -> String {
-        if example { return try await MockLianxinService(text: "今天也辛苦啦。先照顾好自己，今晚做个甜甜的梦。明天，再一起慢慢来。").generate(profile: profile, key: "") }
+        if example { return try await MockLianxinService(text: LianxinWritingRules.example(profile)).generate(profile: profile, key: "") }
         return try await service.generate(profile: profile, key: key)
+    }
+}
+
+// 中文硬规则集中在一处，用户提示词原文始终单独作为user消息。
+enum LianxinWritingRules {
+    static let task = "你为用户创作粉丝向的应援话语。"
+    static let rules = "语气、关系、情境、语言和长度按用户提示词决定。要求：不编造真实发生过的事件、行程、作品、数据或私人信息；不声称这是本人真实发言；只输出话语本身，不加引号、解释或前缀；不超过200字。"
+    static func system(_ profile: LianxinProfile) -> String {
+        let idol = profile.idolName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ([task] + (idol.isEmpty ? [] : ["创作对象：" + idol + "。话语必须明显围绕" + idol + "，按提示词设定以其口吻或对其表达。"])
+            + (user.isEmpty ? [] : ["读者的称呼：" + user + "。在合适处自然地称呼" + user + "。"])
+            + [rules]).joined(separator: "\n")
+    }
+    static func example(_ profile: LianxinProfile) -> String {
+        let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let idol = profile.idolName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lead = user.isEmpty ? "" : user + "，"
+        let subject = idol.isEmpty ? "喜欢的那束光" : idol
+        let templates = ["今天也辛苦啦。愿想起\(subject)时的那份暖意，陪你做个甜甜的梦。", "把对\(subject)的喜欢，也分一点给努力生活的自己吧。", "今天先好好休息，明天带着喜欢\(subject)的心情，继续向前走。", "愿\(subject)带给你的勇气，陪你走过平凡而闪亮的一天。"]
+        return lead + templates[abs((profile.exampleIndex ?? 0) % templates.count)]
+    }
+    static func connected(profile: LianxinProfile, hasKey: Bool) -> Bool {
+        let id = LianxinProviderPreset.preset(profile.providerID).id
+        return hasKey && profile.connectedSignature == id + "|" + profile.endpoint + "|" + profile.model
     }
 }
