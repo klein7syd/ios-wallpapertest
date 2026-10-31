@@ -81,3 +81,5 @@
 | App/LianxinProvider.swift | App + macOS检查 | 官方服务商预设、输入清洗与凭证迁移策略 | LianxinProviderPreset, LianxinSetupRules, LianxinCredentialStore, LianxinCredentialMigration, LianxinConnectionService, MockLianxinConnection |
 | App/LianxinSetupView.swift | App | 服务商、密钥粘贴、连接测试与模型向导 | LianxinSetupView |
 | Tests/LianxinWizardChecks.swift | 独立 macOS 原生检查 | 官方预设完整性、清洗、迁移和离线体验 | LianxinWizardChecks |
+| Core/ContentMode.swift | App + Widget | 内容模式持久化与样式槽位 | ContentMode |
+| Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与强制标注 | LianxinWidgetContent |

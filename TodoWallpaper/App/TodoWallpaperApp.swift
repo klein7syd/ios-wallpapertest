@@ -7,6 +7,7 @@ struct TodoWallpaperApp: App {
     @StateObject private var lianxinWallpaperModel = WallpaperEditorModel(files: WallpaperDraftStore(directory: URL.applicationSupportDirectory.appendingPathComponent("LianxinWallpaper"), exportDirectory: URL.cachesDirectory.appendingPathComponent("LianxinExports")))
     @StateObject private var wallpaperModel = WallpaperEditorModel()
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(ContentMode.key) private var contentMode = "todo"
     @State private var navigation = AppNavigationState()
     #if TODO_UI_CHECKS
     @State private var didRunUIProbe = false
@@ -20,7 +21,8 @@ struct TodoWallpaperApp: App {
 
     var body: some Scene {
         WindowGroup {
-            primaryTabs
+            primaryTabs.environmentObject(lianxinModel)
+            .onChange(of: contentMode) { _, value in if value == "lianxin" { Task { await lianxinModel.load(); await lianxinModel.prepareStyle(store) } } }
             .task {
                 #if TODO_UI_CHECKS
                 if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
@@ -67,7 +69,7 @@ struct TodoWallpaperApp: App {
                 WallpaperEditorView(store: store, navigation: $navigation, model: wallpaperModel)
                     .tabItem { Label("壁纸", systemImage: "photo") }
                     .tag(AppPage.wallpaper)
-                NavigationStack { WidgetAppearanceEditor(store: store) }
+                NavigationStack { WidgetAppearanceEditor(store: store) }.id(contentMode)
                     .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
                     .tag(AppPage.widget)
                 LianxinView(model: lianxinModel, store: store, wallpaper: lianxinWallpaperModel, navigation: $navigation)

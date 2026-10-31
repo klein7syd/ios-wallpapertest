@@ -8,6 +8,7 @@ struct LianxinEntry: TimelineEntry {
     let content: LianxinPublication?
     let photo: CGImage?
     var failed = false
+    var style = WidgetAppearance()
 }
 
 struct LianxinProvider: TimelineProvider {
@@ -23,13 +24,15 @@ struct LianxinProvider: TimelineProvider {
     private func read(size: CGSize) -> LianxinEntry {
         do {
             let content = try LianxinPublication.load(directory: TodoSharedStorage.sharedDirectory())
+            let root = try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).load()
+            let style = root.lianxin ?? root.widget
             var photo: CGImage?
             if let data = content?.photo, let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) {
                 photo = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
                     kCGImageSourceThumbnailMaxPixelSize: min(1200, max(1, max(size.width, size.height) * 3))] as CFDictionary)
             }
-            return LianxinEntry(date: .now, content: content, photo: photo)
+            return LianxinEntry(date: .now, content: content, photo: WidgetPhotoCache.prepared(style: style, size: size, date: .now) ?? photo, style: style)
         } catch { return LianxinEntry(date: .now, content: nil, photo: nil, failed: true) }
     }
 }
@@ -38,6 +41,7 @@ struct LianxinWidgetView: View {
     let entry: LianxinEntry
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var mode
+    @Environment(\.colorScheme) private var scheme
     private var accessory: Bool { family == .accessoryCircular || family == .accessoryRectangular }
     var body: some View {
         Group {
@@ -45,27 +49,23 @@ struct LianxinWidgetView: View {
                 VStack { Image(systemName: "heart"); Text(entry.content?.example == true ? "示例" : (entry.content?.idol ?? "连心")).font(.caption2).lineLimit(1) }
                     .accessibilityLabel((entry.content?.contentLabel ?? "连心") + "，" + (entry.content?.text ?? "在连心中发布一句话"))
             } else {
-                VStack(alignment: .leading, spacing: accessory ? 2 : 8) {
-                    Text("\(entry.content?.idol ?? "连心") · \(entry.content?.contentLabel ?? "AI 创作")").font(.caption).lineLimit(1)
-                    Text(entry.content?.text ?? (entry.failed ? "暂时无法读取，请打开 App 重试。" : "打开 App，在连心中生成并发布话语。"))
-                        .font(accessory ? .caption : .body)
-                        .lineLimit(accessory ? 3 : family == .systemSmall ? 4 : family == .systemMedium ? 5 : 12)
-                        .minimumScaleFactor(0.85)
-                    if !accessory { Spacer(minLength: 0) }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(accessory ? 0 : 10)
-                    .background {
-                        if !accessory && mode == .fullColor { RoundedRectangle(cornerRadius: 16).fill(.regularMaterial) }
+                if accessory {
+                    VStack(alignment: .leading) {
+                        Text(entry.content?.text ?? "打开连心").font(.caption).lineLimit(2)
+                        Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1)
                     }
+                } else { LianxinWidgetContent(content: entry.content, style: entry.style, family: family == .systemLarge ? .large : family == .systemMedium ? .medium : .small, effectsFamily: family) }
+
             }
         }
         .containerBackground(for: .widget) {
-            if !accessory, mode == .fullColor, let photo = entry.photo {
-                GeometryReader { proxy in
-                    Image(decorative: photo, scale: 1).resizable().scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height).clipped()
-                }
+            if !accessory {
+                let readable = ReadableResolver.scrim(style: entry.style, date: entry.date, scheme: scheme, renderingMode: mode, family: family)
+                WidgetBackgroundView(style: entry.style, date: entry.date, preparedPhoto: entry.photo, preparedOnly: true,
+                    scrim: readable.value, scrimAnchor: entry.style.readable.anchor, scrimHeightRatio: entry.style.readable.heightRatio,
+                    scrimColor: readable.color, scrimExtraInset: entry.style.readable.edgeInset, effectsFamily: family)
             } else { Color.clear }
+
         }
     }
 }

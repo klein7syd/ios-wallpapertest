@@ -69,7 +69,7 @@ struct LianxinView: View {
                 }
             }
 
-            .task { await model.load(); outputText = model.profile.message }
+            .task { await model.load(); await model.prepareStyle(store); outputText = model.profile.message }
             .sheet(isPresented: $showsSettings) { settings }
             .sheet(item: $model.wallpaperRequest) { LianxinWallpaperView(request: $0) }
             .onChange(of: model.profile.message) { _, value in outputText = value }
@@ -126,7 +126,7 @@ struct LianxinView: View {
             Menu("小组件 · " + family.title) {
                 ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
             }
-            TodoWidgetContent(document: TodoDocument(items: previewItems), appearance: previewAppearance, error: nil, family: family, interactive: false)
+            LianxinWidgetContent(content: model.publication, style: store.appearance.style(in: .lianxin), family: family)
                 .padding(12).frame(width: 170, height: family == .large ? 280 : 170)
                 .background { if let image = model.photo { Image(uiImage: image).resizable().scaledToFill() } }
                 .clipped().clipShape(RoundedRectangle(cornerRadius: 22)).allowsHitTesting(false)

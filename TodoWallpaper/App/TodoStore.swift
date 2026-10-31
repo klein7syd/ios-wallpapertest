@@ -125,6 +125,7 @@ final class TodoStore: ObservableObject {
         appearance = value; appearanceDirty = false; appearanceStorageError = nil; appearanceError = nil
         if previous != value.widget { schedulePhotoAnalysis(invalidating: analysisContextChanged(previous, value.widget)) }
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+        WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
     }
     func reloadAppearance() {
         guard usesSharedStorage || appearanceRepository != nil else { return }
@@ -138,6 +139,7 @@ final class TodoStore: ObservableObject {
         try activeAppearanceRepository().recover()
         reloadAppearance()
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+        WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
     }
     func rename(id: UUID, title: String) throws { accept(try activeRepository().rename(id: id, title: title)) }
     func setCompleted(id: UUID, completed: Bool) throws { accept(try activeRepository().setCompleted(id: id, completed: completed)) }
@@ -214,7 +216,8 @@ final class TodoStore: ObservableObject {
         guard usesSharedStorage || analysisDirectory != nil else { return }
         cancelPhotoAnalysis()
         analysisNeedsInvalidation = analysisNeedsInvalidation || invalidating
-        let style = appearance.widget, names = analysisNames(appearance.widget)
+        let style = appearance.widget, extraStyle = appearance.lianxin
+        let names = analysisNames(appearance.widget) + (appearance.lianxin.map(analysisNames) ?? [])
         guard !isAppearanceInteracting, !names.isEmpty else { return }
         let generation = analysisGeneration, invalidate = analysisNeedsInvalidation
         let cache = analysisCache, explicitDirectory = analysisDirectory, systemDark = analysisSystemDark
@@ -230,8 +233,20 @@ final class TodoStore: ObservableObject {
                     preferredPhotoName: preferredName, preferredAspect: preferredAspect) { [weak self] reloadWidget in
                     Task { @MainActor [weak self] in
                         guard let self, self.analysisGeneration == generation else { return }
-                        if reloadWidget { WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind) }
+                        if reloadWidget { WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+        WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind) }
                         else { self.analysisRevision += 1 }
+                    }
+                }
+                if let extraStyle {
+                    try await PhotoAnalysisService.shared.runBatch(style: extraStyle, systemDark: systemDark,
+                        invalidating: false, directory: directory, cache: cache,
+                        preferredPhotoName: preferredName, preferredAspect: preferredAspect) { [weak self] reloadWidget in
+                        Task { @MainActor [weak self] in
+                            guard let self, self.analysisGeneration == generation else { return }
+                            if reloadWidget { WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind) }
+                            else { self.analysisRevision += 1 }
+                        }
                     }
                 }
                 succeeded = true
@@ -253,5 +268,6 @@ final class TodoStore: ObservableObject {
         loadError = nil
         canRecover = false
         WidgetCenter.shared.reloadTimelines(ofKind: TodoWidgetConstants.kind)
+        WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
     }
 }

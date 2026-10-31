@@ -15,6 +15,7 @@ struct TodoWidgetContent: View {
     var onPreviewMarker: ((UUID) -> Void)?
     var selectedTaskID: UUID?
     var onPreviewHeader: (() -> Void)?
+    var textAlignment: TextAlignment = .leading
     var effectsFamily: WidgetFamily?
     @ScaledMetric(relativeTo: .body) private var bodyUnit = 15.0
     @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
@@ -171,7 +172,7 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(rowFade)
                 .foregroundStyle(rowColor)
-                .lineLimit(row.lineLimit).multilineTextAlignment(.leading)
+                .lineLimit(row.lineLimit).multilineTextAlignment(textAlignment)
                 .readableText(isLightText: textIsLight, intensity: settings.intensity,
                               enabled: tone.enabled)
                 .fixedSize(horizontal: false, vertical: true)

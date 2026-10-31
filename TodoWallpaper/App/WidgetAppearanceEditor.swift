@@ -17,6 +17,22 @@ private struct WidgetEditState: Equatable {
 }
 struct WidgetAppearanceEditor: View {
     @ObservedObject var store: TodoStore
+    @EnvironmentObject private var lianxinModel: LianxinModel
+    @AppStorage(ContentMode.key) private var contentMode = "todo"
+    private var isLianxin: Bool { contentMode == ContentMode.lianxin.rawValue }
+    private var editingAppearance: TodoAppearance {
+        var root = store.appearance; root.widget = root.style(in: isLianxin ? .lianxin : .todo); return root
+    }
+    @discardableResult private func setEditingAppearance(_ value: TodoAppearance) -> Bool {
+        var root = store.appearance
+        if isLianxin { root.lianxin = value.widget } else { root = value }
+        return store.setAppearance(root)
+    }
+    private func saveEditingAppearance(_ value: TodoAppearance) throws {
+        var root = store.appearance
+        if isLianxin { root.lianxin = value.widget } else { root = value }
+        try store.saveAppearance(root)
+    }
     @State private var error: String?
     @State private var isVisible = false
     @State private var tool = WidgetEditorTool.theme
@@ -37,26 +53,26 @@ struct WidgetAppearanceEditor: View {
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var widget: Binding<WidgetAppearance> {
-        Binding(get: { store.appearance.widget }, set: { var next = store.appearance; next.widget = $0; store.setAppearance(next) })
+        Binding(get: { editingAppearance.widget }, set: { var next = editingAppearance; next.widget = $0; setEditingAppearance(next) })
     }
     private var photoCrop: Binding<PhotoCrop> {
-        Binding(get: { store.appearance.widget.photoCrop }, set: { widget.wrappedValue.backgroundCrop = $0 })
+        Binding(get: { editingAppearance.widget.photoCrop }, set: { widget.wrappedValue.backgroundCrop = $0 })
     }
     private var photoDate: Date { Calendar.current.date(byAdding: .day, value: previewDay, to: .now) ?? .now }
     private var heading: Binding<WidgetHeaderAppearance> {
-        Binding(get: { store.appearance.widget.heading }, set: { widget.wrappedValue.header = $0 })
+        Binding(get: { editingAppearance.widget.heading }, set: { widget.wrappedValue.header = $0 })
     }
     private var scheme: ColorScheme {
-        let theme = store.appearance.widget.theme
+        let theme = editingAppearance.widget.theme
         return theme == .system ? systemScheme : theme == .dark ? .dark : .light
     }
     private var editState: WidgetEditState {
-        WidgetEditState(style: store.appearance.widget,
+        WidgetEditState(style: editingAppearance.widget,
             markers: store.items.map { TaskMarkerState(id: $0.id, marker: $0.marker) }.sorted { $0.id.uuidString < $1.id.uuidString })
     }
     private var layoutScale: Binding<Double> {
-        Binding(get: { store.appearance.widget.fontSize / 15 },
-            set: { widget.wrappedValue = EditorStandards.widget(store.appearance.widget, scale: $0) })
+        Binding(get: { editingAppearance.widget.fontSize / 15 },
+            set: { widget.wrappedValue = EditorStandards.widget(editingAppearance.widget, scale: $0) })
     }
     private var editorInteraction: EditorInteractionContext {
         let base = edits.context(read: { editState })
@@ -70,7 +86,7 @@ struct WidgetAppearanceEditor: View {
     private var editingObservers: some View {
         configuredEditor
             .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
-            .onChange(of: store.appearance.widget.backdrop) { _, _ in cropPhoto = false }
+            .onChange(of: editingAppearance.widget.backdrop) { _, _ in cropPhoto = false }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
             .onChange(of: previousWidgetMarker) { _, value in store.retainPhotoAssets(PhotoAssetReferences.marker(value), owner: "widget.previousMarker") }
     }
@@ -102,16 +118,16 @@ struct WidgetAppearanceEditor: View {
         })
     }
     private var currentTaskIDs: [UUID] { store.items.map(\.id) }
-    private var currentAnalysisPhotoName: String? { store.appearance.widget.photoName(at: photoDate) }
+    private var currentAnalysisPhotoName: String? { editingAppearance.widget.photoName(at: photoDate) }
     private var albumPicker: some View {
         WidgetAlbumPicker(onSelect: acceptAlbum, onCommitted: { store.collectPhotoAssets() })
     }
     private func acceptAlbum(_ rotation: WidgetAlbumRotation, skipped: Int) throws {
-        var next = store.appearance.widget
+        var next = editingAppearance.widget
         next.photoRotation = rotation; next.backgroundPhotoName = rotation.photos.first
         next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop()
-        var root = store.appearance; root.widget = next
-        try store.saveAppearance(root.clampedForEditing()); previewDay = 0
+        var root = editingAppearance; root.widget = next
+        try saveEditingAppearance(root.clampedForEditing()); previewDay = 0
         if skipped > 0 { error = "\(skipped) 张读取失败，已跳过" }
     }
     private var editorSurface: some View {
@@ -131,11 +147,11 @@ struct WidgetAppearanceEditor: View {
                     case .header: headerControls
                     case .text: textControls
                     case .marker: markerControls
-                    case .content: contentControls
+                    case .content: if isLianxin { lianxinControls } else { contentControls }
                     }
                 }
                 .frame(maxHeight: .infinity).accessibilityIdentifier("widget.settings")
-                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
+                EditorToolPicker(choices: WidgetEditorTool.allCases.filter { !isLianxin || $0 != .marker }, selection: $tool,
                     title: { $0.rawValue }, compact: geometry.size.height < 320)
                     .padding(.horizontal, 16).padding(.vertical, 6)
                     .accessibilityIdentifier("widget.tools")
@@ -145,6 +161,7 @@ struct WidgetAppearanceEditor: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" } }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil || importingPhoto)
@@ -184,7 +201,7 @@ struct WidgetAppearanceEditor: View {
                 do {
                     guard let data = try await selection.loadTransferable(type: Data.self) else { throw WallpaperError.unreadablePhoto }
                     let name = try await photos.importPhoto(data)
-                    var next = store.appearance.widget
+                    var next = editingAppearance.widget
                     next.backgroundPhotoName = name; next.backdrop = .photo; next.systemMaterial = false; next.backgroundCrop = PhotoCrop(); next.photoRotation?.enabled = false; previewDay = 0
                     widget.wrappedValue = next; store.flushAppearance()
                 } catch { self.error = error.localizedDescription }
@@ -192,7 +209,7 @@ struct WidgetAppearanceEditor: View {
         }
         .task {
             if let legacy = ReadableSettingsMigration.take() {
-                var next = store.appearance.widget
+                var next = editingAppearance.widget
                 if next.readableAnchor == nil { next.readableAnchor = legacy.anchor }
                 if next.readableIntensity == nil { next.readableIntensity = legacy.intensity }
                 if next.readableShadowPreset == nil { next.readableShadowPreset = legacy.shadowPreset }
@@ -223,7 +240,7 @@ struct WidgetAppearanceEditor: View {
         Task {
             do {
                 try await edits.undo(read: { editState }) { previous, expected in
-                    var restored = store.appearance
+                    var restored = editingAppearance
                     restored.widget = previous.style
                     restored = restored.clampedForEditing()
                     try restored.validate()
@@ -241,7 +258,7 @@ struct WidgetAppearanceEditor: View {
                     try store.updateMarkers(changed.map { old in
                         TodoMarkerUpdate(id: old.id, expected: expected.markers.first(where: { $0.id == old.id })?.marker, marker: old.marker)
                     })
-                    if previous.style != expected.style, !store.setAppearance(restored) {
+                    if previous.style != expected.style, !setEditingAppearance(restored) {
                         throw AppearanceError.invalidStyle
                     }
                 }
@@ -268,10 +285,16 @@ struct WidgetAppearanceEditor: View {
             }
             GeometryReader { proxy in
                 let scale = family.scale(availableWidth: proxy.size.width - 32, availableHeight: proxy.size.height - 8)
+                Group {
+                    if isLianxin {
+                        LianxinWidgetContent(content: lianxinModel.publication, style: editingAppearance.widget, family: family)
+                    } else {
                 TodoWidgetContent(document: store.hasLoaded && store.loadError == nil ? TodoDocument(items: preview.items(store.items)) : nil,
-                    appearance: store.appearance, error: store.loadError, family: family, interactive: false,
+                    appearance: editingAppearance, error: store.loadError, family: family, interactive: false,
                     onPreviewToggle: { id in if let item = store.items.first(where: { $0.id == id }) { preview.toggle(item) } },
                     onPreviewMarker: { id in selectedTaskID = id; tool = .marker }, selectedTaskID: selectedTaskID, onPreviewHeader: { tool = .header })
+                    }
+                }
                     .onPreferenceChange(ReadableGeometryPreference.self) { geometry in
                         readableGeometry = geometry
                         clampReadableInset(geometry: geometry)
@@ -280,16 +303,16 @@ struct WidgetAppearanceEditor: View {
                     .frame(width: family.width, height: family.height)
                     .allowsHitTesting(!cropPhoto)
                     .background {
-                        if cropPhoto && store.appearance.widget.backdrop == .photo && !store.appearance.widget.materialEnabled, let image = WidgetPhotoCache.image(named: store.appearance.widget.photoName(at: photoDate)) {
-                            WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: store.appearance.widget.photoOpacity,
+                        if cropPhoto && editingAppearance.widget.backdrop == .photo && !editingAppearance.widget.materialEnabled, let image = WidgetPhotoCache.image(named: editingAppearance.widget.photoName(at: photoDate)) {
+                            WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: editingAppearance.widget.photoOpacity,
                                 background: scheme == .dark ? UIColor(white: 0.09, alpha: 1) : .white)
                         } else {
-                            let readable = ReadableResolver.scrim(style: store.appearance.widget, date: photoDate, scheme: scheme,
+                            let readable = ReadableResolver.scrim(style: editingAppearance.widget, date: photoDate, scheme: scheme,
                                 canvasAspect: family.width / family.height)
-                            WidgetBackgroundView(style: store.appearance.widget, date: photoDate,
-                                                 scrim: readable.value, scrimAnchor: store.appearance.widget.readable.anchor,
-                                                 scrimHeightRatio: store.appearance.widget.readable.heightRatio,
-                                                 scrimColor: readable.color, scrimExtraInset: store.appearance.widget.readable.edgeInset,
+                            WidgetBackgroundView(style: editingAppearance.widget, date: photoDate,
+                                                 scrim: readable.value, scrimAnchor: editingAppearance.widget.readable.anchor,
+                                                 scrimHeightRatio: editingAppearance.widget.readable.heightRatio,
+                                                 scrimColor: readable.color, scrimExtraInset: editingAppearance.widget.readable.edgeInset,
                                                  contentGeometry: readableGeometry)
                         }
                     }
@@ -309,20 +332,20 @@ struct WidgetAppearanceEditor: View {
     @ViewBuilder private var themeControls: some View {
         InspectorGroupTitle(title: "背景与照片", detail: "先选背景，再调整照片构图与明暗。")
         Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        if store.appearance.widget.materialEnabled {
+        if editingAppearance.widget.materialEnabled {
             Text("请求原生 Liquid Glass。默认图标模式能否透出桌面壁纸，仍需实机确认；系统透明模式由 iOS 控制。")
                 .font(.caption).foregroundStyle(.secondary)
         } else {
             Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            if store.appearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
-            if store.appearance.widget.backdrop == .photo {
+            if editingAppearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
+            if editingAppearance.widget.backdrop == .photo {
                 PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
                     Label("选择或更换照片", systemImage: "photo")
                 }.buttonStyle(.bordered).disabled(importingPhoto)
                 Button("选择相册，每天换一张", systemImage: "photo.stack") { chooseAlbum = true }
                 if importingPhoto { ProgressView("正在处理照片…") }
-                if let rotation = store.appearance.widget.photoRotation {
-                    Toggle("每日轮换 · \(rotation.title)", isOn: Binding(get: { store.appearance.widget.photoRotation?.enabled ?? false }, set: {
+                if let rotation = editingAppearance.widget.photoRotation {
+                    Toggle("每日轮换 · \(rotation.title)", isOn: Binding(get: { editingAppearance.widget.photoRotation?.enabled ?? false }, set: {
                         widget.wrappedValue.photoRotation?.enabled = $0; previewDay = 0
                     }))
                     if rotation.enabled {
@@ -331,10 +354,10 @@ struct WidgetAppearanceEditor: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if store.appearance.widget.photoName(at: photoDate) != nil {
+                if editingAppearance.widget.photoName(at: photoDate) != nil {
                     Toggle("手指调整照片", isOn: $cropPhoto)
                     PreciseSlider(title: "照片缩放", value: photoCrop.zoom, range: 1...4, standard: 1, precision: 2)
-                    PreciseSlider(title: "照片不透明度", value: Binding(get: { store.appearance.widget.photoOpacity }, set: { widget.wrappedValue.backgroundPhotoOpacity = $0 }), range: 0...1, standard: 1, precision: 2)
+                    PreciseSlider(title: "照片不透明度", value: Binding(get: { editingAppearance.widget.photoOpacity }, set: { widget.wrappedValue.backgroundPhotoOpacity = $0 }), range: 0...1, standard: 1, precision: 2)
                     if advanced {
                         PreciseSlider(title: "照片水平位置", value: photoCrop.panX, range: -1...1, standard: 0, precision: 2)
                         PreciseSlider(title: "照片垂直位置", value: photoCrop.panY, range: -1...1, standard: 0, precision: 2)
@@ -342,20 +365,20 @@ struct WidgetAppearanceEditor: View {
                     Button("恢复照片构图") { photoCrop.wrappedValue = PhotoCrop() }
                     Divider()
                     Button("移除照片", role: .destructive) {
-                        if let photos = store.appearance.widget.photoRotation?.photos {
+                        if let photos = editingAppearance.widget.photoRotation?.photos {
                             store.forgetPhotoAnalysis(photos)
                         }
-                        if let current = store.appearance.widget.backgroundPhotoName {
+                        if let current = editingAppearance.widget.backgroundPhotoName {
                             store.forgetPhotoAnalysis([current])
                         }
-                        var next = store.appearance.widget; next.backgroundPhotoName = nil; next.photoRotation = nil; next.backdrop = .system
+                        var next = editingAppearance.widget; next.backgroundPhotoName = nil; next.photoRotation = nil; next.backdrop = .system
                         widget.wrappedValue = next; cropPhoto = false; store.flushAppearance(); store.collectPhotoAssets()
                     }
                 }
             }
         }
         InspectorGroupTitle(title: "实验选项", detail: "系统玻璃效果受 iOS 模式影响，可按需开启。")
-        Toggle("玻璃背景（实验）", isOn: Binding(get: { store.appearance.widget.materialEnabled }, set: {
+        Toggle("玻璃背景（实验）", isOn: Binding(get: { editingAppearance.widget.materialEnabled }, set: {
             widget.wrappedValue.systemMaterial = $0; cropPhoto = false
         }))
         if advanced {
@@ -367,15 +390,18 @@ struct WidgetAppearanceEditor: View {
         InspectorGroupTitle(title: "标题与位置", detail: "标题内容与整块文字的位置在这里调整。")
         PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
         Toggle("显示标题", isOn: heading.showsTitle)
-        if store.appearance.widget.heading.showsTitle {
-            TextField("标题内容", text: Binding(get: { store.appearance.widget.heading.text }, set: { text in
+        if editingAppearance.widget.heading.showsTitle {
+            if isLianxin { Text("标题固定使用IDOL名字：" + lianxinModel.profile.idolName).font(.caption) }
+            else {
+            TextField("标题内容", text: Binding(get: { editingAppearance.widget.heading.text }, set: { text in
                 edits.context(read: { editState }).pulse("widget.title")
                 heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
             })).textInputAutocapitalization(.never).submitLabel(.done)
+            }
             Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
             StyleColorControl(title: "标题颜色", value: heading.color)
-            .disabled(store.appearance.widget.heading.followsTextColor)
-            Picker("标题位置", selection: Binding(get: { store.appearance.widget.heading.horizontalPosition < 0.25 ? 0 : store.appearance.widget.heading.horizontalPosition > 0.75 ? 2 : 1 }, set: {
+            .disabled(editingAppearance.widget.heading.followsTextColor)
+            Picker("标题位置", selection: Binding(get: { editingAppearance.widget.heading.horizontalPosition < 0.25 ? 0 : editingAppearance.widget.heading.horizontalPosition > 0.75 ? 2 : 1 }, set: {
                 heading.wrappedValue.horizontalPosition = Double($0) / 2
             })) {
                 Text("左").tag(0); Text("中").tag(1); Text("右").tag(2)
@@ -398,7 +424,7 @@ struct WidgetAppearanceEditor: View {
         }.pickerStyle(.segmented)
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         StyleColorControl(title: "文字色", value: widget.textColor)
-            .disabled(store.appearance.widget.followsSystemText)
+            .disabled(editingAppearance.widget.followsSystemText)
         if advanced {
             PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
             if hasVisibleMarker { PreciseSlider(title: "标记与文字间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
@@ -411,15 +437,15 @@ struct WidgetAppearanceEditor: View {
             PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
         }
         Toggle("紧凑布局", isOn: widget.compact)
-        Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
+        Picker("每项文字行数", selection: Binding(get: { editingAppearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("1 行").tag(1); Text("2 行").tag(2); Text("3 行").tag(3); Text("4 行").tag(4)
         }.pickerStyle(.menu)
         Text("点按后效果").font(.subheadline)
-        Picker("点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
+        Picker("点按后效果", selection: Binding(get: { editingAppearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.menu)
-        if store.appearance.widget.textCompletion == .color {
-            StyleColorControl(title: "完成文字色", value: Binding(get: { store.appearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
+        if editingAppearance.widget.textCompletion == .color {
+            StyleColorControl(title: "完成文字色", value: Binding(get: { editingAppearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
         if advanced {
             PreciseSlider(title: "Scrim 强度", value: scrimBinding, range: 0...0.8, standard: autoScrim, precision: 2)
@@ -433,19 +459,19 @@ struct WidgetAppearanceEditor: View {
             Text("已使用自定义参数").font(.caption).foregroundStyle(.secondary)
         }
     }
-    private var settings: ReadableSettings { store.appearance.widget.readable }
+    private var settings: ReadableSettings { editingAppearance.widget.readable }
     /// 当前图片在当前锚点上的自动值，滑条的蓝点
     private var autoScrim: Double {
-        let id = store.appearance.widget.photoName(at: photoDate)
+        let id = editingAppearance.widget.photoName(at: photoDate)
         let analysis = id.flatMap { name in
-            AppearanceStore.shared.cachedAnalysis(for: store.appearance.widget.analysisRequest(photoName: name,
+            AppearanceStore.shared.cachedAnalysis(for: editingAppearance.widget.analysisRequest(photoName: name,
                 canvasAspect: family.width / family.height, darkBackground: scheme == .dark), anchor: settings.anchor)
         }
-        let tone = ReadableTone.resolve(style: store.appearance.widget, scheme: scheme, renderingMode: .fullColor)
+        let tone = ReadableTone.resolve(style: editingAppearance.widget, scheme: scheme, renderingMode: .fullColor)
         return settings.autoScrim(analysis: analysis, isLightText: tone.isLightText)
     }
     private func updateAnalysisPriority() {
-        store.prioritizePhotoAnalysis(photoName: store.appearance.widget.photoName(at: photoDate), canvasAspect: family.width / family.height)
+        store.prioritizePhotoAnalysis(photoName: editingAppearance.widget.photoName(at: photoDate), canvasAspect: family.width / family.height)
     }
     private var readableAnchor: Binding<TextAnchor> {
         Binding(get: { settings.anchor }, set: { next in
@@ -512,7 +538,7 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var markerControls: some View {
         Toggle("统一标记（对所有待办生效）", isOn: Binding(
-            get: { store.appearance.widget.unifiedMarkers ?? false },
+            get: { editingAppearance.widget.unifiedMarkers ?? false },
             set: { widget.wrappedValue.unifiedMarkers = $0 }))
         Menu {
             Button("小组件默认") { selectedTaskID = nil }
@@ -520,27 +546,27 @@ struct WidgetAppearanceEditor: View {
         } label: { Label(selectedTask?.title ?? "小组件默认", systemImage: selectedTask == nil ? "square.grid.2x2" : "pencil.circle").lineLimit(2) }
         if let item = selectedTask {
             Group {
-                MarkerChoiceEditor(choice: Binding(get: { store.appearance.marker(for: item, widgetContext: true) }, set: { setTaskMarker($0, id: item.id) }))
+                MarkerChoiceEditor(choice: Binding(get: { editingAppearance.marker(for: item, widgetContext: true) }, set: { setTaskMarker($0, id: item.id) }))
                 if item.marker != nil { Button("恢复小组件默认") { setTaskMarker(nil, id: item.id) } }
             }
-            MarkerStyleEditor(style: widget.markerStyle, kind: store.appearance.marker(for: item, widgetContext: true).kind, advanced: advanced)
+            MarkerStyleEditor(style: widget.markerStyle, kind: editingAppearance.marker(for: item, widgetContext: true).kind, advanced: advanced)
             Text("此项标记单独保存；尺寸与完成效果用于整个小组件。").font(.caption).foregroundStyle(.secondary)
         } else {
             Group {
-                Toggle("继承壁纸标记", isOn: Binding(get: { store.appearance.widget.markerOverride == nil }, set: { inherit in
-                    var next = store.appearance
+                Toggle("继承壁纸标记", isOn: Binding(get: { editingAppearance.widget.markerOverride == nil }, set: { inherit in
+                    var next = editingAppearance
                     if inherit { previousWidgetMarker = next.widget.markerOverride; next.widget.markerOverride = nil }
                     else { next.widget.markerOverride = previousWidgetMarker ?? next.defaultMarker }
-                    store.setAppearance(next)
+                    setEditingAppearance(next)
                 }))
-                if store.appearance.widget.markerOverride != nil {
-                    MarkerChoiceEditor(choice: Binding(get: { store.appearance.widget.markerOverride ?? store.appearance.defaultMarker }, set: { value in
-                        var next = store.appearance; next.widget.markerOverride = value; store.setAppearance(next)
+                if editingAppearance.widget.markerOverride != nil {
+                    MarkerChoiceEditor(choice: Binding(get: { editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker }, set: { value in
+                        var next = editingAppearance; next.widget.markerOverride = value; setEditingAppearance(next)
                     }))
                 }
             }
             MarkerStyleEditor(style: widget.markerStyle,
-                kind: (store.appearance.widget.markerOverride ?? store.appearance.defaultMarker).kind, advanced: advanced)
+                kind: (editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker).kind, advanced: advanced)
         }
         if advanced {
             Text("继承壁纸的标记类型与 Emoji；大小、间距和完成效果在这里独立设置。").font(.caption).foregroundStyle(.secondary)
@@ -548,20 +574,30 @@ struct WidgetAppearanceEditor: View {
     }
     private var selectedTask: TodoItem? { store.items.first { $0.id == selectedTaskID } }
     private var hasVisibleMarker: Bool {
-        (store.appearance.widget.markerOverride ?? store.appearance.defaultMarker).kind != .none ||
-        store.items.contains { store.appearance.marker(for: $0, widgetContext: true).kind != .none }
+        (editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker).kind != .none ||
+        store.items.contains { editingAppearance.marker(for: $0, widgetContext: true).kind != .none }
     }
     private func setTaskMarker(_ marker: TodoMarker?, id: UUID) {
         guard let item = store.items.first(where: { $0.id == id }) else { return }
         do { try store.edit(id: id, title: item.title, marker: marker) }
         catch { self.error = error.localizedDescription }
     }
+    private var lianxinControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("显示IDOL署名", isOn: Binding(get: { widget.wrappedValue.lianxinShowsSignature != false }, set: { widget.wrappedValue.lianxinShowsSignature = $0 }))
+            Toggle("文字居中", isOn: Binding(get: { widget.wrappedValue.lianxinCentered == true }, set: { widget.wrappedValue.lianxinCentered = $0 }))
+            Picker("最多行数", selection: Binding(get: { widget.wrappedValue.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
+                Text("自动").tag(0); ForEach(1...4, id: \.self) { Text("\($0)行").tag($0) }
+            }
+            Text("AI 创作 / 示例内容标注始终显示，不可关闭。").font(.caption)
+        }
+    }
     @ViewBuilder private var contentControls: some View {
         InspectorGroupTitle(title: "显示内容", detail: "控制数量、筛选和辅助说明。")
-        Toggle("显示左下角说明", isOn: Binding(get: { store.appearance.widget.footerVisible }, set: { widget.wrappedValue.showsFooter = $0 }))
+        Toggle("显示左下角说明", isOn: Binding(get: { editingAppearance.widget.footerVisible }, set: { widget.wrappedValue.showsFooter = $0 }))
         Toggle("显示未完成数量", isOn: heading.showsSummary)
-        Toggle("显示行分隔线", isOn: Binding(get: { store.appearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
-        Stepper("最多 \(store.appearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
+        Toggle("显示行分隔线", isOn: Binding(get: { editingAppearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
+        Stepper("最多 \(editingAppearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
         Picker("完成事项", selection: widget.completed) { ForEach(WidgetCompleted.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu)
         Button("请求更新小组件") { store.flushAppearance(); store.reload() }
     }

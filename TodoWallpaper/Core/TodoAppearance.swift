@@ -142,6 +142,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var showsFooter: Bool?
     /// Extra inter-row padding; the separate line-count policy avoids forcing
     /// two text lines into every large Widget row when tight spacing is selected.
+    var lianxinShowsSignature: Bool?
+    var lianxinCentered: Bool?
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
     var unifiedMarkers: Bool?
@@ -229,6 +231,10 @@ extension TodoAppearance {
             header.topInset = ReadableRules.finiteClamp(header.topInset, to: 0...24, fallback: 0)
             next.widget.header = header
         }
+        if let slot = next.lianxin {
+            var isolated = TodoAppearance(); isolated.widget = slot
+            next.lianxin = isolated.clampedForEditing().widget
+        }
         return next
     }
 }
@@ -255,6 +261,7 @@ struct TodoAppearance: Codable, Equatable, Sendable {
     var defaultMarker = TodoMarker()
     var markerStyle = MarkerStyle()
     var widget = WidgetAppearance()
+    var lianxin: WidgetAppearance?
     func marker(for item: TodoItem, widgetContext: Bool = false) -> TodoMarker {
         if widgetContext && widget.unifiedMarkers == true {
             return widget.markerOverride ?? defaultMarker
@@ -263,7 +270,7 @@ struct TodoAppearance: Codable, Equatable, Sendable {
     }
     func validate() throws {
         guard schemaVersion == 1 else { throw AppearanceError.unsupportedVersion }
-        try defaultMarker.validate(); try markerStyle.validate(); try widget.validate()
+        try defaultMarker.validate(); try markerStyle.validate(); try widget.validate(); try lianxin?.validate()
     }
 }
 enum AppearanceError: LocalizedError {

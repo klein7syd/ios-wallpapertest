@@ -7,7 +7,7 @@ enum PhotoAssetReferences {
         marker(value.markerOverride).union([value.backgroundPhotoName].compactMap { $0 })
             .union(value.photoRotation?.photos ?? [])
     }
-    static func appearance(_ value: TodoAppearance) -> Set<String> { marker(value.defaultMarker).union(widget(value.widget)) }
+    static func appearance(_ value: TodoAppearance) -> Set<String> { marker(value.defaultMarker).union(widget(value.widget)).union(value.lianxin.map(widget) ?? []) }
     static func items(_ values: [TodoItem]) -> Set<String> { values.reduce(into: Set<String>()) { $0.formUnion(marker($1.marker)) } }
 }
 

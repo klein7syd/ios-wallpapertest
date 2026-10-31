@@ -19,6 +19,29 @@ enum LianxinWizardChecks {
         func require(_ condition: Bool, _ message: String) throws {
             if !condition { throw NSError(domain: "LianxinWizardChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
         }
+        let suite = "ContentMode." + UUID().uuidString
+        guard let defaults = UserDefaults(suiteName: suite) else { throw LianxinError.storage }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try require(ContentMode.read(defaults) == .todo, "模式默认待办")
+        ContentMode.lianxin.save(defaults)
+        try require(ContentMode.read(defaults) == .lianxin, "两个编辑器读取同一持久化键")
+        var appearance = TodoAppearance(); let original = appearance.widget
+        let photo = "widget-photo-" + UUID().uuidString + ".jpg"
+        appearance.initializeLianxin(photoName: photo)
+        try require(appearance.widget == original && appearance.lianxin?.backgroundPhotoName == photo, "首次复制且覆盖连心底图")
+        var slot = appearance.style(in: .lianxin); slot.fontSize = 19
+        appearance.setStyle(slot, in: .lianxin)
+        try require(appearance.widget == original && appearance.lianxin?.fontSize == 19, "连心编辑不影响待办")
+        var todo = original; todo.fontSize = 12; appearance.setStyle(todo, in: .todo)
+        appearance.initializeLianxin()
+        try require(appearance.lianxin?.fontSize == 19, "待办编辑和重复初始化不影响连心")
+        try appearance.validate()
+        let decoded = try JSONDecoder().decode(TodoAppearance.self, from: JSONEncoder().encode(appearance))
+        try require(decoded == appearance && PhotoAssetReferences.appearance(decoded).contains(photo), "样式持久化与照片引用保留")
+        var legacy = try JSONSerialization.jsonObject(with: JSONEncoder().encode(appearance)) as? [String: Any] ?? [:]
+        legacy.removeValue(forKey: "lianxin")
+        let legacyLook = try JSONDecoder().decode(TodoAppearance.self, from: JSONSerialization.data(withJSONObject: legacy))
+        try require(legacyLook.lianxin == nil && legacyLook.widget == todo, "旧JSON无连心字段仍可读")
         let presets = LianxinProviderPreset.all
         try require(Set(presets.map(\.id)).count == 8, "预设ID唯一、七家官方服务商加自定义")
         for p in presets where p.id != "custom" {

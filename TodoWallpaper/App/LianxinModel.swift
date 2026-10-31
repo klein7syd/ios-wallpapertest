@@ -92,6 +92,10 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var keySaved = false
     @Published var connectionNotice: String?
     @Published var wallpaperRequest: LianxinWallpaperRequest?
+    weak var styleStore: TodoStore?
+    var publication: LianxinPublication {
+        LianxinPublication(idol: profile.messageIdol.isEmpty ? profile.idolName : profile.messageIdol, text: profile.message, photo: nil, date: .now, example: profile.exampleContent)
+    }
     private let storage = LianxinStorage()
     private let service: any AIServiceProtocol
     private var generation: Task<Void, Never>?
@@ -152,6 +156,16 @@ final class LianxinModel: ObservableObject {
     }
     func wallpaperPhotoData() async throws -> Data? { try await storage.photoData(profile.photoName, original: true) }
 
+    func prepareStyle(_ store: TodoStore) async {
+        styleStore = store
+        guard store.appearance.lianxin == nil else { return }
+        do {
+            var name: String?
+            if let data = try await storage.photoData(profile.photoName) { name = try await WidgetPhotoStore.shared.importPhoto(data) }
+            var root = store.appearance; root.initializeLianxin(photoName: name)
+            try store.saveAppearance(root)
+        } catch { self.error = "连心样式初始化失败，请重试。" }
+    }
     func selectProvider(_ id: String) async {
         guard !busy else { return }
         let next = LianxinProviderPreset.preset(id)
