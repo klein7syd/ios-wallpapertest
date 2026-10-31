@@ -4,11 +4,11 @@ import Security
 import WidgetKit
 
 enum LianxinKeychain {
-    private static var query: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "org.todowallpaper.lianxin", kSecAttrAccount as String: "api-key"]
+    private static func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "org.todowallpaper.lianxin", kSecAttrAccount as String: account]
     }
-    static func read() throws -> String {
-        var query = query
+    static func read(account: String) throws -> String {
+        var query = query(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -17,7 +17,8 @@ enum LianxinKeychain {
         guard status == errSecSuccess, let data = result as? Data, let value = String(data: data, encoding: .utf8) else { throw LianxinError.storage }
         return value
     }
-    static func save(_ value: String) throws {
+    static func save(_ value: String, account: String) throws {
+        let query = query(account)
         if value.isEmpty {
             let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else { throw LianxinError.storage }
@@ -86,13 +87,27 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var busy = false
     @Published var error: String?
     @Published var notice: String?
+    @Published var exampleMode = false
+    @Published private(set) var availableModels: [String] = []
+    @Published private(set) var keySaved = false
+    @Published var connectionNotice: String?
     @Published var wallpaperRequest: LianxinWallpaperRequest?
     private let storage = LianxinStorage()
     private let service: any AIServiceProtocol
     private var generation: Task<Void, Never>?
     private var generationID = UUID()
 
-    init(service: any AIServiceProtocol = LianxinAPIService()) { self.service = service }
+    private let connection: any LianxinConnectionService
+    init(service: any AIServiceProtocol = LianxinAPIService(), connection: any LianxinConnectionService = LianxinAPIService()) {
+        self.service = service; self.connection = connection
+    }
+    var provider: LianxinProviderPreset { LianxinProviderPreset.preset(profile.providerID) }
+    private var credentialAccount: String { LianxinSetupRules.account(provider.id) }
+    private var signature: String { provider.id + "|" + profile.endpoint + "|" + profile.model }
+    var connected: Bool { !key.isEmpty && profile.connectedSignature == signature }
+    var configurationComplete: Bool { connected && profile.setupFinished == true }
+    var keySuffix: String { String(key.suffix(4)) }
+
 
     func load() async {
         guard !loaded else { return }
@@ -100,7 +115,10 @@ final class LianxinModel: ObservableObject {
             let saved = try await storage.load()
             profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
             loaded = true
-            do { key = try LianxinKeychain.read() }
+            do {
+                try LianxinCredentialMigration.migrate(profile: profile, store: LianxinSystemCredentials())
+                key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty
+            }
             catch { notice = "密钥暂时无法读取，请解锁设备后重试；其他连心资料仍可查看。" }
         } catch { self.error = "连心资料读取失败，原文件已保留。请稍后重新打开页面重试。" }
     }
@@ -111,14 +129,64 @@ final class LianxinModel: ObservableObject {
         defer { busy = false }
         do {
             // 不把密钥写入普通文件；资料保存失败时恢复原钥匙串值。
-            let previousKey = try LianxinKeychain.read()
-            try LianxinKeychain.save(key.trimmingCharacters(in: .whitespacesAndNewlines))
-            do { try await storage.save(profile) }
-            catch { try LianxinKeychain.save(previousKey); throw error }
-            key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !profile.endpoint.isEmpty { profile.endpoint = try LianxinSetupRules.endpoint(profile.endpoint) }
+            try await storage.save(profile)
             notice = "已保存"
             return true
         } catch { self.error = "设置未能完整保存，请重试。"; return false }
+    }
+
+    func selectProvider(_ id: String) async {
+        guard !busy else { return }
+        let next = LianxinProviderPreset.preset(id)
+        guard next.id != profile.providerID else { return }
+        let keepsLegacyCustom = next.id == "custom" && provider.id == "custom"
+        profile.providerID = next.id
+        if !keepsLegacyCustom { profile.endpoint = next.endpoint; profile.model = next.model }
+        profile.connectedSignature = nil; availableModels = []; connectionNotice = nil; key = ""; keySaved = false
+        do { key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty }
+        catch { connectionNotice = "密钥暂时无法读取，请解锁设备后重试。" }
+    }
+    func saveKey(_ input: String) -> Bool {
+        guard !busy else { return false }
+        let cleaned = LianxinSetupRules.cleanKey(input)
+        guard cleaned.count <= 4096, cleaned.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
+            connectionNotice = "密钥中还有空格或换行，请重新完整复制。"; return false
+        }
+        do {
+            try LianxinKeychain.save(cleaned, account: credentialAccount)
+            key = cleaned; keySaved = !cleaned.isEmpty; profile.connectedSignature = nil; connectionNotice = nil
+            return true
+        } catch { connectionNotice = "密钥未保存，请解锁设备并检查签名后重试。"; return false }
+    }
+    func testConnection() async {
+        guard !busy else { return }
+        busy = true; connectionNotice = nil
+        defer { busy = false }
+        do {
+            profile.endpoint = try LianxinSetupRules.endpoint(profile.endpoint)
+            guard !key.isEmpty else { throw LianxinError.invalidKey }
+            let models = try await connection.test(profile: profile, key: key, provider: provider)
+            availableModels = models
+            if profile.model.isEmpty { profile.model = models.first ?? provider.model }
+            profile.connectedSignature = signature
+            try await storage.save(profile)
+            connectionNotice = "✓ 测试成功。模型列表不代表每个模型都已开通，生成时仍以服务商权限为准。"
+            exampleMode = false
+        } catch {
+            profile.connectedSignature = nil
+            connectionNotice = (error as? LianxinError)?.localizedDescription ?? LianxinError.network.localizedDescription
+        }
+    }
+    func finishSetup() async {
+        guard connected else { return }
+        profile.setupFinished = true
+        if !(await saveSettings()) { profile.setupFinished = false }
+    }
+    func chooseModel(_ value: String) async {
+        profile.model = value
+        // 模型改变后需再次测试，避免沿用其他模型的成功状态。
+        profile.connectedSignature = nil
     }
 
     func setPhoto(_ data: Data?) async {
@@ -150,18 +218,20 @@ final class LianxinModel: ObservableObject {
         guard loaded, !busy else { return }
         let input = profile
         let secret = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        do { _ = try LianxinAPIService.request(profile: input, key: secret) }
+        do { if !exampleMode { _ = try LianxinAPIService.request(profile: input, key: secret) } }
         catch { self.error = error.localizedDescription; return }
         busy = true; notice = nil
+        let isExample = exampleMode
         let id = UUID(); generationID = id
         generation = Task {
             defer { if generationID == id { busy = false; generation = nil } }
             do {
-                let text = try await service.generate(profile: input, key: secret)
+                let text = try await LianxinGeneration.generate(example: isExample, profile: input, key: secret, service: service)
                 try Task.checkCancellation()
                 guard generationID == id else { return }
                 var updated = input
-                updated.message = text; updated.messageIdol = input.idolName
+                updated.message = text; updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
+                updated.exampleContent = isExample
                 try await storage.save(updated)
                 profile = updated
             } catch is CancellationError { }
@@ -182,7 +252,7 @@ final class LianxinModel: ObservableObject {
         defer { busy = false }
         do {
             let content = LianxinPublication(idol: profile.messageIdol, text: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                                            photo: try await storage.photoData(profile.photoName), date: .now)
+                                            photo: try await storage.photoData(profile.photoName), date: .now, example: profile.exampleContent)
             try content.validate()
             if wallpaper {
                 wallpaperRequest = LianxinWallpaperRequest(content: content, sourcePhoto: try await storage.photoData(profile.photoName, original: true))
@@ -193,4 +263,9 @@ final class LianxinModel: ObservableObject {
             }
         } catch { self.error = "未能输出。请确认文案为 1–200 字，并检查共享存储和剩余空间。原有小组件内容已保留。" }
     }
+}
+
+struct LianxinSystemCredentials: LianxinCredentialStore {
+    func read(account: String) throws -> String { try LianxinKeychain.read(account: account) }
+    func save(_ key: String, account: String) throws { try LianxinKeychain.save(key, account: account) }
 }

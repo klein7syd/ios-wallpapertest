@@ -71,10 +71,13 @@
 | Wallpaper/WallpaperSettings.swift | App | 壁纸设置与尺寸 | WallpaperSize, WallpaperSettings, WallpaperDraft |
 | Widget/TodoWallpaperWidget.swift | Widget | Widget bundle：Provider、View、Timeline 策略 | TodoWidgetEntry, TodoWidgetProvider, TodoWidgetView |
 | App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService |
-| App/LianxinModel.swift | App | 连心状态、钥匙串密钥与私有目录持久化 | LianxinKeychain, LianxinStorage, LianxinModel |
+| App/LianxinModel.swift | App | 连心状态、钥匙串密钥与私有目录持久化 | LianxinKeychain, LianxinStorage, LianxinModel, LianxinSystemCredentials |
 | App/LianxinView.swift | App | 连心底图话语卡片及 API/提示词设置 | LianxinView |
 | App/LianxinWallpaperView.swift | App | 独立连心壁纸预览、调节与相册导出 | LianxinWallpaperRequest, LianxinWallpaperView |
 | Core/LianxinPublication.swift | App + Widget | 用户明确发布的文案与底图原子快照 | LianxinPublication |
 | Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
 | Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
 | Tests/WidgetWrappingChecks.swift | 独立 macOS 原生检查 | 逐项多行、容量与旧数据兼容检查 | WidgetWrappingChecks |
+| App/LianxinProvider.swift | App + macOS检查 | 官方服务商预设、输入清洗与凭证迁移策略 | LianxinProviderPreset, LianxinSetupRules, LianxinCredentialStore, LianxinCredentialMigration, LianxinConnectionService, MockLianxinConnection |
+| App/LianxinSetupView.swift | App | 服务商、密钥粘贴、连接测试与模型向导 | LianxinSetupView |
+| Tests/LianxinWizardChecks.swift | 独立 macOS 原生检查 | 官方预设完整性、清洗、迁移和离线体验 | LianxinWizardChecks |
