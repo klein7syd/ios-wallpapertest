@@ -8,12 +8,14 @@ struct LianxinView: View {
     @ObservedObject var wallpaper: WallpaperEditorModel
     @Binding var navigation: AppNavigationState
     @State private var family = WidgetPreviewFamily.small
+    @State private var hasSyncedPhoto = false
     @State private var lastPreviewPhoto: String?
     @AppStorage("editor.contentMode") private var contentMode = "todo"
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
     @State private var outputText = ""
+    @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -45,7 +47,7 @@ struct LianxinView: View {
                     if !model.profile.message.isEmpty {
                         outputControls
                         HStack {
-                            Button { UIPasteboard.general.string = model.profile.message; model.notice = "已复制话语" } label: {
+                            Button { UIPasteboard.general.string = model.publication.shareText; model.notice = "已复制话语" } label: {
                                 Label("复制", systemImage: "doc.on.doc").frame(minHeight: 44)
                             }
                             Spacer()
@@ -54,7 +56,7 @@ struct LianxinView: View {
                             }
                         }
                     }
-                    if model.photo != nil {
+                    if store.appearance.lianxin?.backgroundPhotoName != nil {
                         Button("移除底图", role: .destructive) { Task { await model.setPhoto(nil) } }
                             .frame(minHeight: 44).disabled(model.busy || loadingPhoto)
                     }
@@ -71,7 +73,6 @@ struct LianxinView: View {
 
             .task { await model.load(); await model.prepareStyle(store); outputText = model.profile.message }
             .sheet(isPresented: $showsSettings) { settings }
-            .sheet(item: $model.wallpaperRequest) { LianxinWallpaperView(request: $0) }
             .onChange(of: model.profile.message) { _, value in outputText = value }
             .onChange(of: outputText) { _, value in if value.count <= 200 && value != model.profile.message { model.profile.message = value } }
             .alert("连心", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
@@ -79,7 +80,7 @@ struct LianxinView: View {
             } message: { Text(model.error ?? "") }
             .onDisappear { model.cancel(); Task { await model.saveInputsNow() } }
             .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } }
-            .task(id: model.profile.message + (model.profile.photoName ?? "")) { await syncPreview() }
+            .task(id: model.profile.message + (store.appearance.lianxin?.photoName(at: .now) ?? "")) { await syncPreview() }
             .task(id: selection) { await importSelection() }
         }
     }
@@ -91,7 +92,7 @@ struct LianxinView: View {
                 .lineLimit(3...8).textFieldStyle(.roundedBorder)
             Text("\(outputText.count)/200 字 · 可以编辑后再发布；小号组件可能只展示部分文字。")
                 .font(.caption).foregroundStyle(.secondary)
-            Button { Task { await model.output(text: outputText, wallpaper: false) } } label: {
+            Button { Task { await model.output(text: outputText) } } label: {
                 Label("发布到连心小组件", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.borderedProminent).disabled(!canOutput)
             Button { openEditor(.wallpaper) } label: {
@@ -126,32 +127,34 @@ struct LianxinView: View {
             Menu("小组件 · " + family.title) {
                 ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
             }
-            LianxinWidgetContent(content: model.publication, style: store.appearance.style(in: .lianxin), family: family)
-                .padding(12).frame(width: 170, height: family == .large ? 280 : 170)
-                .background { if let image = model.photo { Image(uiImage: image).resizable().scaledToFill() } }
-                .clipped().clipShape(RoundedRectangle(cornerRadius: 22)).allowsHitTesting(false)
-                .overlay { Color.clear.contentShape(Rectangle()).onTapGesture { openEditor(.widget) } }
+            GeometryReader { proxy in
+                let scale = family.scale(availableWidth: proxy.size.width, availableHeight: proxy.size.height)
+                let style = store.appearance.style(in: .lianxin)
+                let scheme: ColorScheme = style.theme == .system ? systemScheme : (style.theme == .dark ? .dark : .light)
+                let readable = ReadableResolver.scrim(style: style, date: .now, scheme: scheme, canvasAspect: family.width / family.height)
+                LianxinWidgetContent(content: model.publication, style: style, family: family)
+                    .padding(16).frame(width: family.width, height: family.height)
+                    .background { WidgetBackgroundView(style: style, scrim: readable.value, scrimAnchor: style.readable.anchor, scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color, scrimExtraInset: style.readable.edgeInset) }
+                    .environment(\.colorScheme, scheme)
+                    .clipShape(RoundedRectangle(cornerRadius: 22)).scaleEffect(scale)
+                    .frame(width: family.width * scale, height: family.height * scale)
+                    .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            }.frame(height: family == .large ? 280 : 170).contentShape(Rectangle()).onTapGesture { openEditor(.widget) }
             Button("调整小组件") { openEditor(.widget) }
         }
     }
-    private var previewItems: [TodoItem] {
-        [TodoItem(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
-                  title: model.profile.message.isEmpty ? "写下提示词，生成一句话。" : model.profile.message,
-                  marker: TodoMarker(kind: .none), isCompleted: false, createdAt: .distantPast, updatedAt: .distantPast)]
-    }
+    private var previewItems: [TodoItem] { WallpaperContentSource.lianxin(model.publication).items }
     private var previewAppearance: TodoAppearance {
-        var value = store.appearance; value.defaultMarker = TodoMarker(kind: .none)
-        value.widget.header = WidgetHeaderAppearance(text: model.profile.idolName.isEmpty ? "连心" : String(model.profile.idolName.prefix(40)))
-        return value
+        var value = store.appearance; value.widget = value.style(in: .lianxin); value.defaultMarker = TodoMarker(kind: .none); return value
     }
     private func syncPreview() async {
         do {
             try await Task.sleep(for: .milliseconds(350)); try Task.checkCancellation()
             await wallpaper.start(items: previewItems, appearance: previewAppearance)
-            if model.profile.photoName != lastPreviewPhoto {
+            if !hasSyncedPhoto || store.appearance.lianxin?.photoName(at: .now) != lastPreviewPhoto {
                 if let data = try await model.wallpaperPhotoData() { try await wallpaper.importPhotoData(data) }
                 else { wallpaper.removePhoto() }
-                lastPreviewPhoto = model.profile.photoName
+                lastPreviewPhoto = store.appearance.lianxin?.photoName(at: .now); hasSyncedPhoto = true
             }
         } catch is CancellationError { }
         catch { model.notice = "壁纸预览暂未更新，请重试。" }

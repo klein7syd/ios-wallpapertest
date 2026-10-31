@@ -278,7 +278,7 @@ struct WidgetAppearanceEditor: View {
                 }.accessibilityLabel("预览尺寸：\(family.title)")
                 Spacer(minLength: 0)
                 if !typeSize.isAccessibilitySize {
-                    Text("点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(isLianxin ? "连心 · 标注始终显示" : "点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
                     .accessibilityLabel("重置预览完成状态，不修改真实待办")
@@ -440,12 +440,14 @@ struct WidgetAppearanceEditor: View {
         Picker("每项文字行数", selection: Binding(get: { editingAppearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("1 行").tag(1); Text("2 行").tag(2); Text("3 行").tag(3); Text("4 行").tag(4)
         }.pickerStyle(.menu)
+        if !isLianxin {
         Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { editingAppearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.menu)
         if editingAppearance.widget.textCompletion == .color {
             StyleColorControl(title: "完成文字色", value: Binding(get: { editingAppearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
+        }
         }
         if advanced {
             PreciseSlider(title: "Scrim 强度", value: scrimBinding, range: 0...0.8, standard: autoScrim, precision: 2)
@@ -574,7 +576,8 @@ struct WidgetAppearanceEditor: View {
     }
     private var selectedTask: TodoItem? { store.items.first { $0.id == selectedTaskID } }
     private var hasVisibleMarker: Bool {
-        (editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker).kind != .none ||
+        if isLianxin { return false }
+        return         (editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker).kind != .none ||
         store.items.contains { editingAppearance.marker(for: $0, widgetContext: true).kind != .none }
     }
     private func setTaskMarker(_ marker: TodoMarker?, id: UUID) {
