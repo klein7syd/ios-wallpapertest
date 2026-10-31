@@ -73,7 +73,6 @@
 | App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService, LianxinWritingRules |
 | App/LianxinModel.swift | App | 连心状态、钥匙串密钥与私有目录持久化 | LianxinKeychain, LianxinStorage, LianxinModel, LianxinSystemCredentials |
 | App/LianxinView.swift | App | 连心底图话语卡片及 API/提示词设置 | LianxinView |
-| App/LianxinWallpaperView.swift | App | 独立连心壁纸预览、调节与相册导出 | LianxinWallpaperRequest, LianxinWallpaperView |
 | Core/LianxinPublication.swift | App + Widget | 用户明确发布的文案与底图原子快照 | LianxinPublication |
 | Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
 | Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
@@ -83,3 +82,4 @@
 | Tests/LianxinWizardChecks.swift | 独立 macOS 原生检查 | 官方预设完整性、清洗、迁移和离线体验 | LianxinWizardChecks |
 | Core/ContentMode.swift | App + Widget | 内容模式持久化与样式槽位 | ContentMode |
 | Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与强制标注 | LianxinWidgetContent |
+| Core/WallpaperContentSource.swift | App + Widget | 待办/连心壁纸内容来源和强制分享标注 | WallpaperContentSource |
