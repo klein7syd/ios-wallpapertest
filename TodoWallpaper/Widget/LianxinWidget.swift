@@ -46,7 +46,7 @@ struct LianxinWidgetView: View {
                     .accessibilityLabel(entry.content?.text ?? "在连心中发布一句话")
             } else {
                 VStack(alignment: .leading, spacing: accessory ? 2 : 8) {
-                    Text("\(entry.content?.idol ?? "连心") · AI 创作").font(.caption).lineLimit(1)
+                    Text("\(entry.content?.idol ?? "连心") · \(entry.content?.contentLabel ?? "AI 创作")").font(.caption).lineLimit(1)
                     Text(entry.content?.text ?? (entry.failed ? "暂时无法读取，请打开 App 重试。" : "打开 App，在连心中生成并发布话语。"))
                         .font(accessory ? .caption : .body)
                         .lineLimit(accessory ? 3 : family == .systemSmall ? 4 : family == .systemMedium ? 5 : 12)

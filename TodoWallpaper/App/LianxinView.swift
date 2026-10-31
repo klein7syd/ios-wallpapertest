@@ -7,8 +7,6 @@ struct LianxinView: View {
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
-    @State private var settingsOriginal = LianxinProfile()
-    @State private var keyOriginal = ""
     @State private var outputText = ""
     @Environment(\.scenePhase) private var scenePhase
 
@@ -17,8 +15,15 @@ struct LianxinView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !model.loaded { Button("重新读取连心资料") { Task { await model.load() } } }
+                    if !model.connected && !model.exampleMode {
+                        LianxinSetupView(model: model)
+                    }
+                    if model.exampleMode {
+                        Label("体验模式：示例内容，非 AI 生成", systemImage: "sparkles").font(.footnote)
+                        Button("连接我自己的AI") { model.exampleMode = false }
+                    }
                     card
-                    Text("由你的提示词决定语气与情境。这里的话语是 AI 创作，不代表本人真实言论。")
+                    Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成。连接自己的AI后，语气与情境由你的提示词决定。" : "由你的提示词决定语气与情境。这里的话语是 AI 创作，不代表本人真实言论。")
                         .font(.footnote).foregroundStyle(.secondary)
                     if model.profile.prompt.isEmpty {
                         Button("先填写名字、提示词和 API") { openSettings() }
@@ -31,7 +36,7 @@ struct LianxinView: View {
                                 Label("复制", systemImage: "doc.on.doc").frame(minHeight: 44)
                             }
                             Spacer()
-                            ShareLink(item: "\(model.profile.messageIdol) · AI 创作\n\(model.profile.message)") {
+                            ShareLink(item: "\(model.profile.messageIdol) · \(model.profile.exampleContent == true ? "示例内容，非 AI 生成" : "AI 创作")\n\(model.profile.message)") {
                                 Label("分享文字", systemImage: "square.and.arrow.up").frame(minHeight: 44)
                             }
                         }
@@ -46,7 +51,7 @@ struct LianxinView: View {
             .navigationTitle("连心")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { openSettings() } label: { Label("连心设置", systemImage: "slider.horizontal.3") }
+                    Button { openSettings() } label: { Label("连心设置", systemImage: "gearshape") }
                         .disabled(!model.loaded || model.busy || loadingPhoto)
                 }
             }
@@ -91,7 +96,7 @@ struct LianxinView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(model.profile.message.isEmpty ? "写下你期待的情境，让一句话来到你身边。" : model.profile.message)
                     .font(.title3).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                Text("AI 创作 · 连心").font(.caption)
+                Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成 · 连心" : "AI 创作 · 连心").font(.caption)
             }
             .padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -137,15 +142,7 @@ struct LianxinView: View {
                 } header: { Text("你的提示词") } footer: {
                     Text("由你决定关系、语气、情境、语言和长度，最多 12000 字。留空时不会发起生成。")
                 }
-                Section {
-                    TextField("完整 HTTPS 接口地址", text: $model.profile.endpoint)
-                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("模型名称", text: $model.profile.model).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    SecureField("API 密钥（清空并保存可删除）", text: $model.key)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                } header: { Text("接入你自己的 API") } footer: {
-                    Text("支持 Chat Completions 兼容接口；填写完整地址（通常以 /v1/chat/completions 结尾）。点击生成会将名字和提示词发送给你填写的服务商，由其按你的账号计费。照片仅留在本机；密钥保存于系统钥匙串。")
-                }
+                Section("连接AI向导") { LianxinSetupView(model: model) }
 
             }
             .disabled(model.busy)
@@ -158,8 +155,8 @@ struct LianxinView: View {
             .interactiveDismissDisabled()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        model.profile = settingsOriginal; model.key = keyOriginal; showsSettings = false
+                    Button("关闭") {
+                        showsSettings = false
                     }.disabled(model.busy)
                 }
             }
@@ -167,7 +164,7 @@ struct LianxinView: View {
     }
 
     private func openSettings() {
-        settingsOriginal = model.profile; keyOriginal = model.key; showsSettings = true
+        showsSettings = true
     }
 
     private func importSelection() async {
