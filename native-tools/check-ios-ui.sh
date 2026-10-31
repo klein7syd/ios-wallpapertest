@@ -65,3 +65,4 @@ else
     echo 'Simulator system content-size command unavailable. Five Dynamic Type environments and UIKit metrics were still rendered. Real iPhone Display Zoom not verified.' > TodoWallpaper/out/ios-ui-checks/system-size-scope.txt
 fi
 echo 'PASS: iOS Simulator native SwiftUI Emoji pixels, completion effects, five Dynamic Type sizes, reduced logical-space matrix and actual app screenshots. Not a physical iPhone acceptance result.'
+python3 native-tools/check-mode-performance.py "$UI_SIMULATOR"
