@@ -167,7 +167,7 @@ struct WidgetAppearanceEditor: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" } }
+            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .widget, current: contentMode) { contentMode = $0 } } }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil || importingPhoto)
@@ -189,6 +189,7 @@ struct WidgetAppearanceEditor: View {
             store.updateAnalysisSystemTheme(dark: systemScheme == .dark)
             store.resumePhotoAnalysis()
             edits.synchronize(editState)
+            EditorModePerformance.shared.presented(page: .widget, mode: contentMode)
             #if TODO_UI_CHECKS
             if ProcessInfo.processInfo.arguments.contains("--native-widget-text") { tool = .text }
             if ProcessInfo.processInfo.arguments.contains("--native-widget-header") { tool = .header }
