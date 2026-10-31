@@ -116,7 +116,7 @@ private final class WallpaperGlyphUIView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func configure(settings: WallpaperSettings, appearance: TodoAppearance, layout: WallpaperLayout?) {
         let changed = self.settings?.glyphKey != settings.glyphKey || self.appearance.defaultMarker != appearance.defaultMarker ||
-            self.appearance.markerStyle != appearance.markerStyle || self.template?.rows.map(\.item) != layout?.rows.map(\.item)
+            self.appearance.markerStyle != appearance.markerStyle || self.appearance.widget != appearance.widget || self.template?.rows.map(\.item) != layout?.rows.map(\.item)
         self.settings = settings; self.appearance = appearance; template = layout
         if changed { setNeedsDisplay() }
     }

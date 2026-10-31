@@ -2,6 +2,16 @@
 import SwiftUI
 import PhotosUI
 
+struct LianxinFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration.padding(14).background(Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+private struct LianxinPreviewInput: Equatable {
+    let content: LianxinPublication
+    let style: WidgetAppearance
+}
 struct LianxinView: View {
     @ObservedObject var model: LianxinModel
     @ObservedObject var store: TodoStore
@@ -14,12 +24,13 @@ struct LianxinView: View {
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
-    @State private var outputText = ""
+    private enum Field: Hashable { case user, idol, prompt, message }
+    @FocusState private var focused: Field?
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
 
-    var body: some View {
-        NavigationStack {
+    var body: some View { NavigationStack { configuredPage } }
+    private var scrollContent: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !model.loaded { Button("重新读取连心资料") { Task { await model.load() } } }
@@ -29,7 +40,7 @@ struct LianxinView: View {
                         HStack {
                             Button("连接 AI（约 1 分钟）") { openSettings() }
                             Button("先体验") { model.exampleMode = true; model.generate() }
-                        }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 16))
+                        }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     if model.exampleMode {
                         Label("体验模式：示例内容，非 AI 生成", systemImage: "sparkles").font(.footnote)
@@ -37,21 +48,19 @@ struct LianxinView: View {
                     }
                     previews
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("你的称呼（最多100字）", text: limited(\.userName, 100))
-                        TextField("IDOL 名字（最多100字）", text: limited(\.idolName, 100))
-                        TextField("提示词（最多12000字）", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10)
-                    }.textFieldStyle(.roundedBorder).disabled(model.busy)
+                        TextField("你的称呼（最多100字）", text: limited(\.userName, 100)).focused($focused, equals: .user)
+                        TextField("IDOL 名字（最多100字）", text: limited(\.idolName, 100)).focused($focused, equals: .idol)
+                        TextField("提示词（最多12000字）", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
+                    }.textFieldStyle(LianxinFieldStyle()).disabled(model.busy)
                     actions
-                    Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成。连接自己的AI后，语气与情境由你的提示词决定。" : "由你的提示词决定语气与情境。这里的话语是 AI 创作，不代表本人真实言论。")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    if !model.profile.message.isEmpty {
+                    if !model.profile.message.isEmpty || model.currentContent != nil {
                         outputControls
                         HStack {
                             Button { UIPasteboard.general.string = model.publication.shareText; model.notice = "已复制话语" } label: {
                                 Label("复制", systemImage: "doc.on.doc").frame(minHeight: 44)
                             }
                             Spacer()
-                            ShareLink(item: "\(model.profile.messageIdol) · \(model.profile.exampleContent == true ? "示例内容，非 AI 生成" : "AI 创作")\n\(model.profile.message)") {
+                            ShareLink(item: model.publication.shareText) {
                                 Label("分享文字", systemImage: "square.and.arrow.up").frame(minHeight: 44)
                             }
                         }
@@ -61,40 +70,52 @@ struct LianxinView: View {
                             .frame(minHeight: 44).disabled(model.busy || loadingPhoto)
                     }
                     if let notice = model.notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
+                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；体验模式下的内容为示例，非 AI 生成。")
+                        .font(.caption).foregroundStyle(.secondary).padding(14)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }.padding(20)
             }
+    }
+    private var page: some View {
+        scrollContent
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(uiColor: .systemGroupedBackground).onTapGesture { focused = nil })
+            .buttonBorderShape(.roundedRectangle(radius: 14))
             .navigationTitle("连心")
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = nil } }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { openSettings() } label: { Label("连心设置", systemImage: "gearshape") }
                         .disabled(!model.loaded || model.busy || loadingPhoto)
                 }
             }
 
-            .task { await model.load(); await model.prepareStyle(store); outputText = model.profile.message }
+    }
+    private var configuredPage: some View {
+        page
+            .task { await model.load(); await model.prepareStyle(store) }
             .sheet(isPresented: $showsSettings) { settings }
-            .onChange(of: model.profile.message) { _, value in outputText = value }
-            .onChange(of: outputText) { _, value in if value.count <= 200 && value != model.profile.message { model.profile.message = value } }
             .alert("连心", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
                 Button("好") { model.error = nil }
             } message: { Text(model.error ?? "") }
             .onDisappear { model.cancel(); Task { await model.saveInputsNow() } }
             .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } }
-            .task(id: model.profile.message + (store.appearance.lianxin?.photoName(at: .now) ?? "")) { await syncPreview() }
+            .task(id: LianxinPreviewInput(content: model.publication, style: store.appearance.style(in: .lianxin))) { await syncPreview() }
             .task(id: selection) { await importSelection() }
-        }
     }
 
     private var outputControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("放到每天看得见的地方").font(.headline)
-            TextField("编辑用于小组件和壁纸的话语", text: $outputText, axis: .vertical)
-                .lineLimit(3...8).textFieldStyle(.roundedBorder)
-            Text("\(outputText.count)/200 字 · 可以编辑后再发布；小号组件可能只展示部分文字。")
+            TextField("编辑用于小组件和壁纸的话语", text: $model.profile.message, axis: .vertical)
+                .lineLimit(3...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message)
+            Text("\(model.profile.message.count)/200 字 · 自动同步；小号组件可能只展示部分文字。")
                 .font(.caption).foregroundStyle(.secondary)
-            Button { Task { await model.output(text: outputText) } } label: {
-                Label("发布到连心小组件", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
-            }.buttonStyle(.borderedProminent).disabled(!canOutput)
+            if !canOutput { Text("话语需为 1–200 字，小组件保留上一次有效内容。").font(.caption).foregroundStyle(.secondary) }
+            if let error = model.syncError {
+                HStack { Text(error).font(.caption); Button("重试") { model.scheduleSync() } }
+            } else if let date = model.syncedAt {
+                Text("小组件已更新 · " + date.formatted(date: .omitted, time: .standard)).font(.caption2).foregroundStyle(.tertiary)
+            }
             Button { openEditor(.wallpaper) } label: {
                 Label("去调整壁纸样式", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.bordered).disabled(!canOutput)
@@ -102,7 +123,7 @@ struct LianxinView: View {
         }.disabled(model.busy || loadingPhoto)
     }
 
-    private var canOutput: Bool { !outputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && outputText.count <= 200 }
+    private var canOutput: Bool { !model.profile.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.profile.message.count <= 200 }
 
     private func limited(_ path: WritableKeyPath<LianxinProfile, String>, _ limit: Int) -> Binding<String> {
         Binding(get: { model.profile[keyPath: path] }, set: { model.profile[keyPath: path] = String($0.prefix(limit)) })
@@ -150,7 +171,7 @@ struct LianxinView: View {
     private func syncPreview() async {
         do {
             try await Task.sleep(for: .milliseconds(350)); try Task.checkCancellation()
-            await wallpaper.start(items: previewItems, appearance: previewAppearance)
+            await wallpaper.start(items: previewItems, appearance: previewAppearance, content: model.publication)
             if !hasSyncedPhoto || store.appearance.lianxin?.photoName(at: .now) != lastPreviewPhoto {
                 if let data = try await model.wallpaperPhotoData() { try await wallpaper.importPhotoData(data) }
                 else { wallpaper.removePhoto() }
@@ -190,6 +211,8 @@ struct LianxinView: View {
                 }
             }
             .interactiveDismissDisabled()
+            .scrollDismissesKeyboard(.interactively)
+            .buttonBorderShape(.roundedRectangle(radius: 14))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") {

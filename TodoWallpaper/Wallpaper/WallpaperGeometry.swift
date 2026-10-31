@@ -64,6 +64,7 @@ extension WallpaperLayout {
             marker: $0.marker, markerTop: $0.markerTop + delta, markerSize: $0.markerSize) }
         return WallpaperLayout(canvas: canvas, panel: moved, markerColumn: markerColumn, textWidth: textWidth,
             rows: movedRows, hiddenCount: hiddenCount, footer: footer, footerTop: footerTop + delta,
-            emptyText: emptyText, emptyTop: emptyTop + delta)
+            emptyText: emptyText, emptyTop: emptyTop + delta,
+            supplements: supplements.map { WallpaperSupplement(block: $0.block, top: $0.top + delta) }, lianxinOverflow: lianxinOverflow)
     }
 }

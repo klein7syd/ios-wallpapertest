@@ -30,7 +30,7 @@ struct WallpaperEditorView: View {
         if isLianxin { root.lianxin = value.widget } else { root = value }
         return store.setAppearance(root)
     }
-    private var textFits: Bool { !isLianxin || (model.layout?.hiddenCount == 0 && model.layout?.rows.isEmpty == false && model.layout?.rows.allSatisfy { !$0.block.truncated } == true && !lianxinModel.profile.message.isEmpty && lianxinModel.profile.message.count <= 200) }
+    private var textFits: Bool { !isLianxin || (model.layout?.lianxinOverflow == false && (try? lianxinModel.publication.validate()) != nil) }
     private func syncPhoto() async {
         guard isLianxin, model.ready, !model.busy else { return }
         let name = store.appearance.lianxin?.photoName(at: .now)
@@ -140,7 +140,7 @@ struct WallpaperEditorView: View {
         editorSurface
             .task {
                 if isLianxin { await lianxinModel.load(); await lianxinModel.prepareStyle(store) }
-                await model.start(items: contentItems, appearance: editingAppearance)
+                await model.start(items: contentItems, appearance: editingAppearance, content: isLianxin ? lianxinModel.publication : nil)
                 if isLianxin {
                     model.settings.usesTaskMarkers = true
                     if navigation.wallpaperTool == .marker { navigation.selectTool(.text) }
@@ -159,6 +159,7 @@ struct WallpaperEditorView: View {
     }
     private var dataEditor: some View {
         lifecycleEditor
+            .onChange(of: lianxinModel.publication) { _, value in if isLianxin { model.updateContent(value) } }
             .onChange(of: contentItems) { _, items in model.updateItems(items) }
             .onChange(of: editingAppearance) { _, value in model.updateAppearance(value) }
             .onChange(of: selectedPhoto) { _, selection in
@@ -236,7 +237,7 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
-            if !textFits { Text("请将话语缩至200字以内，并调整字号/面板宽度使全部文字及创作标注完整显示。").font(.caption).foregroundStyle(.red) }
+            if !textFits { Text("文字超出面板，请增大面板高度、减小字号或缩短话语").font(.caption).foregroundStyle(.red) }
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +
                     (tool == .marker ? (selectedMarkerTask?.id.uuidString ?? ".uniform") : "")) {
@@ -369,13 +370,17 @@ struct WallpaperEditorView: View {
         }
         Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        if isLianxin {
+            Toggle("在小组件/壁纸上显示创作标注", isOn: Binding(get: { model.settings.lianxinShowsCreationLabel == true }, set: { model.settings.lianxinShowsCreationLabel = $0 }))
+        } else {
         Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
         Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
+        }
         if advanced {
             Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
             PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20, standard: 4)
             PreciseSlider(title: "事项间距", value: $model.settings.itemSpacing, range: 0...36, standard: 12)
-            Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8)
+            if !isLianxin { Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8) }
         }
     }
     private var markerTasks: [TodoItem] {

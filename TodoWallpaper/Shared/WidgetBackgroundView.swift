@@ -40,9 +40,6 @@ struct WidgetBackgroundView: View {
             let effectiveInset = measured.map { ReadableRules.inset(scrimExtraInset, anchor: scrimAnchor,
                 canvasHeight: $0.canvasHeight, textHeight: $0.textHeight) } ?? scrimExtraInset
             ZStack {
-                if style.materialEnabled {
-                    WidgetGlassBackground()
-                } else {
                     (style.backdrop == .solid ? style.panelColor.swiftColor :
                         (style.isExplicitlyDark ?? (systemScheme == .dark) ? Color(white: 0.09) : .white))
                     if let image {
@@ -51,7 +48,6 @@ struct WidgetBackgroundView: View {
                             .frame(width: frame.width, height: frame.height)
                             .position(x: frame.midX, y: frame.midY).opacity(style.photoOpacity)
                     }
-                }
                 if scrim > 0 && ReadableRules.permitsEffects(isFullColor: renderingMode == .fullColor, isAccessory: (effectsFamily ?? family).isReadableAccessory) {
                     ScrimView(anchor: scrimAnchor, strength: scrim, heightRatio: scrimHeightRatio, color: scrimColor, extraInset: effectiveInset)
                 }
@@ -76,16 +72,6 @@ enum WidgetPhotoCache {
         cache.totalCostLimit = 4 * 1024 * 1024
         cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
         return image
-    }
-}
-
-/// Public API only. Whether SpringBoard supplies its wallpaper behind this view
-/// in default-icon mode must be verified on a device, not inferred from app blur.
-private struct WidgetGlassBackground: View {
-    var body: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            Color.clear.glassEffect(.clear, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        } else { Rectangle().fill(.ultraThinMaterial) }
     }
 }
 

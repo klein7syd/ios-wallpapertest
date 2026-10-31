@@ -63,13 +63,13 @@ struct LianxinWidgetView: View {
     var body: some View {
         Group {
             if family == .accessoryCircular {
-                VStack(spacing: 2) { Image(systemName: "heart"); Text(entry.content?.example == true ? "示例" : (entry.content?.idol ?? "连心")).font(.caption2).lineLimit(1); Text(entry.content?.example == true ? "示例" : "AI 创作").font(.system(size: 8)).lineLimit(1) }
+                VStack(spacing: 2) { Image(systemName: "heart"); Text(entry.content?.idol ?? "连心").font(.caption2).lineLimit(1); if entry.style.lianxinShowsCreationLabel == true { Text(entry.content?.contentLabel ?? "AI 创作").font(.system(size: 8)).lineLimit(1) } }
                     .accessibilityLabel((entry.content?.contentLabel ?? "连心") + "，" + (entry.content?.text ?? "在连心中发布一句话"))
             } else {
                 if accessory {
                     VStack(alignment: .leading) {
                         Text(entry.content?.text ?? "打开连心").font(.caption).lineLimit(2)
-                        Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1)
+                        if entry.style.lianxinShowsCreationLabel == true { Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1) }
                     }
                 } else { LianxinWidgetContent(content: entry.content, style: entry.style, family: family == .systemLarge ? .large : family == .systemMedium ? .medium : .small, effectsFamily: family) }
 
@@ -91,7 +91,7 @@ struct LianxinWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: LianxinPublication.kind, provider: LianxinProvider()) { LianxinWidgetView(entry: $0) }
             .configurationDisplayName("连心")
-            .description("展示你生成并发布的话语与照片底图。")
+            .description("自动同步连心中的话语与照片底图。")
             .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular])
     }
 }

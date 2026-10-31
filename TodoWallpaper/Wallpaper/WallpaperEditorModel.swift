@@ -19,6 +19,8 @@ final class WallpaperEditorModel: ObservableObject {
     @Published private(set) var liveBlurPhoto: WallpaperLivePhoto?
     @Published private(set) var layout: WallpaperLayout?
     @Published private(set) var appearance = TodoAppearance()
+    @Published private(set) var lianxinContent: LianxinPublication?
+    private var layoutContent: LianxinPublication?
     private var layoutKey: WallpaperSettings?
     private var layoutItems: [TodoItem] = []
     private var layoutAppearance = TodoAppearance()
@@ -49,9 +51,10 @@ final class WallpaperEditorModel: ObservableObject {
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
 
-    func start(items: [TodoItem], appearance: TodoAppearance) async {
+    func start(items: [TodoItem], appearance: TodoAppearance, content: LianxinPublication? = nil) async {
         self.items = items
         self.appearance = appearance
+        self.lianxinContent = content
         guard !hasBootstrapped else { schedulePreview(); return }
         hasBootstrapped = true
         do {
@@ -68,7 +71,7 @@ final class WallpaperEditorModel: ObservableObject {
 
     func updateAppearance(_ value: TodoAppearance) {
         // Widget-only changes never invalidate wallpaper rendering.
-        guard appearance.defaultMarker != value.defaultMarker || appearance.markerStyle != value.markerStyle else { return }
+        guard appearance.defaultMarker != value.defaultMarker || appearance.markerStyle != value.markerStyle || (lianxinContent != nil && appearance.widget != value.widget) else { return }
         appearance = value
         if ready { schedulePreview() }
     }
@@ -85,6 +88,12 @@ final class WallpaperEditorModel: ObservableObject {
     func updateItems(_ items: [TodoItem]) {
         guard self.items != items else { return }
         self.items = items
+        if ready { schedulePreview() }
+    }
+    func updateContent(_ content: LianxinPublication?) {
+        guard lianxinContent != content else { return }
+        lianxinContent = content
+        if let content { items = WallpaperContentSource.lianxin(content).items }
         if ready { schedulePreview() }
     }
 
@@ -185,9 +194,10 @@ final class WallpaperEditorModel: ObservableObject {
     private func schedulePreview() {
         scheduleLiveBlur()
         // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
-        if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle {
+        if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle || layoutContent != lianxinContent || (lianxinContent != nil && layoutAppearance.widget != appearance.widget) {
             do {
-                layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance)
+                layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance, content: lianxinContent)
+                layoutContent = lianxinContent
                 layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance; previewError = nil
             } catch { previewError = error.localizedDescription }
         }
@@ -196,11 +206,11 @@ final class WallpaperEditorModel: ObservableObject {
         // only when the user asks for exact preview or explicitly exports.
         guard wantsExactPreview else { if isRendering { isRendering = false }; return }
         isRendering = true
-        let snapshot = settings, tasks = items, photo = photoURL, look = appearance
+        let snapshot = settings, tasks = items, photo = photoURL, look = appearance, content = lianxinContent
         previewTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(240))
-                let rendered = try await renderer.preview(settings: snapshot, items: tasks, photoURL: photo, appearance: look)
+                let rendered = try await renderer.preview(settings: snapshot, items: tasks, photoURL: photo, appearance: look, content: content)
                 try Task.checkCancellation()
                 preview = rendered; previewError = nil; isRendering = false
             } catch is CancellationError { }
@@ -228,16 +238,17 @@ final class WallpaperEditorModel: ObservableObject {
 
     func export(saveToPhotos: Bool) async {
         guard ready, !busy, !draftBlocked else { return }
+        if layout?.lianxinOverflow == true { message = WallpaperError.contentOverflow.localizedDescription; return }
         isExporting = true; needsPhotoPermission = false
         previewTask?.cancel(); isRendering = false
         let snapshot: WallpaperSettings
         do { snapshot = try settings.validated() }
         catch { message = error.localizedDescription; isExporting = false; return }
-        let tasks = items, photo = photoURL, look = appearance
+        let tasks = items, photo = photoURL, look = appearance, content = lianxinContent
         defer { isExporting = false }
         do {
             let url = try await renderer.export(settings: snapshot, items: tasks, photoURL: photo,
-                                                 directory: files.exportDirectory, appearance: look)
+                                                 directory: files.exportDirectory, appearance: look, content: content)
             lastExportSize = snapshot.size.label
             if saveToPhotos {
                 let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)

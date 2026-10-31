@@ -8,7 +8,7 @@ enum WallpaperContentSource {
         case .todo(let items): return items
         case .lianxin(let content):
             return [TodoItem(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
-                title: content.shareText, marker: TodoMarker(kind: .none), isCompleted: false,
+                title: content.text, marker: TodoMarker(kind: .none), isCompleted: false,
                 createdAt: .distantPast, updatedAt: .distantPast)]
         }
     }

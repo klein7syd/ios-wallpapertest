@@ -6,6 +6,8 @@ struct LianxinSetupView: View {
     @State private var choosing = false
     @State private var draftKey = ""
     @State private var revealsKey = false
+    private enum Field: Hashable { case endpoint, key, model }
+    @FocusState private var focused: Field?
     @Environment(\.openURL) private var openURL
     private var finalAddress: String { (try? LianxinSetupRules.endpoint(model.profile.endpoint)) ?? "请填写有效的HTTPS地址" }
     var body: some View {
@@ -20,6 +22,7 @@ struct LianxinSetupView: View {
                 }.disabled(model.busy)
             } else { wizard }
         }
+        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = nil } } }
     }
     private var wizard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -45,7 +48,7 @@ struct LianxinSetupView: View {
                             Spacer()
                             if model.provider.id == preset.id { Image(systemName: "checkmark.circle.fill") }
                         }.padding(12).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 14))
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }.buttonStyle(.plain)
                 }
             }
@@ -59,7 +62,7 @@ struct LianxinSetupView: View {
             if model.provider.id == "custom" {
                 Text("2. 按服务商说明填写").font(.subheadline)
                 TextField("域名、Base URL或完整接口地址", text: $model.profile.endpoint)
-                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .endpoint)
             }
             Text("最终聊天地址：\(finalAddress)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             if model.profile.endpoint.lowercased().hasPrefix("http://") { Text("需要 https，请向服务商确认安全地址。").font(.caption).foregroundStyle(.red) }
@@ -68,7 +71,7 @@ struct LianxinSetupView: View {
                 Group {
                     if revealsKey { TextField("粘贴新密钥", text: $draftKey) }
                     else { SecureField("粘贴新密钥", text: $draftKey) }
-                }.textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                }.textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .key)
                 Button { revealsKey.toggle() } label: { Image(systemName: revealsKey ? "eye.slash" : "eye").frame(minWidth: 44, minHeight: 44) }
                     .accessibilityLabel(revealsKey ? "隐藏密钥" : "显示新输入的密钥")
             }
@@ -94,7 +97,7 @@ struct LianxinSetupView: View {
                 }.pickerStyle(.menu)
             } else if model.provider.id == "custom" || model.provider.modelsEndpoint == nil {
                 TextField("模型名称（已预填，可修改）", text: $model.profile.model).textInputAutocapitalization(.never)
-                    .autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .model)
             } else { Text("推荐模型：\(model.profile.model)").font(.caption) }
             Button { Task { await model.testConnection() } } label: {
                 Label("测试连接", systemImage: "network").frame(maxWidth: .infinity, minHeight: 44)

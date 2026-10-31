@@ -45,7 +45,7 @@
 | Shared/SetTodoCompletionIntent.swift | App + Widget | 小组件点按完成的 AppIntent | SetTodoCompletionIntent |
 | Shared/TodoMarkerView.swift | App + Widget | 标记视图与位图缓存 | TodoMarkerView, MarkerBitmapCache |
 | Shared/TodoWidgetContent.swift | App + Widget | 小组件内容层与共享自然高度：标题栏、行、阴影、锚点对齐 | TodoWidgetContent, WidgetContentLayout, WidgetMeasureCache |
-| Shared/WidgetBackgroundView.swift | App + Widget | 背景层：照片、裁剪、不透明度、蒙层、准备缓存 | WidgetBackgroundView, WidgetPhotoCache, WidgetGlassBackground |
+| Shared/WidgetBackgroundView.swift | App + Widget | 背景层：照片、裁剪、不透明度、蒙层、准备缓存 | WidgetBackgroundView, WidgetPhotoCache |
 | Tests/D34Checks.swift | 独立 macOS 原生检查 | 由原生检查脚本执行的生产状态/渲染回归 | D34Checks |
 | Tests/EditorRefinementChecks.swift | 独立 macOS 原生检查 | 由原生检查脚本执行的生产状态/渲染回归 | EditorRefinementChecks |
 | Tests/FeedbackRepairChecks.swift | 独立 macOS 原生检查 | 由原生检查脚本执行的生产状态/渲染回归 | FeedbackRepairChecks |
@@ -67,13 +67,13 @@
 | Wallpaper/WallpaperEditorView.swift | App | 壁纸编辑、撤销引用保留与连续微调分组 | WallpaperEditState, WallpaperEditorView, WallpaperFullPreview |
 | Wallpaper/WallpaperGeometry.swift | App | 画布比例、导出尺寸、静态字形缓存键与单像素微调 | WallpaperAspect, WallpaperQuality |
 | Wallpaper/WallpaperLiveCanvas.swift | App | 实时画布与面板拖动 | WallpaperLiveCanvas, WallpaperLayerSurface, WallpaperLayerView |
-| Wallpaper/WallpaperRenderer.swift | App | 壁纸合成渲染 | WallpaperPhotoInfo, WallpaperTextBlock, WallpaperRow, WallpaperLayout, WallpaperRendered, WallpaperRenderer |
+| Wallpaper/WallpaperRenderer.swift | App | 壁纸合成渲染 | WallpaperPhotoInfo, WallpaperTextBlock, WallpaperRow, WallpaperLayout, WallpaperRendered, WallpaperRenderer, WallpaperSupplement |
 | Wallpaper/WallpaperSettings.swift | App | 壁纸设置与尺寸 | WallpaperSize, WallpaperSettings, WallpaperDraft |
 | Widget/TodoWallpaperWidget.swift | Widget | Widget bundle：Provider、View、Timeline 策略 | TodoWidgetEntry, TodoWidgetProvider, TodoWidgetView |
 | App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService, LianxinWritingRules |
 | App/LianxinModel.swift | App | 连心状态、钥匙串、输入保存与共享底图桥接 | LianxinKeychain, LianxinStorage, LianxinModel, LianxinSystemCredentials |
-| App/LianxinView.swift | App | 连心双预览、输入自动保存、内容发布和编辑器跳转 | LianxinView |
-| Core/LianxinPublication.swift | App + Widget | 用户明确发布的文案与底图原子快照 | LianxinPublication |
+| App/LianxinView.swift | App | 连心双预览、输入自动保存、内容发布和编辑器跳转 | LianxinView, LianxinFieldStyle |
+| Core/LianxinPublication.swift | App + Widget | 当前有效连心内容的原子共享快照 | LianxinPublication |
 | Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
 | Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
 | Tests/WidgetWrappingChecks.swift | 独立 macOS 原生检查 | 逐项多行、容量与旧数据兼容检查 | WidgetWrappingChecks |
@@ -81,5 +81,6 @@
 | App/LianxinSetupView.swift | App | 服务商、密钥粘贴、连接测试与模型向导 | LianxinSetupView |
 | Tests/LianxinWizardChecks.swift | 独立 macOS 原生检查 | 官方预设完整性、清洗、迁移和离线体验 | LianxinWizardChecks |
 | Core/ContentMode.swift | App + Widget | 内容模式持久化与样式槽位 | ContentMode |
-| Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与强制标注 | LianxinWidgetContent |
+| Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与默认关闭的可选标注 | LianxinWidgetContent |
 | Core/WallpaperContentSource.swift | App + Widget | 待办/连心壁纸内容来源和强制分享标注 | WallpaperContentSource |
+| Tests/LianxinWallpaperChecks.swift | 独立 macOS 原生检查 | 连心长文完整折行、溢出阻止导出、PNG元数据和旧材质兼容 | LianxinWallpaperChecks |

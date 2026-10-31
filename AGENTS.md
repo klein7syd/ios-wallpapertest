@@ -7,7 +7,7 @@
 - SwiftUI + WidgetKit + AppIntents + EventKit + PhotosUI + CoreText/CoreGraphics，无第三方依赖。
 - 最低 iOS 17.0（`generate_product_project.py` 里 `IPHONEOS_DEPLOYMENT_TARGET=17.0`）。
 - 编译器与 SDK 以 CI 为准：Xcode 26.6 / iOS SDK 26.5 / arm64（见构建日志 `toolchain.txt`、`platform.txt`）。
-- iOS 26 API：`WidgetGlassBackground` 里用 `#available(iOS 26.0, *)` 判断后调用 `.glassEffect(.clear, in:)`，否则回落 `.ultraThinMaterial`。
+- 实验玻璃背景已退役：`systemMaterial` 仅兼容解码，旧 true 与 false 使用同一普通背景管线。
 
 ## Target 与目录
 - Target：`TodoWallpaper`（App）、`TodoWallpaperWidget`（扩展）。工程文件由 `native-tools/generate_product_project.py` 生成。
@@ -49,4 +49,4 @@
 - 日期缓存跟随地区/日历并在系统通知后重建默认时区；照片组合手势全取消才回滚；微调的 begin/end 合并连点，仍为一个导出像素。
 
 ## 连心入口
-用户明确要求新增底栏业务入口，现为五页。连心私有资料与钥匙串不可写入组件；仅用户明确发布的 LianxinPublication 可进入 App Group。连心壁纸使用独立草稿目录，保留原待办/壁纸/组件行为。
+用户明确要求新增底栏业务入口，现为五页。连心私有资料与钥匙串不可写入组件；仅经校验的当前 LianxinPublication 自动同步进入 App Group。连心壁纸使用独立草稿目录，保留原待办/壁纸/组件行为。

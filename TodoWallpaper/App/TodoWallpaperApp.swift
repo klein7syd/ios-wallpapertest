@@ -304,6 +304,10 @@ struct AboutView: View {
                     LabeledContent("版本", value: "\(version) · 构建 \(build)")
                     Text("原生待办与个性化壁纸")
                 }
+                Section("关于连心与 AI 创作") {
+                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；体验模式下的内容为示例，非 AI 生成。")
+                    Text("密钥只存在本机钥匙串，照片不会上传给 AI 服务商。复制、分享文字保留创作后缀，导出的 PNG 含创作说明元数据。")
+                }
                 Section("数据") {
                     Text("待办保存在这台 iPhone，当前没有跨设备同步。")
                     Text("升级时请使用同一签名账号和安装标识直接覆盖。卸载 App 会删除本机数据。")

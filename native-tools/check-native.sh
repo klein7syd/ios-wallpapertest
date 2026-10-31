@@ -16,7 +16,7 @@ python3 native-tools/make-render-fixture.py TodoWallpaper/out/render-checks/fixt
 swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
     TodoWallpaper/Wallpaper/WallpaperSettings.swift TodoWallpaper/Wallpaper/WallpaperRenderer.swift \
     TodoWallpaper/Wallpaper/WallpaperDraftStore.swift TodoWallpaper/Wallpaper/WallpaperGeometry.swift \
-    TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift TodoWallpaper/Tests/WidgetFeedbackRenderChecks.swift TodoWallpaper/Tests/FeedbackRepairRenderChecks.swift TodoWallpaper/Tests/PhotoRepairRenderChecks.swift \
+    TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift TodoWallpaper/Tests/WidgetFeedbackRenderChecks.swift TodoWallpaper/Tests/FeedbackRepairRenderChecks.swift TodoWallpaper/Tests/PhotoRepairRenderChecks.swift TodoWallpaper/Tests/LianxinWallpaperChecks.swift \
     -o "$RUNNER_TEMP/todo-wallpaper-render-checks" 2>&1 | tee TodoWallpaper/out/render-compile.log
 "$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
 
