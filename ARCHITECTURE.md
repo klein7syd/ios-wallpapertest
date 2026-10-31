@@ -4,6 +4,17 @@
 
 ## a. 模块总览
 
+**模式切换与性能（App/RetainedModeEditors, App/EditorModePerformance）**
+两个壁纸模型继续由App的StateObject持有。两个编辑页各用RetainedModeEditors按模式首次懒建、之后保留；固定mode绑定各自样式与撤销会话，active决定加载、分析优先级和可交互性，隐藏页退出触摸与无障碍树。撤销资源保留owner包含模式名，避免互相覆盖。壁纸model统一syncSharedPhoto，主页预览与编辑器共享引用/在途任务；同引用零读取，新引用串行替换。首次恢复时WallpaperDraftStore actor比较源文件，相同则不重导入、不重置裁剪；共享照片读取也在LianxinStorage actor。原草稿目录、原图导出、独立裁剪和原有字形/实时层缓存保持。
+
+公开os_signpost记录EditorModeSwitch与分段；CFRunLoopObserver记录非等待区间，CADisplayLink在编辑器就绪后两帧结束。CI专用夹具用两张2400×3600合成图、200字中韩原文与译文，触发同一生产按钮action，区分首次与21次热切换。该数据是Simulator Debug程序触发、主循环墙钟时间，不能等同真机触摸延迟或独占CPU；Time Profiler原始trace与JSON放在构建产物mode-performance中，采集失败保留日志并失败，不伪造调用栈。
+
+App源图缓存预算为8MB以容纳两模式各一张1024px照片；扩展仍为4MB。iOS26.5全进程Time Profiler出现系统dylib地址重叠、保存挂起，尝试26.4又遇boot/install准备超时。因此当前夹具仍用能运行App的26.5独立模拟器，核对App自己写出的PID、simctl结果与主机ps，仅优先定向附加生产App；实际runtime与PID写入environment.json。失败保留日志并保持门禁失败，不能冒充调用栈证据。原完整UI检查与截图、SDK及发布目标不变，前后使用相同的最终采样环境。
+
+模式选择的AppStorage只由根页持有；编辑器固定mode，通过Binding写入切换，不各自订阅全局选择。已bootstrap的wallpaper.start调用等值保护的updateItems/updateAppearance/updateContent；相同激活不反复发布@Published，也不重算布局或渲染。
+
+CI同一workflow包含build-app原完整门禁与mode-performance附加严格门禁，二者并行、均须成功。record-mode-performance.sh编译同一HEAD的Debug App，单独启动26.5并核对目标进程；build-app继续原26.5 UI/像素与双Target Release。独立性能artifact与IPA artifact按相同HEAD合并交付，不以单任务成功代替完整CI。
+
 **待办数据（Core/TodoItem, TodoRepository, TodoStore）**
 `TodoItem` / `TodoDocument` 是值类型模型；`TodoRepository` 负责 `todos-v1.json` 的加锁读写、备份与校验；`TodoStore`（`@MainActor` 观察者）持有内存状态并在变更后 `reloadTimelines`。入口：`TodoListView`、`SetTodoCompletionIntent`。
 
