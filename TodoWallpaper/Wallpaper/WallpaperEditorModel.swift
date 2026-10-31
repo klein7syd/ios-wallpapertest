@@ -47,12 +47,19 @@ final class WallpaperEditorModel: ObservableObject {
     private var wantsExactPreview = false
     private var blurTask: Task<Void, Never>?
     private var blurKey = ""
+    private var appliedSharedPhoto: String?
+    private var hasAppliedSharedPhoto = false
+    private var requestedSharedPhoto: String?
+    private var sharedPhotoRequest: UUID?
+    private var sharedPhotoTask: Task<Void, Error>?
 
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
     var lianxinContentIssue: String? { layout?.lianxinIssue?.localizedDescription }
 
     func start(items: [TodoItem], appearance: TodoAppearance, content: LianxinPublication? = nil) async {
+        let span = EditorModePerformance.beginStage("StartWallpaper"); defer { EditorModePerformance.endStage("StartWallpaper", span) }
+        EditorModePerformance.count("wallpaper_start_calls")
         self.items = items
         self.appearance = appearance
         self.lianxinContent = content
@@ -121,12 +128,45 @@ final class WallpaperEditorModel: ObservableObject {
         try await applyPhotoData(data)
     }
 
+    // 引用同步状态属于常驻model，主页预览与编辑器共享；视图重现不会重置。
+    func syncSharedPhoto(reference: String?, loader: @escaping @MainActor () async throws -> Data?) async throws {
+        guard ready, !draftBlocked else { throw WallpaperError.invalidDraft }
+        if hasAppliedSharedPhoto && appliedSharedPhoto == reference { return }
+        if let pending = sharedPhotoTask, requestedSharedPhoto == reference { try await pending.value; return }
+        let previous = sharedPhotoTask
+        previous?.cancel()
+        let request = UUID()
+        requestedSharedPhoto = reference; sharedPhotoRequest = request
+        let pending = Task { @MainActor in
+            // 新引用排在旧导入结束之后，避免旧结果覆盖用户刚换的照片。
+            if let previous { _ = try? await previous.value }
+            try Task.checkCancellation()
+            let data = try await loader()
+            try Task.checkCancellation()
+            guard !self.busy else { throw WallpaperError.renderingFailed }
+            if let data {
+                let sameSource = try await self.files.photoMatches(data, name: self.photoName)
+                try Task.checkCancellation()
+                if !sameSource { try await self.importPhotoData(data) }
+            } else { self.removePhoto() }
+            try Task.checkCancellation()
+            self.appliedSharedPhoto = reference; self.hasAppliedSharedPhoto = true
+        }
+        sharedPhotoTask = pending
+        defer { if sharedPhotoRequest == request { sharedPhotoTask = nil; sharedPhotoRequest = nil } }
+        try await pending.value
+    }
+
     private func applyPhotoData(_ data: Data) async throws {
+        let span = EditorModePerformance.beginStage("ImportWallpaperPhoto"); defer { EditorModePerformance.endStage("ImportWallpaperPhoto", span) }
+        EditorModePerformance.count("wallpaper_photo_imports")
         saveTask?.cancel()
         let url = try await files.importPhoto(data)
+        try Task.checkCancellation()
         var next = settings
         next.backgroundZoom = 1; next.backgroundPanX = 0; next.backgroundPanY = 0
         let live = try await renderer.loadPhoto(at: url)
+        try Task.checkCancellation()
         try await files.save(WallpaperDraft(settings: next, photoFileName: url.lastPathComponent))
         photoURL = url; photoName = url.lastPathComponent; livePhoto = live
         settings = next
@@ -202,6 +242,7 @@ final class WallpaperEditorModel: ObservableObject {
         // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
         if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle || layoutContent != lianxinContent || (lianxinContent != nil && layoutAppearance.widget != appearance.widget) {
             do {
+                let span = EditorModePerformance.beginStage("WallpaperTextLayout"); defer { EditorModePerformance.endStage("WallpaperTextLayout", span) }
                 layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance, content: lianxinContent)
                 layoutContent = lianxinContent
                 layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance; previewError = nil
