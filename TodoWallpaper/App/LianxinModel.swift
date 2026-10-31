@@ -98,9 +98,10 @@ final class LianxinModel: ObservableObject {
         guard !loaded else { return }
         do {
             let saved = try await storage.load()
-            let savedKey = try LianxinKeychain.read()
-            profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }; key = savedKey
+            profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
             loaded = true
+            do { key = try LianxinKeychain.read() }
+            catch { notice = "密钥暂时无法读取，请解锁设备后重试；其他连心资料仍可查看。" }
         } catch { self.error = "连心资料读取失败，原文件已保留。请稍后重新打开页面重试。" }
     }
 
