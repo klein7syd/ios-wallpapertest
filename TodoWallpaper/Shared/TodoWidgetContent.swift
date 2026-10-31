@@ -173,6 +173,7 @@ struct TodoWidgetContent: View {
                 .opacity(rowFade)
                 .foregroundStyle(rowColor)
                 .lineLimit(row.lineLimit).multilineTextAlignment(textAlignment)
+                .frame(maxWidth: .infinity, alignment: textAlignment == .center ? .center : .leading)
                 .readableText(isLightText: textIsLight, intensity: settings.intensity,
                               enabled: tone.enabled)
                 .fixedSize(horizontal: false, vertical: true)
