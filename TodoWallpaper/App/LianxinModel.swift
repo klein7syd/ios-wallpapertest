@@ -2,6 +2,7 @@
 import SwiftUI
 import Security
 import WidgetKit
+import Combine
 
 enum LianxinKeychain {
     private static func query(_ account: String) -> [String: Any] {
@@ -71,6 +72,7 @@ actor LianxinStorage {
     func publish(_ content: LianxinPublication, directory: URL) throws {
         try content.save(directory: directory)
     }
+    func currentContent(directory: URL) throws -> LianxinPublication? { try LianxinPublication.load(directory: directory) }
     func removePhoto(_ name: String?) {
         guard let name, let root = try? directory(), let url = try? WidgetPhotoReference.url(for: name, in: root) else { return }
         try? FileManager.default.removeItem(at: url)
@@ -80,7 +82,7 @@ actor LianxinStorage {
 
 @MainActor
 final class LianxinModel: ObservableObject {
-    @Published var profile = LianxinProfile() { didSet { if loaded && oldValue != profile { scheduleInputSave() } } }
+    @Published var profile = LianxinProfile() { didSet { if loaded && oldValue != profile { scheduleInputSave(); scheduleSync() } } }
     @Published var key = ""
     @Published private(set) var photo: UIImage?
     @Published private(set) var loaded = false
@@ -92,9 +94,15 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var keySaved = false
     @Published var connectionNotice: String?
     weak var styleStore: TodoStore?
-    var publication: LianxinPublication {
-        LianxinPublication(idol: profile.messageIdol.isEmpty ? profile.idolName : profile.messageIdol, text: profile.message, photo: nil, date: .now, example: profile.exampleContent)
+    @Published private(set) var currentContent: LianxinPublication?
+    @Published private(set) var syncedAt: Date?
+    @Published private(set) var syncError: String?
+    var publication: LianxinPublication { currentContent ?? draftContent }
+    private var draftContent: LianxinPublication {
+        LianxinPublication(idol: profile.messageIdol.isEmpty ? profile.idolName : profile.messageIdol, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent)
     }
+    private var syncTask: Task<Void, Never>?
+    private var styleObserver: AnyCancellable?
     private let storage = LianxinStorage()
     private let service: any AIServiceProtocol
     private var generation: Task<Void, Never>?
@@ -118,6 +126,8 @@ final class LianxinModel: ObservableObject {
             let saved = try await storage.load()
             profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
             loaded = true
+            if let directory = try? mediaDirectory() { currentContent = try? await storage.currentContent(directory: directory) }
+            scheduleSync()
             do {
                 try LianxinCredentialMigration.migrate(profile: profile, store: LianxinSystemCredentials())
                 key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty
@@ -183,6 +193,9 @@ final class LianxinModel: ObservableObject {
 
     func prepareStyle(_ store: TodoStore) async {
         styleStore = store
+        if styleObserver == nil {
+            styleObserver = store.$appearance.map(\.lianxin).removeDuplicates().dropFirst().sink { [weak self] _ in self?.scheduleSync() }
+        }
         guard store.appearance.lianxin == nil else { return }
         do {
             var name: String?
@@ -310,19 +323,28 @@ final class LianxinModel: ObservableObject {
 
     func cancel() { generation?.cancel() }
 
-    func output(text: String) async {
-        guard loaded, !busy else { return }
-        busy = true
-        defer { busy = false }
-        do {
-            let content = LianxinPublication(idol: profile.messageIdol, text: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                                            photo: try await storage.photoData(profile.photoName), date: .now, example: profile.exampleContent)
-            try content.validate()
-            try await storage.publish(content, directory: mediaDirectory())
-            WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
-            notice = "已发布到连心小组件，系统决定刷新时间。"
-
-        } catch { self.error = "未能输出。请确认文案为 1–200 字，并检查共享存储和剩余空间。原有小组件内容已保留。" }
+    func scheduleSync() {
+        guard loaded else { return }
+        syncTask?.cancel()
+        let draft = draftContent
+        guard (try? draft.validate()) != nil else { return } // 无效输入不覆盖上一份有效内容。
+        if currentContent?.text != draft.text || currentContent?.idol != draft.idol || currentContent?.example != draft.example {
+            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example)
+        }
+        let content = publication
+        syncTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(400)); try Task.checkCancellation()
+                // 样式和照片引用先落盘；共享内容里没有接口、提示词或凭证。
+                styleStore?.flushAppearance()
+                if styleStore?.appearanceError != nil { throw LianxinError.storage }
+                try await storage.publish(content, directory: mediaDirectory())
+                try Task.checkCancellation()
+                WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
+                syncedAt = .now; syncError = nil
+            } catch is CancellationError { }
+            catch { syncError = "小组件暂未更新，请重试。上一份有效内容已保留。" }
+        }
     }
 }
 

@@ -26,6 +26,10 @@ struct WallpaperRow {
     let markerTop: CGFloat
     let markerSize: CGFloat
 }
+struct WallpaperSupplement {
+    let block: WallpaperTextBlock
+    let top: CGFloat
+}
 struct WallpaperLayout {
     let canvas: CGSize
     let panel: CGRect
@@ -37,6 +41,8 @@ struct WallpaperLayout {
     let footerTop: CGFloat
     let emptyText: WallpaperTextBlock?
     let emptyTop: CGFloat
+    var supplements: [WallpaperSupplement] = []
+    var lianxinOverflow = false
 }
 struct WallpaperRendered {
     let image: CGImage
@@ -113,7 +119,7 @@ enum WallpaperRenderer {
             lineAdvance: advance, truncated: truncated)
     }
 
-    static func layout(settings raw: WallpaperSettings, items: [TodoItem], appearance: TodoAppearance = TodoAppearance()) throws -> WallpaperLayout {
+    static func layout(settings raw: WallpaperSettings, items: [TodoItem], appearance: TodoAppearance = TodoAppearance(), content: LianxinPublication? = nil) throws -> WallpaperLayout {
         let settings = try raw.validated()
         let canvas = CGSize(width: logicalWidth, height: settings.logicalHeight)
         let margin: CGFloat = 8
@@ -129,8 +135,19 @@ enum WallpaperRenderer {
         let candidates = Array(filtered.prefix(settings.maximumItems))
         var blocks: [(TodoItem, WallpaperTextBlock)] = []
         for item in candidates {
-            blocks.append((item, text(item.title, width: textWidth, settings: settings)))
+            // 连心只受面板实际高度限制，不使用待办每项行数上限。
+            blocks.append((item, text(item.title, width: textWidth, settings: settings, maxLines: content == nil ? nil : max(1, item.title.utf16.count))))
         }
+        var supplementBlocks: [WallpaperTextBlock] = []
+        if let content {
+            if appearance.widget.lianxinShowsSignature != false {
+                supplementBlocks.append(text(content.idol, width: textWidth, settings: settings, opacity: 0.8, size: min(13, settings.fontSize), maxLines: 8))
+            }
+            if settings.lianxinShowsCreationLabel == true {
+                supplementBlocks.append(text(content.contentLabel, width: textWidth, settings: settings, opacity: 0.7, size: min(11, settings.fontSize), maxLines: 8))
+            }
+        }
+        let supplementHeight = supplementBlocks.reduce(CGFloat.zero) { $0 + $1.height + 4 }
         let empty = filtered.isEmpty ? text(items.isEmpty ? "还没有待办" : "今天的待办都完成了",
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
@@ -145,7 +162,7 @@ enum WallpaperRenderer {
         var allHeight: CGFloat = 0
         for pair in blocks { allHeight += rowMetrics(pair).height }
         allHeight += CGFloat(max(0, blocks.count - 1)) * itemSpacing
-        let contentHeight: CGFloat = empty?.height ?? allHeight
+        let contentHeight: CGFloat = (empty?.height ?? allHeight) + supplementHeight
         let footerHeight: CGFloat = filtered.count > candidates.count ? reserveFooter.height + 12 : 0
         let naturalHeight: CGFloat = contentHeight + padding * 2 + footerHeight
         let requestedHeight: CGFloat = settings.automaticHeight ? naturalHeight : canvas.height * CGFloat(settings.panelHeight)
@@ -160,7 +177,7 @@ enum WallpaperRenderer {
         var used: CGFloat = 0
         for (index, pair) in blocks.enumerated() {
             let spacing: CGFloat = rows.isEmpty ? 0 : itemSpacing
-            let reserve: CGFloat = filtered.count > index + 1 ? reserveFooter.height + 12 : 0
+            let reserve: CGFloat = (filtered.count > index + 1 ? reserveFooter.height + 12 : 0) + supplementHeight
             let metrics = rowMetrics(pair)
             guard used + spacing + metrics.height + reserve <= usable + 0.01 else { break }
             used += spacing
@@ -182,9 +199,15 @@ enum WallpaperRenderer {
             block.height <= usable ? block : text("暂无可显示事项", width: panelWidth - 2 * padding,
                 settings: settings, size: 11, maxLines: 1)
         }
+        var supplements: [WallpaperSupplement] = []
+        for block in supplementBlocks where hidden == 0 {
+            used += 4
+            supplements.append(WallpaperSupplement(block: block, top: panel.minY + padding + used)); used += block.height
+        }
         return WallpaperLayout(canvas: canvas, panel: panel, markerColumn: markerColumn, textWidth: textWidth, rows: rows,
-            hiddenCount: hidden, footer: footer, footerTop: panel.maxY - padding - (footer?.height ?? 0),
-            emptyText: fittedEmpty, emptyTop: panel.minY + padding)
+            hiddenCount: hidden, footer: content == nil ? footer : nil, footerTop: panel.maxY - padding - (footer?.height ?? 0),
+            emptyText: fittedEmpty, emptyTop: panel.minY + padding, supplements: supplements,
+            lianxinOverflow: content != nil && (hidden > 0 || rows.isEmpty || blocks.contains { $0.1.truncated } || supplementBlocks.contains { $0.truncated }))
     }
 
     static func photoInfo(at url: URL) throws -> WallpaperPhotoInfo {
@@ -221,9 +244,9 @@ enum WallpaperRenderer {
     }
 
     static func render(settings raw: WallpaperSettings, items: [TodoItem], photoURL: URL?,
-                       previewWidth: Int? = nil, ciContext: CIContext, appearance: TodoAppearance = TodoAppearance(), assetDirectory: URL? = nil) throws -> WallpaperRendered {
+                       previewWidth: Int? = nil, ciContext: CIContext, appearance: TodoAppearance = TodoAppearance(), assetDirectory: URL? = nil, content: LianxinPublication? = nil) throws -> WallpaperRendered {
         let settings = try raw.validated()
-        let layout = try layout(settings: settings, items: items, appearance: appearance)
+        let layout = try layout(settings: settings, items: items, appearance: appearance, content: content)
         let pixelWidth = min(settings.size.width, previewWidth ?? settings.size.width)
         let pixelHeight = previewWidth == nil ? settings.size.height :
             Int((Double(pixelWidth) / settings.aspectRatio).rounded())
@@ -334,6 +357,10 @@ enum WallpaperRenderer {
             drawText(footer, in: context, x: panel.minX + padding, top: layout.footerTop,
                 width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
+        for supplement in layout.supplements {
+            drawText(supplement.block, in: context, x: panel.minX + padding, top: supplement.top,
+                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
+        }
         context.restoreGState()
     }
 
@@ -371,12 +398,13 @@ enum WallpaperRenderer {
         }
     }
 
-    static func writePNG(_ image: CGImage, to url: URL, expected: WallpaperSize) throws {
+    static func writePNG(_ image: CGImage, to url: URL, expected: WallpaperSize, creationDescription: String? = nil) throws {
         guard image.width == expected.width && image.height == expected.height else { throw WallpaperError.dimensionsMismatch }
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { throw WallpaperError.encodingFailed }
         // New pixels only: do not copy source GPS/EXIF metadata.
-        CGImageDestinationAddImage(destination, image, nil)
+        let properties = creationDescription.map { [kCGImagePropertyPNGDictionary: [kCGImagePropertyPNGDescription: $0]] as CFDictionary }
+        CGImageDestinationAddImage(destination, image, properties)
         guard CGImageDestinationFinalize(destination) else { throw WallpaperError.encodingFailed }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -416,22 +444,23 @@ actor WallpaperRenderService {
         guard let output = context.createCGImage(result, from: result.extent) else { throw WallpaperError.renderingFailed }
         return WallpaperLivePhoto(image: output, info: photo.info)
     }
-    func preview(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, appearance: TodoAppearance = TodoAppearance(), assetDirectory: URL? = nil) throws -> WallpaperRendered {
+    func preview(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, appearance: TodoAppearance = TodoAppearance(), assetDirectory: URL? = nil, content: LianxinPublication? = nil) throws -> WallpaperRendered {
         try Task.checkCancellation()
         return try autoreleasepool {
             try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL,
-                                         previewWidth: 1000, ciContext: context, appearance: appearance)
+                                         previewWidth: 1000, ciContext: context, appearance: appearance, content: content)
         }
     }
-    func export(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, directory: URL, appearance: TodoAppearance = TodoAppearance()) throws -> URL {
+    func export(settings: WallpaperSettings, items: [TodoItem], photoURL: URL?, directory: URL, appearance: TodoAppearance = TodoAppearance(), content: LianxinPublication? = nil) throws -> URL {
         try Task.checkCancellation()
         defer { context.clearCaches() }
         return try autoreleasepool {
-            let rendered = try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL, ciContext: context, appearance: appearance)
+            let rendered = try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL, ciContext: context, appearance: appearance, content: content)
+            if rendered.layout.lianxinOverflow { throw WallpaperError.contentOverflow }
             try Task.checkCancellation()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let url = directory.appendingPathComponent("TodoWallpaper-\(settings.size.width)x\(settings.size.height)-\(UUID()).png")
-            do { try WallpaperRenderer.writePNG(rendered.image, to: url, expected: settings.size) }
+            do { try WallpaperRenderer.writePNG(rendered.image, to: url, expected: settings.size, creationDescription: content.map { $0.contentLabel + " · 连心" }) }
             catch { try? FileManager.default.removeItem(at: url); throw error }
             return url
         }

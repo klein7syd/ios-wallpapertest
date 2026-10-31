@@ -47,6 +47,7 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     var maximumLines: Int = 4
     // Missing in older drafts: keep their existing per-task marker behavior.
     var usesTaskMarkers: Bool?
+    var lianxinShowsCreationLabel: Bool?
     var inheritsTaskMarkers: Bool { usesTaskMarkers ?? true }
     func marker(for item: TodoItem, appearance: TodoAppearance) -> TodoMarker {
         inheritsTaskMarkers ? appearance.marker(for: item) : appearance.defaultMarker
@@ -94,7 +95,7 @@ struct WallpaperDraft: Codable, Sendable {
 }
 enum WallpaperError: LocalizedError {
     case ratioMismatch, invalidSize, unreadablePhoto, photoTooLarge, renderingFailed
-    case encodingFailed, dimensionsMismatch, photoPermission, unsupportedDraft, invalidDraft
+    case encodingFailed, dimensionsMismatch, photoPermission, unsupportedDraft, invalidDraft, contentOverflow
     var errorDescription: String? {
         switch self {
         case .ratioMismatch: return "像素尺寸与画布比例不一致。请保持比例，或先设置自定义画布比例。"
@@ -107,6 +108,7 @@ enum WallpaperError: LocalizedError {
         case .photoPermission: return "没有相册添加权限。可在系统设置中允许添加照片，或使用系统分享。"
         case .unsupportedDraft: return "壁纸草稿来自较新版本，已保留原文件，当前未覆盖它。"
         case .invalidDraft: return "壁纸草稿无法读取，原文件已保留。可确认恢复默认以重新开始；待办不受影响。"
+        case .contentOverflow: return "文字超出面板，请增大面板高度、减小字号或缩短话语"
         }
     }
 }

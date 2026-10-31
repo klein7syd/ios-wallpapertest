@@ -232,3 +232,8 @@ WallpaperContentSource将待办或连心话语适配为生产渲染内容，连�
 自测：1. 已验证请求规则/名字模板，真实AI是否遵守需真机与服务商；2. 连接状态判断已验证，设置收起与按钮仅编译/模拟器画面检查；3. 双预览导航及防抖保存仅编译检查，需真机；4. ContentMode同键持久化已验证，跨页真实点按需真机；5. 样式隔离与引用保留已验证，组件同步与亮暗照片观感需真机；6. 壁纸内容标签检查已验证，连心编辑/相册权限和草稿切换需真机；7. 旧JSON与Publication解码已验证，覆盖安装和已有组件需真机；8. 黑白文字/亮暗图真实肉眼观感需真机。没有调用真实付费API，没有签名或设备安装验收。
 
 当前以本轮第3组后的实现为准：0.7.0/0.7.1段落为历史说明；LianxinWallpaperView已删除，导出位于共用WallpaperEditorView连心模式。TodoAppearance包含可选lianxin外观，连心主页复用同一共享内容视图；旧发布快照只有照片而私有原图不存在时，壁纸使用已迁入共享容器的缩略底图。
+
+## 连心反馈第1组（当前约束，覆盖历史发布/强制画面标注说明）
+LianxinModel.currentContent 是当前有效内容，所有预览及 WallpaperEditorModel 读取同一份值。资料编辑先校验，400ms 防抖写入原 lianxin-published-v1.json 并请求刷新连心 kind；名称/正文无效时保留上一份有效内容。样式变化同样触发同步，照片继续由共享样式引用，旧嵌入照片兼容。WidgetKit 实际显示时间由系统调度，不能保证桌面1秒刷新。
+WallpaperRenderer 接收可选 LianxinPublication，用同一 CoreText 管线取消待办每项行数上限，署名/可选标注作为独立 WallpaperSupplement 计入面板高度。布局报告 lianxinOverflow，UI与实际导出服务双重阻止放不下的导出；实时/精确预览/PNG共用布局。PNG只写新像素与创作Description，不复制源照片元数据。
+systemMaterial 只保留兼容解码，渲染始终普通背景。创作标注默认关闭，widget槽位及wallpaper草稿分别可选开启；复制分享始终后缀，PNG始终元数据。主页底部与关于页保留AI说明。LianxinFieldStyle和FocusState覆盖主页面/连接向导，交互滑动与键盘完成收起。

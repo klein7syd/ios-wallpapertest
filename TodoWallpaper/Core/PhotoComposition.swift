@@ -42,7 +42,8 @@ struct WidgetAlbumRotation: Codable, Equatable, Sendable {
 extension WidgetAppearance {
     var photoCrop: PhotoCrop { backgroundCrop ?? PhotoCrop() }
     var photoOpacity: Double { backgroundPhotoOpacity ?? 1 }
-    var materialEnabled: Bool { systemMaterial ?? false }
+    // 仅保留旧 JSON 字段；实验材质已退役，true 也按普通背景渲染。
+    var materialEnabled: Bool { false }
     var footerVisible: Bool { showsFooter ?? true }
     func photoName(at date: Date = .now) -> String? {
         if let album = photoRotation, album.enabled { return album.photo(at: date) }

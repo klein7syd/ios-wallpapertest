@@ -332,10 +332,6 @@ struct WidgetAppearanceEditor: View {
     @ViewBuilder private var themeControls: some View {
         InspectorGroupTitle(title: "背景与照片", detail: "先选背景，再调整照片构图与明暗。")
         Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        if editingAppearance.widget.materialEnabled {
-            Text("请求原生 Liquid Glass。默认图标模式能否透出桌面壁纸，仍需实机确认；系统透明模式由 iOS 控制。")
-                .font(.caption).foregroundStyle(.secondary)
-        } else {
             Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
             if editingAppearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
             if editingAppearance.widget.backdrop == .photo {
@@ -376,11 +372,6 @@ struct WidgetAppearanceEditor: View {
                     }
                 }
             }
-        }
-        InspectorGroupTitle(title: "实验选项", detail: "系统玻璃效果受 iOS 模式影响，可按需开启。")
-        Toggle("玻璃背景（实验）", isOn: Binding(get: { editingAppearance.widget.materialEnabled }, set: {
-            widget.wrappedValue.systemMaterial = $0; cropPhoto = false
-        }))
         if advanced {
             Text("网格不会出现在主屏幕。系统外观会影响实际小组件背景。")
                 .font(.caption).foregroundStyle(.secondary)
@@ -592,7 +583,7 @@ struct WidgetAppearanceEditor: View {
             Picker("最多行数", selection: Binding(get: { widget.wrappedValue.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
                 Text("自动").tag(0); ForEach(1...4, id: \.self) { Text("\($0)行").tag($0) }
             }
-            Text("AI 创作 / 示例内容标注始终显示，不可关闭。").font(.caption)
+            Toggle("在小组件/壁纸上显示创作标注", isOn: Binding(get: { widget.wrappedValue.lianxinShowsCreationLabel == true }, set: { widget.wrappedValue.lianxinShowsCreationLabel = $0 }))
         }
     }
     @ViewBuilder private var contentControls: some View {

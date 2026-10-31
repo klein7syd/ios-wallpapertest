@@ -144,6 +144,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     /// two text lines into every large Widget row when tight spacing is selected.
     var lianxinShowsSignature: Bool?
     var lianxinCentered: Bool?
+    var lianxinShowsCreationLabel: Bool?
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
     var unifiedMarkers: Bool?

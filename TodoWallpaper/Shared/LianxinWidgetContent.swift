@@ -1,4 +1,4 @@
-// Target Membership：App + Widget。正文与标签各自参与可读性层；标签不可关闭。
+// Target Membership：App + Widget。画面标注默认关闭，复制/分享另有强制后缀。
 import SwiftUI
 import WidgetKit
 
@@ -28,8 +28,10 @@ struct LianxinWidgetContent: View {
                 Text(content?.idol ?? "连心").font(.system(size: labelSize)).lineLimit(1)
                     .foregroundStyle(tone.textColor).readableText(isLightText: tone.isLightText, intensity: style.readable.intensity, enabled: tone.enabled)
             }
+            if style.lianxinShowsCreationLabel == true {
             Text(content?.contentLabel ?? "AI 创作").font(.system(size: labelSize)).lineLimit(2)
                 .foregroundStyle(tone.textColor).readableText(isLightText: tone.isLightText, intensity: style.readable.intensity, enabled: tone.enabled)
+            }
         }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
     }
     private var item: TodoItem {

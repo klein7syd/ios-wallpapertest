@@ -79,7 +79,7 @@ require('isExplicitlyDark' in shared and 'systemScheme' in read('TodoWallpaper/S
 require('WidgetDayTimeline.dates' in extension and 'entry.date' in extension and '.after(dates[1])' in extension, 'Daily image uses actual Widget timeline entries')
 require('WidgetAlbumPicker' in widget and 'PHAssetCollection.fetchAssetCollections' in read('TodoWallpaper/App/WidgetAlbumPicker.swift'), 'Album selector uses native PhotoKit with explicit access')
 require('指定日期' in app and '指定时间' in app and 'schedule' in read('TodoWallpaper/Core/TodoItem.swift'), 'Optional schedule has real shared task persistence')
-require('systemMaterial' in widget and '.ultraThinMaterial' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Experimental glass requests public Liquid Glass with material fallback')
+require('var systemMaterial: Bool?' in read('TodoWallpaper/Core/TodoAppearance.swift') and 'var materialEnabled: Bool { false }' in read('TodoWallpaper/Core/PhotoComposition.swift'), 'Retired material decodes old values but never enables rendering')
 require('Text("标记点按后效果")' in marker and 'case hollow, filled, thin, bordered, square, emoji, image, none' in read('TodoWallpaper/Core/TodoAppearance.swift'), 'Visible marker-effect heading and image marker kind')
 require('PhotosPicker(selection: $selection' in marker and 'importMarker(' in marker, 'Every reused marker chooser supports real native photo input')
 require('preparedOnly: true' in extension and 'count: rotating ? 2 : 1' in extension and 'kCGImageSourceThumbnailMaxPixelSize: 1024' in read('TodoWallpaper/Shared/WidgetBackgroundView.swift'), 'Extension archives bounded prepared photos and limits future image entries')
@@ -88,7 +88,7 @@ require('@Published private var history' not in read('TodoWallpaper/App/EditorUn
 text_section = widget[widget.index('@ViewBuilder private var textControls'):widget.index('@ViewBuilder private var markerControls')]
 content_section = widget[widget.index('@ViewBuilder private var contentControls'):widget.index('private var help:')]
 require('PreciseSlider(title: "行距"' in text_section and 'range: -10...40' in text_section and 'showsSummary' in content_section, 'Text owns expanded row spacing; content owns the count switch')
-require(widget.index('Toggle("玻璃背景') > widget.index('Picker("明暗"') and 'title: "实验选项"' in widget, 'Experimental glass follows everyday theme settings in a labeled section')
+require('玻璃背景' not in widget and 'WidgetGlassBackground' not in read('TodoWallpaper/Shared/WidgetBackgroundView.swift') and 'style.materialEnabled' not in read('TodoWallpaper/Shared/WidgetBackgroundView.swift')[:read('TodoWallpaper/Shared/WidgetBackgroundView.swift').index('enum WidgetPhotoCache')], 'Retired glass has no editor entry or material render branch')
 require('ReadableTone.resolve' in shared and 'layout.titleY' in shared, 'Widget uses explicit text contrast protection and bounded title insets')
 readable_rules = read('TodoWallpaper/Core/ReadableModels.swift')
 readable_layer = read('TodoWallpaper/Shared/ReadableLayer.swift')
