@@ -145,6 +145,9 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var lianxinShowsSignature: Bool?
     var lianxinCentered: Bool?
     var lianxinShowsCreationLabel: Bool?
+    var lianxinDisplayStyle: LianxinDisplayStyle?
+    var lianxinCustomTitle: String?
+    var lianxinMarker: TodoMarker?
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
     var unifiedMarkers: Bool?
@@ -173,6 +176,9 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     func validate() throws {
         try markerOverride?.validate(); try markerStyle.validate()
         try header?.validate()
+        try lianxinDisplayStyle?.validate()
+        try lianxinMarker?.validate()
+        if let lianxinCustomTitle, lianxinCustomTitle.count > 40 || lianxinCustomTitle.contains(where: \.isNewline) { throw AppearanceError.invalidStyle }
         if let readableScrimOverride, !(0...0.8).contains(readableScrimOverride) { throw AppearanceError.invalidStyle }
         if let readableHeightRatio, !(0.25...0.7).contains(readableHeightRatio) { throw AppearanceError.invalidStyle }
         if let readableEdgeInset,
@@ -211,6 +217,8 @@ extension TodoAppearance {
         next.widget.spacing = ReadableRules.finiteClamp(next.widget.spacing, to: -10...40, fallback: 5)
         next.widget.maximumItems = min(10, max(1, next.widget.maximumItems))
         next.widget.maximumTitleLines = next.widget.maximumTitleLines.map { min(4, max(1, $0)) }
+        next.widget.lianxinDisplayStyle = next.widget.lianxinDisplayStyle?.clamped
+        next.lianxinWallpaperMarkerStyle?.clampForEditing()
         next.widget.readableScrimOverride = next.widget.readableScrimOverride.map { ReadableRules.finiteClamp($0, to: 0...0.8, fallback: 0.4) }
         next.widget.readableHeightRatio = next.widget.readableHeightRatio.map { ReadableRules.finiteClamp($0, to: 0.25...0.7, fallback: 0.45) }
         if let inset = next.widget.readableEdgeInset {
@@ -263,6 +271,8 @@ struct TodoAppearance: Codable, Equatable, Sendable {
     var markerStyle = MarkerStyle()
     var widget = WidgetAppearance()
     var lianxin: WidgetAppearance?
+    var lianxinWallpaperMarker: TodoMarker?
+    var lianxinWallpaperMarkerStyle: MarkerStyle?
     func marker(for item: TodoItem, widgetContext: Bool = false) -> TodoMarker {
         if widgetContext && widget.unifiedMarkers == true {
             return widget.markerOverride ?? defaultMarker
@@ -272,6 +282,7 @@ struct TodoAppearance: Codable, Equatable, Sendable {
     func validate() throws {
         guard schemaVersion == 1 else { throw AppearanceError.unsupportedVersion }
         try defaultMarker.validate(); try markerStyle.validate(); try widget.validate(); try lianxin?.validate()
+        try lianxinWallpaperMarker?.validate(); try lianxinWallpaperMarkerStyle?.validate()
     }
 }
 enum AppearanceError: LocalizedError {

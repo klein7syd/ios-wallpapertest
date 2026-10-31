@@ -59,28 +59,32 @@ struct LianxinWidgetView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var mode
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetContentMargins) private var margins
+    private var previewFamily: WidgetPreviewFamily { family == .systemLarge ? .large : family == .systemMedium ? .medium : .small }
     private var accessory: Bool { family == .accessoryCircular || family == .accessoryRectangular }
     var body: some View {
         Group {
             if family == .accessoryCircular {
-                VStack(spacing: 2) { Image(systemName: "heart"); Text(entry.content?.idol ?? "连心").font(.caption2).lineLimit(1); if entry.style.lianxinShowsCreationLabel == true { Text(entry.content?.contentLabel ?? "AI 创作").font(.system(size: 8)).lineLimit(1) } }
+                VStack(spacing: 2) { Image(systemName: "heart"); Text(entry.content?.idol ?? "连心").font(.caption2).lineLimit(1); if entry.style.lianxinDisplay.showsCreationLabel { Text(entry.content?.contentLabel ?? "AI 创作").font(.system(size: 8)).lineLimit(1) } }
                     .accessibilityLabel((entry.content?.contentLabel ?? "连心") + "，" + (entry.content?.text ?? "在连心中发布一句话"))
             } else {
                 if accessory {
                     VStack(alignment: .leading) {
-                        Text(entry.content?.text ?? "打开连心").font(.caption).lineLimit(2)
-                        if entry.style.lianxinShowsCreationLabel == true { Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1) }
+                        if let content = entry.content {
+                            let presentation = LianxinPresentation(content, style: entry.style.lianxinDisplay)
+                            Text(presentation.primary).font(.caption).lineLimit(2)
+                            if let secondary = presentation.secondary { Text(secondary).font(.caption2).opacity(entry.style.lianxinDisplay.translationOpacity).lineLimit(1) }
+                        } else { Text("打开连心").font(.caption) }
+                        if entry.style.lianxinDisplay.showsCreationLabel { Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1) }
                     }
-                } else { LianxinWidgetContent(content: entry.content, style: entry.style, family: family == .systemLarge ? .large : family == .systemMedium ? .medium : .small, effectsFamily: family) }
+                } else { LianxinWidgetContent(content: entry.content, style: entry.style, family: previewFamily, effectsFamily: family) }
 
             }
         }
         .containerBackground(for: .widget) {
             if !accessory {
-                let readable = ReadableResolver.scrim(style: entry.style, date: entry.date, scheme: scheme, renderingMode: mode, family: family, canvasAspect: entry.aspect, preparedAnalyses: entry.analyses)
-                WidgetBackgroundView(style: entry.style, date: entry.date, preparedPhoto: entry.photo, preparedOnly: true,
-                    scrim: readable.value, scrimAnchor: entry.style.readable.anchor, scrimHeightRatio: entry.style.readable.heightRatio,
-                    scrimColor: readable.color, scrimExtraInset: entry.style.readable.edgeInset, effectsFamily: family)
+                LianxinWidgetBackground(content: entry.content, style: entry.style, family: previewFamily, date: entry.date,
+                    preparedPhoto: entry.photo, preparedOnly: true, analyses: entry.analyses, effectsFamily: family, canvasAspect: entry.aspect, margins: margins)
             } else { Color.clear }
 
         }

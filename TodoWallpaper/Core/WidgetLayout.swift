@@ -7,6 +7,9 @@ struct WidgetRowMetrics: Equatable {
     let lineLimit: Int
     let height: Double
     let dateHeight: Double
+    var secondaryLineLimit = 0
+    var secondaryHeight = 0.0
+    var textTopInset = 0.0
 }
 struct WidgetLayoutMetrics: Equatable {
     let rows: [WidgetRowMetrics]
@@ -26,7 +29,8 @@ struct WidgetLayoutMetrics: Equatable {
     static func make(items: [TodoItem], appearance: TodoAppearance, family: WidgetPreviewFamily,
                      width: Double, height: Double, fontLineHeight: Double,
                      headerHeight: Double, footerHeight: Double, font: CTFont? = nil,
-                     dateLineHeight: Double? = nil) -> WidgetLayoutMetrics {
+                     dateLineHeight: Double? = nil, secondaryText: [UUID: String] = [:],
+                     secondaryScale: Double = 0.85, maximumLinesOverride: Int? = nil, alignsMarkerToFirstLine: Bool = false) -> WidgetLayoutMetrics {
         let style = appearance.widget
         let candidates = style.rows(items, capacity: style.maximumItems)
         let marks = candidates.map { MarkerDrawing.extent(marker: appearance.marker(for: $0, widgetContext: true), style: style.markerStyle, completed: $0.isCompleted) }
@@ -40,26 +44,37 @@ struct WidgetLayoutMetrics: Equatable {
         let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
         let line = max(1, fontLineHeight)
         let date = dateLineHeight ?? max(11, line * 0.65)
-        func rowHeight(_ index: Int, _ lines: Int) -> Double {
-            max(marks[index] + (marks[index] > 0 ? vertical : 0), line * Double(lines) + (candidates[index].schedule == nil ? 0 : date + 2)) + padding
+        let actualFont = font ?? NativeTypography.font(family: style.font, weight: style.weight, size: style.fontSize)
+        let secondaryFont = NativeTypography.font(family: style.font, weight: style.weight, size: CTFontGetSize(actualFont) * secondaryScale)
+        let secondaryLines = candidates.map { item in secondaryText[item.id].map { WidgetTitleMeasure.lineHeight($0, font: secondaryFont) } ?? 0 }
+        let secondaryGap = max(0, style.spacing) / 2
+        func textTop(_ index: Int) -> Double { alignsMarkerToFirstLine && marks[index] > 0 ? max(0, (marks[index] + vertical - line) / 2) : 0 }
+        func extraHeight(_ index: Int, _ lines: Int) -> Double { lines > 0 ? secondaryLines[index] * Double(lines) + secondaryGap : 0 }
+        func rowHeight(_ index: Int, _ lines: Int, _ secondary: Int = 0) -> Double {
+            max(marks[index] + (marks[index] > 0 ? vertical : 0), textTop(index) + line * Double(lines) + extraHeight(index, secondary) + (candidates[index].schedule == nil ? 0 : date + 2)) + padding
         }
         let minimum = candidates.isEmpty ? line : rowHeight(0, 1)
         let footerFits = style.footerVisible && afterHeader >= minimum + footerHeight + spacing
         let footer = footerFits ? footerHeight : 0
         let rowSpace = max(0, afterHeader - (footerFits ? footer + spacing : 0))
-        let limit = style.maximumTitleLines ?? (family == .small ? 2 : 3)
-        let actualFont = font ?? NativeTypography.font(family: style.font, weight: style.weight, size: style.fontSize)
+        let limit = max(1, maximumLinesOverride ?? style.maximumTitleLines ?? (family == .small ? 2 : 3))
         let columnWidth = max(1, width - marker - gap)
         var rows: [WidgetRowMetrics] = [], used = 0.0
         for (index, item) in candidates.enumerated() {
             let needed = WidgetTitleMeasure.lines(item.title, font: actualFont, width: columnWidth)
             var lines = min(limit, needed)
+            let secondaryNeeded = secondaryText[item.id].map { WidgetTitleMeasure.lines($0, font: secondaryFont, width: columnWidth) } ?? 0
+            var secondary = min(limit, secondaryNeeded)
             let remaining = rowSpace - used - (rows.isEmpty ? 0 : spacing)
-            while lines > 0 && rowHeight(index, lines) > remaining + 0.00001 { lines -= 1 }
+            while lines > 0 && rowHeight(index, lines, secondary) > remaining + 0.00001 {
+                if secondary > 1 && (secondary >= lines || lines == 1) { secondary -= 1 }
+                else { lines -= 1 }
+            }
             guard lines > 0 else { break }
-            let row = WidgetRowMetrics(id: item.id, lineLimit: lines, height: rowHeight(index, lines), dateHeight: item.schedule == nil ? 0 : date + 2)
+            let row = WidgetRowMetrics(id: item.id, lineLimit: lines, height: rowHeight(index, lines, secondary), dateHeight: item.schedule == nil ? 0 : date + 2,
+                secondaryLineLimit: secondary, secondaryHeight: extraHeight(index, secondary), textTopInset: textTop(index))
             used += row.height + (rows.isEmpty ? 0 : spacing); rows.append(row)
-            if lines < min(limit, needed) { break }
+            if lines < min(limit, needed) || secondary < min(limit, secondaryNeeded) { break }
         }
         return WidgetLayoutMetrics(rows: rows, markerWidth: marker, gap: gap, lineHeight: line,
             headerHeight: header, footerHeight: footer, separatorHeight: 0, spacing: spacing,
@@ -70,6 +85,12 @@ struct WidgetLayoutMetrics: Equatable {
 // 字体名称/字号/字重描述、完整标题和列宽共同组成有界缓存键。
 enum WidgetTitleMeasure {
     private static let cache = NSCache<NSString, NSNumber>()
+    static func lineHeight(_ text: String, font: CTFont) -> Double {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]) as CFAttributedString)
+        var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+        CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
+        return ceil(max(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font), ascent + descent + leading)) + 1
+    }
     static func lines(_ text: String, font: CTFont, width: Double) -> Int {
         let key = "\(CTFontCopyPostScriptName(font)):\(CTFontGetSize(font)):\(CTFontCopyTraits(font)):\(width):\(text)" as NSString
         if let value = cache.object(forKey: key) { return value.intValue }

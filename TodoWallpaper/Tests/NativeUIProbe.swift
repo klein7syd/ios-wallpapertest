@@ -586,6 +586,24 @@ enum NativeUIProbe {
                 }
             }
             report["lianxin_shared_content_matrix"] = lianxinImages
+            var translationImages = 0
+            for family in WidgetPreviewFamily.allCases {
+                for type in [DynamicTypeSize.large, .xxxLarge, .accessibility3] {
+                    for mode in LianxinTranslationDisplay.allCases {
+                        var style = WidgetAppearance(); style.lianxinMarker = TodoMarker(kind: .emoji, emoji: "🌙")
+                        style.lianxinDisplayStyle = LianxinDisplayStyle(translationDisplay: mode)
+                        let content = LianxinPublication(idol: "成员", text: String(String(repeating: "中文과한국어今天也辛苦了", count: 20).prefix(200)), photo: nil, date: .now,
+                            translation: String(String(repeating: "한국어와中文，오늘도 잘 자요。", count: 20).prefix(200)), signatureSubtitle: "公开团体")
+                        let image = try render(LianxinWidgetContent(content: content, style: style, family: family)
+                            .padding(16).frame(width: family.width, height: family.height).background(.white)
+                            .environment(\.colorScheme, .light).environment(\.dynamicTypeSize, type),
+                            name: "lianxin-translation-\(family.id)-\(translationImages)", directory: output, scale: 2)
+                        try require(image.width == Int(family.width * 2) && image.height == Int(family.height * 2), "双语/标记/标题共享视图尺寸与组件一致")
+                        translationImages += 1
+                    }
+                }
+            }
+            report["lianxin_translation_marker_title_matrix"] = translationImages
             var measuredFonts: [String: Double] = [:]; var matrix = 0
             appearance.widget.markerStyle.emojiSize = 48; appearance.widget.markerStyle.gap = 32
             for (name, type, category) in types {

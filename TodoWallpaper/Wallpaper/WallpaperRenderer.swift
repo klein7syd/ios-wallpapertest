@@ -25,10 +25,15 @@ struct WallpaperRow {
     let marker: TodoMarker
     let markerTop: CGFloat
     let markerSize: CGFloat
+    var secondary: WallpaperTextBlock?
+    var secondaryTop: CGFloat = 0
 }
 struct WallpaperSupplement {
     let block: WallpaperTextBlock
     let top: CGFloat
+    var x: CGFloat?
+    var width: CGFloat?
+    var alignment: WallpaperAlignment?
 }
 struct WallpaperLayout {
     let canvas: CGSize
@@ -43,6 +48,14 @@ struct WallpaperLayout {
     let emptyTop: CGFloat
     var supplements: [WallpaperSupplement] = []
     var lianxinOverflow = false
+    var headings: [WallpaperSupplement] = []
+    var drawMarkerStyle: MarkerStyle?
+    var lianxinLineOverflow = false
+    var lianxinMissingTranslation = false
+    var revision = UUID()
+    var lianxinIssue: WallpaperError? {
+        lianxinMissingTranslation ? .translationMissing : lianxinLineOverflow ? .lineLimitExceeded : lianxinOverflow ? .contentOverflow : nil
+    }
 }
 struct WallpaperRendered {
     let image: CGImage
@@ -73,11 +86,11 @@ enum WallpaperRenderer {
     }
 
     static func text(_ title: String, width: CGFloat, settings: WallpaperSettings,
-                     opacity: Double = 1, size: CGFloat? = nil, maxLines: Int? = nil) -> WallpaperTextBlock {
+                     opacity: Double = 1, size: CGFloat? = nil, maxLines: Int? = nil, textColor: WallpaperColor? = nil) -> WallpaperTextBlock {
         let chosenFont = font(settings, size: size)
         let attributed = NSAttributedString(string: title, attributes: [
             NSAttributedString.Key(kCTFontAttributeName as String): chosenFont,
-            NSAttributedString.Key(kCTForegroundColorAttributeName as String): color(effectiveTextColor(settings), opacity: opacity)
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): color(textColor ?? effectiveTextColor(settings), opacity: opacity)
         ])
         let typesetter = CTTypesetterCreateWithAttributedString(attributed as CFAttributedString)
         let length = attributed.length
@@ -120,61 +133,98 @@ enum WallpaperRenderer {
     }
 
     static func layout(settings raw: WallpaperSettings, items: [TodoItem], appearance: TodoAppearance = TodoAppearance(), content: LianxinPublication? = nil) throws -> WallpaperLayout {
-        let settings = try raw.validated()
+        var settings = try raw.validated()
+        let display = settings.lianxinDisplay
+        if content != nil { settings.alignment = display.centered ? .center : .leading }
+        let presentation = content.map { LianxinPresentation($0, style: display) }
+        let sourceItems = presentation.map { [$0.item] } ?? items
         let canvas = CGSize(width: logicalWidth, height: settings.logicalHeight)
         let margin: CGFloat = 8
-        let panelWidth: CGFloat = canvas.width * CGFloat(settings.panelWidth)
-        let padding: CGFloat = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
-        let visibleItems = Array(settings.filtered(items).prefix(settings.maximumItems))
-        let markerStyle = appearance.markerStyle
-        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: settings.marker(for: $0, appearance: appearance), style: markerStyle, completed: false) }.max() ?? 0
+        let panelWidth = canvas.width * CGFloat(settings.panelWidth)
+        let padding = min(CGFloat(settings.padding), max(8, (panelWidth - 50) / 2))
+        let visibleItems = Array(settings.filtered(sourceItems).prefix(settings.maximumItems))
+        let markerStyle = content == nil ? appearance.markerStyle : (appearance.lianxinWallpaperMarkerStyle ?? MarkerStyle())
+        func marker(_ item: TodoItem) -> TodoMarker {
+            if content != nil { return display.translationDisplay == .translation ? TodoMarker(kind: .none) : (appearance.lianxinWallpaperMarker ?? TodoMarker(kind: .none)) }
+            return settings.marker(for: item, appearance: appearance)
+        }
+        let markerWidth = visibleItems.map { MarkerDrawing.extent(marker: marker($0), style: markerStyle, completed: false) }.max() ?? 0
         let markerColumn: CGFloat = markerWidth > 0 ? CGFloat(markerWidth + markerStyle.gap) : 0
-        let textWidth: CGFloat = max(12, panelWidth - 2 * padding - markerColumn)
+        let textWidth = max(12, panelWidth - 2 * padding - markerColumn)
         let itemSpacing = CGFloat(settings.itemSpacing)
-        let filtered = settings.filtered(items)
+        let filtered = settings.filtered(sourceItems)
         let candidates = Array(filtered.prefix(settings.maximumItems))
-        var blocks: [(TodoItem, WallpaperTextBlock)] = []
+        func limit(_ title: String) -> Int? {
+            guard content != nil else { return nil }
+            if let explicit = display.maximumLines, explicit > 0 { return explicit }
+            return max(1, title.utf16.count) // 自动/不限按面板实际高度容纳，不使用待办上限。
+        }
+        let secondaryGap = CGFloat(settings.lineSpacing) / 2
+        var blocks: [(TodoItem, WallpaperTextBlock, WallpaperTextBlock?)] = []
         for item in candidates {
-            // 连心只受面板实际高度限制，不使用待办每项行数上限。
-            blocks.append((item, text(item.title, width: textWidth, settings: settings, maxLines: content == nil ? nil : max(1, item.title.utf16.count))))
+            let secondary: WallpaperTextBlock?
+            if let title = presentation?.secondary {
+                secondary = text(title, width: textWidth, settings: settings,
+                    opacity: display.translationOpacity, size: settings.fontSize * display.translationScale, maxLines: limit(title))
+            } else { secondary = nil }
+            blocks.append((item, text(item.title, width: textWidth, settings: settings, maxLines: limit(item.title)), secondary))
         }
         var supplementBlocks: [WallpaperTextBlock] = []
         if let content {
-            if appearance.widget.lianxinShowsSignature != false {
-                supplementBlocks.append(text(content.idol, width: textWidth, settings: settings, opacity: 0.8, size: min(13, settings.fontSize), maxLines: 8))
-            }
-            if settings.lianxinShowsCreationLabel == true {
-                supplementBlocks.append(text(content.contentLabel, width: textWidth, settings: settings, opacity: 0.7, size: min(11, settings.fontSize), maxLines: 8))
+            for annotation in LianxinPresentation.annotations(content, style: display) {
+                supplementBlocks.append(text(annotation, width: panelWidth - 2 * padding, settings: settings, opacity: 0.8,
+                    size: min(13, settings.fontSize), maxLines: max(1, annotation.utf16.count)))
             }
         }
         let supplementHeight = supplementBlocks.reduce(CGFloat.zero) { $0 + $1.height + 4 }
-        let empty = filtered.isEmpty ? text(items.isEmpty ? "还没有待办" : "今天的待办都完成了",
+        var headingMetrics: WidgetHeaderLayout?
+        var titleBlock: WallpaperTextBlock?, summaryBlock: WallpaperTextBlock?
+        if let content {
+            let header = LianxinPresentation.header(settings.lianxinHeader ?? WidgetHeaderAppearance(), customTitle: settings.lianxinCustomTitle,
+                member: content.idol, subtitle: content.signatureSubtitle)
+            var headerSettings = settings; headerSettings.font = header.font; headerSettings.weight = header.weight
+            headerSettings.fontSize = header.fontSize; headerSettings.lineSpacing = 0
+            let titleColor = header.followsTextColor ? effectiveTextColor(settings) : header.color
+            let measured = text(header.text, width: 10000, settings: headerSettings, maxLines: 1, textColor: titleColor)
+            let summary = text(content.signatureSubtitle ?? "", width: 10000, settings: settings, opacity: 0.7, size: 11, maxLines: 1)
+            let metrics = WidgetHeaderLayout.make(style: header, width: panelWidth - 2 * padding, maximumHeight: canvas.height * 0.6,
+                measuredTitleWidth: ceil(measured.lines.map { CTLineGetTypographicBounds($0, nil, nil, nil) }.max() ?? 0), titleLineHeight: measured.height,
+                measuredSummaryWidth: ceil(summary.lines.map { CTLineGetTypographicBounds($0, nil, nil, nil) }.max() ?? 0), summaryHeight: summary.height)
+            headingMetrics = metrics
+            if header.visibleTitle { titleBlock = text(header.text, width: metrics.titleWidth, settings: headerSettings, maxLines: 2, textColor: titleColor) }
+            if header.showsSummary { summaryBlock = text(content.signatureSubtitle ?? "", width: metrics.summaryWidth, settings: settings, opacity: 0.7, size: 11, maxLines: 1) }
+        }
+        let headingHeight = CGFloat(headingMetrics?.height ?? 0)
+        let headingGap = headingHeight > 0 ? itemSpacing : 0
+        let edge = content == nil ? 0 : CGFloat(settings.lianxinEdgeInset ?? 0)
+        let empty = filtered.isEmpty ? text(sourceItems.isEmpty ? "还没有待办" : "今天的待办都完成了",
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
-        func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
-            let extent = CGFloat(MarkerDrawing.extent(marker: settings.marker(for: pair.0, appearance: appearance), style: markerStyle, completed: false))
+        func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock, WallpaperTextBlock?)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
+            let extent = CGFloat(MarkerDrawing.extent(marker: marker(pair.0), style: markerStyle, completed: false))
             let lineHeight = pair.1.ascent + CTFontGetDescent(pair.1.font)
             let textOffset = max(0, (extent - lineHeight) / 2) + max(0, -CGFloat(markerStyle.verticalOffset))
             let markerOffset = max(0, (lineHeight - extent) / 2) + max(0, CGFloat(markerStyle.verticalOffset))
-            return (max(pair.1.height + textOffset, extent + markerOffset), textOffset, markerOffset, extent)
+            let textHeight = pair.1.height + (pair.2.map { $0.height + secondaryGap } ?? 0)
+            return (max(textHeight + textOffset, extent + markerOffset), textOffset, markerOffset, extent)
         }
         var allHeight: CGFloat = 0
         for pair in blocks { allHeight += rowMetrics(pair).height }
         allHeight += CGFloat(max(0, blocks.count - 1)) * itemSpacing
-        let contentHeight: CGFloat = (empty?.height ?? allHeight) + supplementHeight
+        let contentHeight = (empty?.height ?? allHeight) + supplementHeight + headingHeight + headingGap + edge
         let footerHeight: CGFloat = filtered.count > candidates.count ? reserveFooter.height + 12 : 0
-        let naturalHeight: CGFloat = contentHeight + padding * 2 + footerHeight
-        let requestedHeight: CGFloat = settings.automaticHeight ? naturalHeight : canvas.height * CGFloat(settings.panelHeight)
-        let height: CGFloat = min(canvas.height - margin * 2, max(padding * 2 + 28, requestedHeight))
-        let desiredX: CGFloat = CGFloat(settings.customPosition ? settings.panelX : 0.5) * canvas.width
-        let desiredY: CGFloat = CGFloat(settings.customPosition ? settings.panelY : 0.5) * canvas.height
+        let naturalHeight = contentHeight + padding * 2 + footerHeight
+        let requestedHeight = settings.automaticHeight ? naturalHeight : canvas.height * CGFloat(settings.panelHeight)
+        let height = min(canvas.height - margin * 2, max(padding * 2 + 28, requestedHeight))
+        let desiredX = CGFloat(settings.customPosition ? settings.panelX : 0.5) * canvas.width
+        let desiredY = CGFloat(settings.customPosition ? settings.panelY : 0.5) * canvas.height
         let x = min(canvas.width - panelWidth - margin, max(margin, desiredX - panelWidth / 2))
         let y = min(canvas.height - height - margin, max(margin, desiredY - height / 2))
         let panel = CGRect(x: x, y: y, width: panelWidth, height: height)
         let usable = max(0, height - 2 * padding)
         var rows: [WallpaperRow] = []
-        var used: CGFloat = 0
+        var used = headingHeight + headingGap + edge
         for (index, pair) in blocks.enumerated() {
             let spacing: CGFloat = rows.isEmpty ? 0 : itemSpacing
             let reserve: CGFloat = (filtered.count > index + 1 ? reserveFooter.height + 12 : 0) + supplementHeight
@@ -183,7 +233,8 @@ enum WallpaperRenderer {
             used += spacing
             let top = panel.minY + padding + used
             rows.append(WallpaperRow(item: pair.0, block: pair.1, top: top + metrics.textOffset,
-                marker: settings.marker(for: pair.0, appearance: appearance), markerTop: top + metrics.markerOffset, markerSize: metrics.extent))
+                marker: marker(pair.0), markerTop: top + metrics.markerOffset, markerSize: metrics.extent,
+                secondary: pair.2, secondaryTop: top + metrics.textOffset + pair.1.height + secondaryGap))
             used += metrics.height
         }
         let hidden = max(0, filtered.count - rows.count)
@@ -204,10 +255,21 @@ enum WallpaperRenderer {
             used += 4
             supplements.append(WallpaperSupplement(block: block, top: panel.minY + padding + used)); used += block.height
         }
+        var headings: [WallpaperSupplement] = []
+        if let metrics = headingMetrics {
+            if let titleBlock { headings.append(WallpaperSupplement(block: titleBlock, top: panel.minY + padding + edge,
+                x: panel.minX + padding + metrics.titleX, width: metrics.titleWidth, alignment: .leading)) }
+            if let summaryBlock { headings.append(WallpaperSupplement(block: summaryBlock, top: panel.minY + padding + edge,
+                x: panel.minX + padding + metrics.summaryX, width: metrics.summaryWidth, alignment: .trailing)) }
+        }
+        let lineOverflow = blocks.contains { $0.1.truncated || $0.2?.truncated == true }
+        let missingTranslation = content != nil && display.translationDisplay == .translation && presentation?.primary.isEmpty != false
         return WallpaperLayout(canvas: canvas, panel: panel, markerColumn: markerColumn, textWidth: textWidth, rows: rows,
             hiddenCount: hidden, footer: content == nil ? footer : nil, footerTop: panel.maxY - padding - (footer?.height ?? 0),
             emptyText: fittedEmpty, emptyTop: panel.minY + padding, supplements: supplements,
-            lianxinOverflow: content != nil && (hidden > 0 || rows.isEmpty || blocks.contains { $0.1.truncated } || supplementBlocks.contains { $0.truncated }))
+            lianxinOverflow: content != nil && (hidden > 0 || rows.isEmpty || lineOverflow || missingTranslation),
+            headings: headings, drawMarkerStyle: content == nil ? nil : markerStyle, lianxinLineOverflow: content != nil && lineOverflow,
+            lianxinMissingTranslation: missingTranslation)
     }
 
     static func photoInfo(at url: URL) throws -> WallpaperPhotoInfo {
@@ -333,8 +395,10 @@ enum WallpaperRenderer {
         return WallpaperRendered(image: image, layout: layout, sourceInfo: sourceInfo, sourceIsSoft: soft)
     }
 
-    static func drawContent(layout: WallpaperLayout, settings: WallpaperSettings,
+    static func drawContent(layout: WallpaperLayout, settings raw: WallpaperSettings,
                             appearance: TodoAppearance, context: CGContext, assetDirectory: URL? = nil) {
+        var settings = raw
+        if layout.drawMarkerStyle != nil { settings.alignment = settings.lianxinDisplay.centered ? .center : .leading }
         context.saveGState()
         let panel = native(layout.panel, height: layout.canvas.height)
         context.clip(to: panel)
@@ -344,10 +408,14 @@ enum WallpaperRenderer {
             let placement = rowPlacement(row, layout: layout, settings: settings)
             let rect = CGRect(x: placement.markerX, y: layout.canvas.height - row.markerTop - row.markerSize,
                               width: row.markerSize, height: row.markerSize)
-            MarkerDrawing.draw(marker: row.marker, completed: false, style: appearance.markerStyle,
+            MarkerDrawing.draw(marker: row.marker, completed: false, style: layout.drawMarkerStyle ?? appearance.markerStyle,
                                textColor: textColor, rect: rect, context: context, assetDirectory: assetDirectory)
             drawText(row.block, in: context, x: placement.textX, top: row.top,
                 width: placement.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment)
+            if let secondary = row.secondary {
+                drawText(secondary, in: context, x: placement.textX, top: row.secondaryTop,
+                    width: placement.textWidth, canvasHeight: layout.canvas.height, alignment: settings.alignment)
+            }
         }
         if let empty = layout.emptyText {
             drawText(empty, in: context, x: panel.minX + padding, top: layout.emptyTop,
@@ -357,9 +425,9 @@ enum WallpaperRenderer {
             drawText(footer, in: context, x: panel.minX + padding, top: layout.footerTop,
                 width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
         }
-        for supplement in layout.supplements {
-            drawText(supplement.block, in: context, x: panel.minX + padding, top: supplement.top,
-                width: panel.width - 2 * padding, canvasHeight: layout.canvas.height, alignment: settings.alignment)
+        for supplement in layout.headings + layout.supplements {
+            drawText(supplement.block, in: context, x: supplement.x ?? (panel.minX + padding), top: supplement.top,
+                width: supplement.width ?? (panel.width - 2 * padding), canvasHeight: layout.canvas.height, alignment: supplement.alignment ?? settings.alignment)
         }
         context.restoreGState()
     }
@@ -369,7 +437,7 @@ enum WallpaperRenderer {
     static func rowPlacement(_ row: WallpaperRow, layout: WallpaperLayout, settings: WallpaperSettings)
         -> (markerX: CGFloat, textX: CGFloat, textWidth: CGFloat) {
         let padding = min(CGFloat(settings.padding), max(8, (layout.panel.width - 50) / 2))
-        let measured = row.block.lines.map { CGFloat(CTLineGetTypographicBounds($0, nil, nil, nil)) }.max() ?? 0
+        let measured = (row.block.lines + (row.secondary?.lines ?? [])).map { CGFloat(CTLineGetTypographicBounds($0, nil, nil, nil)) }.max() ?? 0
         let textWidth = min(layout.textWidth, max(1, ceil(measured)))
         let inner = layout.panel.width - 2 * padding
         let groupWidth = layout.markerColumn + textWidth
@@ -457,7 +525,7 @@ actor WallpaperRenderService {
         defer { context.clearCaches() }
         return try autoreleasepool {
             let rendered = try WallpaperRenderer.render(settings: settings, items: items, photoURL: photoURL, ciContext: context, appearance: appearance, content: content)
-            if rendered.layout.lianxinOverflow { throw WallpaperError.contentOverflow }
+            if let issue = rendered.layout.lianxinIssue { throw issue }
             try Task.checkCancellation()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let url = directory.appendingPathComponent("TodoWallpaper-\(settings.size.width)x\(settings.size.height)-\(UUID()).png")

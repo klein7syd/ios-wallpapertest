@@ -4,10 +4,10 @@ import Foundation
 enum PhotoAssetReferences {
     static func marker(_ value: TodoMarker?) -> Set<String> { Set([value?.imageName].compactMap { $0 }) }
     static func widget(_ value: WidgetAppearance) -> Set<String> {
-        marker(value.markerOverride).union([value.backgroundPhotoName].compactMap { $0 })
+        marker(value.markerOverride).union(marker(value.lianxinMarker)).union([value.backgroundPhotoName].compactMap { $0 })
             .union(value.photoRotation?.photos ?? [])
     }
-    static func appearance(_ value: TodoAppearance) -> Set<String> { marker(value.defaultMarker).union(widget(value.widget)).union(value.lianxin.map(widget) ?? []) }
+    static func appearance(_ value: TodoAppearance) -> Set<String> { marker(value.defaultMarker).union(widget(value.widget)).union(value.lianxin.map(widget) ?? []).union(marker(value.lianxinWallpaperMarker)) }
     static func items(_ values: [TodoItem]) -> Set<String> { values.reduce(into: Set<String>()) { $0.formUnion(marker($1.marker)) } }
 }
 

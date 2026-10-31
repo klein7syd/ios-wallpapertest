@@ -49,6 +49,12 @@ for UI_SCREEN in wallpaper-advanced wallpaper-marker widget-standard widget-text
     xcrun simctl io "$UI_SIMULATOR" screenshot "TodoWallpaper/out/ios-ui-checks/actual-$UI_SCREEN.png" >/dev/null 2>&1
 done
 xcrun simctl terminate "$UI_SIMULATOR" org.todowallpaper.app >/dev/null
+xcrun simctl ui "$UI_SIMULATOR" appearance dark
+xcrun simctl launch "$UI_SIMULATOR" org.todowallpaper.app --native-ui-probe --native-lianxin-screen >/dev/null
+sleep 2
+xcrun simctl io "$UI_SIMULATOR" screenshot TodoWallpaper/out/ios-ui-checks/actual-lianxin-dark.png >/dev/null 2>&1
+xcrun simctl ui "$UI_SIMULATOR" appearance light
+xcrun simctl terminate "$UI_SIMULATOR" org.todowallpaper.app >/dev/null
 xcrun simctl launch "$UI_SIMULATOR" org.todowallpaper.app --native-ui-probe --native-widget-screen --native-widget-text --native-advanced >/dev/null
 sleep 2
 if xcrun simctl ui "$UI_SIMULATOR" content_size accessibility-extra-extra-extra-large >/dev/null 2>&1; then

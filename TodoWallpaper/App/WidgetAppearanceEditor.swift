@@ -55,6 +55,12 @@ struct WidgetAppearanceEditor: View {
     private var widget: Binding<WidgetAppearance> {
         Binding(get: { editingAppearance.widget }, set: { var next = editingAppearance; next.widget = $0; setEditingAppearance(next) })
     }
+    private var lianxinDisplay: Binding<LianxinDisplayStyle> {
+        Binding(get: { widget.wrappedValue.lianxinDisplay }, set: { widget.wrappedValue.lianxinDisplayStyle = $0 })
+    }
+    private var lianxinMarker: Binding<TodoMarker> {
+        Binding(get: { widget.wrappedValue.lianxinMarker ?? TodoMarker(kind: .none) }, set: { widget.wrappedValue.lianxinMarker = $0 })
+    }
     private var photoCrop: Binding<PhotoCrop> {
         Binding(get: { editingAppearance.widget.photoCrop }, set: { widget.wrappedValue.backgroundCrop = $0 })
     }
@@ -68,7 +74,7 @@ struct WidgetAppearanceEditor: View {
     }
     private var editState: WidgetEditState {
         WidgetEditState(style: editingAppearance.widget,
-            markers: store.items.map { TaskMarkerState(id: $0.id, marker: $0.marker) }.sorted { $0.id.uuidString < $1.id.uuidString })
+            markers: isLianxin ? [] : store.items.map { TaskMarkerState(id: $0.id, marker: $0.marker) }.sorted { $0.id.uuidString < $1.id.uuidString })
     }
     private var layoutScale: Binding<Double> {
         Binding(get: { editingAppearance.widget.fontSize / 15 },
@@ -151,7 +157,7 @@ struct WidgetAppearanceEditor: View {
                     }
                 }
                 .frame(maxHeight: .infinity).accessibilityIdentifier("widget.settings")
-                EditorToolPicker(choices: WidgetEditorTool.allCases.filter { !isLianxin || $0 != .marker }, selection: $tool,
+                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
                     title: { $0.rawValue }, compact: geometry.size.height < 320)
                     .padding(.horizontal, 16).padding(.vertical, 6)
                     .accessibilityIdentifier("widget.tools")
@@ -307,6 +313,9 @@ struct WidgetAppearanceEditor: View {
                             WidgetPhotoMotionSurface(image: image, crop: photoCrop, opacity: editingAppearance.widget.photoOpacity,
                                 background: scheme == .dark ? UIColor(white: 0.09, alpha: 1) : .white)
                         } else {
+                            if isLianxin {
+                                LianxinWidgetBackground(content: lianxinModel.publication, style: editingAppearance.widget, family: family, date: photoDate)
+                            } else {
                             let readable = ReadableResolver.scrim(style: editingAppearance.widget, date: photoDate, scheme: scheme,
                                 canvasAspect: family.width / family.height)
                             WidgetBackgroundView(style: editingAppearance.widget, date: photoDate,
@@ -314,6 +323,7 @@ struct WidgetAppearanceEditor: View {
                                                  scrimHeightRatio: editingAppearance.widget.readable.heightRatio,
                                                  scrimColor: readable.color, scrimExtraInset: editingAppearance.widget.readable.edgeInset,
                                                  contentGeometry: readableGeometry)
+                            }
                         }
                     }
                     .environment(\.colorScheme, scheme)
@@ -381,9 +391,15 @@ struct WidgetAppearanceEditor: View {
         InspectorGroupTitle(title: "标题与位置", detail: "标题内容与整块文字的位置在这里调整。")
         PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
         Toggle("显示标题", isOn: heading.showsTitle)
+        if isLianxin {
+            Toggle("显示团体摘要", isOn: heading.showsSummary)
+            Text("团体摘要属于公开署名，会随话语同步到小组件。").font(.caption).foregroundStyle(.secondary)
+        }
         if editingAppearance.widget.heading.showsTitle {
-            if isLianxin { Text("标题固定使用IDOL名字：" + lianxinModel.profile.idolName).font(.caption) }
-            else {
+            if isLianxin {
+                TextField("默认：" + lianxinModel.publication.idol, text: Binding(get: { widget.wrappedValue.lianxinCustomTitle ?? "" }, set: { widget.wrappedValue.lianxinCustomTitle = String($0.filter { !$0.isNewline }.prefix(40)) }))
+                Text("留空时使用成员名。").font(.caption).foregroundStyle(.secondary)
+            } else {
             TextField("标题内容", text: Binding(get: { editingAppearance.widget.heading.text }, set: { text in
                 edits.context(read: { editState }).pulse("widget.title")
                 heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
@@ -428,9 +444,12 @@ struct WidgetAppearanceEditor: View {
             PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
         }
         Toggle("紧凑布局", isOn: widget.compact)
+        if !isLianxin {
         Picker("每项文字行数", selection: Binding(get: { editingAppearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("1 行").tag(1); Text("2 行").tag(2); Text("3 行").tag(3); Text("4 行").tag(4)
         }.pickerStyle(.menu)
+        }
+        if isLianxin && advanced { LianxinTranslationControls(value: lianxinDisplay) }
         if !isLianxin {
         Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { editingAppearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
@@ -530,6 +549,11 @@ struct WidgetAppearanceEditor: View {
         reloadWidget()
     }
     @ViewBuilder private var markerControls: some View {
+        if isLianxin {
+            MarkerChoiceEditor(choice: lianxinMarker)
+            MarkerStyleEditor(style: widget.markerStyle, kind: lianxinMarker.wrappedValue.kind, advanced: advanced, showsCompletion: false)
+            Text("标记只画在原文前，译文不带标记。").font(.caption).foregroundStyle(.secondary)
+        } else {
         Toggle("统一标记（对所有待办生效）", isOn: Binding(
             get: { editingAppearance.widget.unifiedMarkers ?? false },
             set: { widget.wrappedValue.unifiedMarkers = $0 }))
@@ -564,10 +588,11 @@ struct WidgetAppearanceEditor: View {
         if advanced {
             Text("继承壁纸的标记类型与 Emoji；大小、间距和完成效果在这里独立设置。").font(.caption).foregroundStyle(.secondary)
         }
+        }
     }
     private var selectedTask: TodoItem? { store.items.first { $0.id == selectedTaskID } }
     private var hasVisibleMarker: Bool {
-        if isLianxin { return false }
+        if isLianxin { return lianxinMarker.wrappedValue.kind != .none && lianxinDisplay.wrappedValue.translationDisplay != .translation }
         return         (editingAppearance.widget.markerOverride ?? editingAppearance.defaultMarker).kind != .none ||
         store.items.contains { editingAppearance.marker(for: $0, widgetContext: true).kind != .none }
     }
@@ -577,14 +602,7 @@ struct WidgetAppearanceEditor: View {
         catch { self.error = error.localizedDescription }
     }
     private var lianxinControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle("显示IDOL署名", isOn: Binding(get: { widget.wrappedValue.lianxinShowsSignature != false }, set: { widget.wrappedValue.lianxinShowsSignature = $0 }))
-            Toggle("文字居中", isOn: Binding(get: { widget.wrappedValue.lianxinCentered == true }, set: { widget.wrappedValue.lianxinCentered = $0 }))
-            Picker("最多行数", selection: Binding(get: { widget.wrappedValue.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
-                Text("自动").tag(0); ForEach(1...4, id: \.self) { Text("\($0)行").tag($0) }
-            }
-            Toggle("在小组件/壁纸上显示创作标注", isOn: Binding(get: { widget.wrappedValue.lianxinShowsCreationLabel == true }, set: { widget.wrappedValue.lianxinShowsCreationLabel = $0 }))
-        }
+        LianxinContentControls(value: lianxinDisplay, hasTranslation: !(lianxinModel.publication.translation ?? "").isEmpty)
     }
     @ViewBuilder private var contentControls: some View {
         InspectorGroupTitle(title: "显示内容", detail: "控制数量、筛选和辅助说明。")

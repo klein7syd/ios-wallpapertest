@@ -81,10 +81,14 @@
 | App/LianxinSetupView.swift | App | 服务商、密钥粘贴、连接测试与模型向导 | LianxinSetupView |
 | Tests/LianxinWizardChecks.swift | 独立 macOS 原生检查 | 官方预设完整性、清洗、迁移和离线体验 | LianxinWizardChecks |
 | Core/ContentMode.swift | App + Widget | 内容模式持久化与样式槽位 | ContentMode |
-| Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与默认关闭的可选标注 | LianxinWidgetContent |
+| Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与默认关闭的可选标注 | LianxinWidgetContent, LianxinWidgetBackground |
 | Core/WallpaperContentSource.swift | App + Widget | 待办/连心壁纸内容来源和强制分享标注 | WallpaperContentSource |
 | Tests/LianxinWallpaperChecks.swift | 独立 macOS 原生检查 | 连心长文完整折行、溢出阻止导出、PNG元数据和旧材质兼容 | LianxinWallpaperChecks |
 | App/LianxinRole.swift | App + macOS检查 | 私有角色资料、确认结果、提示词角色块、语言、宽容JSON与核对协议 | LianxinRoleResult, LianxinVerifiedProfile, LianxinJSON, LianxinFit, LianxinRoleRules, LianxinLanguageRules, LianxinGeneratedMessage, LianxinProfileChecking |
 | App/LianxinSamples.swift | App + macOS检查 | 四种语言的离线对应示例 | LianxinSamples |
 | App/LianxinRoleView.swift | App | 角色折叠表单、主动核对确认、语言与翻译卡片 | LianxinRoleView, LianxinLanguageView |
 | Tests/LianxinRoleChecks.swift | 独立 macOS原生检查 | 角色提示词、确认隔离、语言解析、共享隐私及离线模板 | LianxinRoleChecks |
+| Core/LianxinPresentation.swift | App + Widget | 发布内容的三种译文显示、独立样式、标题回退与标记适配 | LianxinTranslationDisplay, LianxinDisplayStyle, LianxinPresentation |
+| App/LianxinContentControls.swift | App | 两个编辑器的连心内容选项与译文高级参数 | LianxinContentControls, LianxinTranslationControls |
+| Tests/LianxinDisplayChecks.swift | 独立 macOS原生检查 | 次要行预算、标记、标题、三种显示及旧样式 | LianxinDisplayChecks |
+| Tests/LianxinDisplayRenderChecks.swift | 独立 macOS原生检查 | 生产壁纸双语、标题标记、字号及独立样式 | LianxinDisplayRenderChecks |

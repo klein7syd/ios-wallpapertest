@@ -63,6 +63,7 @@ enum RepositoryChecks {
         try MigrationChecks.run()
         try UIStateChecks.run()
         try WidgetWrappingChecks.run()
+        try LianxinDisplayChecks.run()
         try WidgetFeedbackChecks.run()
         try EditorRefinementChecks.run()
         try FeedbackRepairChecks.run()

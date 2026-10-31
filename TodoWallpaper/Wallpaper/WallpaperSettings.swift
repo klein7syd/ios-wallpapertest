@@ -48,6 +48,17 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     // Missing in older drafts: keep their existing per-task marker behavior.
     var usesTaskMarkers: Bool?
     var lianxinShowsCreationLabel: Bool?
+    var lianxinDisplayStyle: LianxinDisplayStyle?
+    var lianxinHeader: WidgetHeaderAppearance?
+    var lianxinCustomTitle: String?
+    var lianxinEdgeInset: Double?
+    var lianxinDisplay: LianxinDisplayStyle {
+        if let lianxinDisplayStyle { return lianxinDisplayStyle }
+        var value = LianxinDisplayStyle(); value.maximumLines = 0
+        value.showsCreationLabel = lianxinShowsCreationLabel == true
+        value.centered = alignment == .center
+        return value
+    }
     var inheritsTaskMarkers: Bool { usesTaskMarkers ?? true }
     func marker(for item: TodoItem, appearance: TodoAppearance) -> TodoMarker {
         inheritsTaskMarkers ? appearance.marker(for: item) : appearance.defaultMarker
@@ -69,6 +80,10 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
         v.maximumItems = min(20, max(1, maximumItems)); v.maximumLines = min(8, max(1, maximumLines))
         v.fontSize = c(fontSize, 10...38, 18); v.lineSpacing = c(lineSpacing, 0...20, 4)
         v.itemSpacing = c(itemSpacing, 0...36, 12)
+        v.lianxinDisplayStyle = lianxinDisplayStyle?.clamped
+        v.lianxinEdgeInset = lianxinEdgeInset.map { c($0, -min(12, v.padding)...40, 0) }
+        if let header = lianxinHeader { try header.validate() }
+        if let lianxinCustomTitle, lianxinCustomTitle.count > 40 || lianxinCustomTitle.contains(where: \.isNewline) { throw WallpaperError.invalidDraft }
         v.textColor.red = c(textColor.red, 0...1, 1); v.textColor.green = c(textColor.green, 0...1, 1)
         v.textColor.blue = c(textColor.blue, 0...1, 1); v.textColor.alpha = c(textColor.alpha, 0...1, 1)
         return v
@@ -95,7 +110,7 @@ struct WallpaperDraft: Codable, Sendable {
 }
 enum WallpaperError: LocalizedError {
     case ratioMismatch, invalidSize, unreadablePhoto, photoTooLarge, renderingFailed
-    case encodingFailed, dimensionsMismatch, photoPermission, unsupportedDraft, invalidDraft, contentOverflow
+    case encodingFailed, dimensionsMismatch, photoPermission, unsupportedDraft, invalidDraft, contentOverflow, lineLimitExceeded, translationMissing
     var errorDescription: String? {
         switch self {
         case .ratioMismatch: return "像素尺寸与画布比例不一致。请保持比例，或先设置自定义画布比例。"
@@ -109,6 +124,8 @@ enum WallpaperError: LocalizedError {
         case .unsupportedDraft: return "壁纸草稿来自较新版本，已保留原文件，当前未覆盖它。"
         case .invalidDraft: return "壁纸草稿无法读取，原文件已保留。可确认恢复默认以重新开始；待办不受影响。"
         case .contentOverflow: return "文字超出面板，请增大面板高度、减小字号或缩短话语"
+        case .lineLimitExceeded: return "话语超过所选行数，请改为不限或缩短话语后导出。"
+        case .translationMissing: return "还没有译文，请在连心开启翻译并生成，或改为显示原文。"
         }
     }
 }

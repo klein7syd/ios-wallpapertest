@@ -11,6 +11,8 @@ struct LianxinFieldStyle: TextFieldStyle {
 private struct LianxinPreviewInput: Equatable {
     let content: LianxinPublication
     let style: WidgetAppearance
+    let marker: TodoMarker?
+    let markerStyle: MarkerStyle?
 }
 struct LianxinView: View {
     @ObservedObject var model: LianxinModel
@@ -99,8 +101,8 @@ struct LianxinView: View {
                 Button("好") { model.error = nil }
             } message: { Text(model.error ?? "") }
             .onDisappear { model.cancel(); Task { await model.saveInputsNow() } }
-            .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } }
-            .task(id: LianxinPreviewInput(content: model.publication, style: store.appearance.style(in: .lianxin))) { await syncPreview() }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } else { Task { await syncPreview() } } }
+            .task(id: LianxinPreviewInput(content: model.publication, style: store.appearance.style(in: .lianxin), marker: store.appearance.lianxinWallpaperMarker, markerStyle: store.appearance.lianxinWallpaperMarkerStyle)) { await syncPreview() }
             .task(id: selection) { await importSelection() }
     }
 
@@ -163,10 +165,9 @@ struct LianxinView: View {
                 let scale = family.scale(availableWidth: proxy.size.width, availableHeight: proxy.size.height)
                 let style = store.appearance.style(in: .lianxin)
                 let scheme: ColorScheme = style.theme == .system ? systemScheme : (style.theme == .dark ? .dark : .light)
-                let readable = ReadableResolver.scrim(style: style, date: .now, scheme: scheme, canvasAspect: family.width / family.height)
                 LianxinWidgetContent(content: model.publication, style: style, family: family)
                     .padding(16).frame(width: family.width, height: family.height)
-                    .background { WidgetBackgroundView(style: style, scrim: readable.value, scrimAnchor: style.readable.anchor, scrimHeightRatio: style.readable.heightRatio, scrimColor: readable.color, scrimExtraInset: style.readable.edgeInset) }
+                    .background { LianxinWidgetBackground(content: model.publication, style: style, family: family) }
                     .environment(\.colorScheme, scheme)
                     .clipShape(RoundedRectangle(cornerRadius: 22)).scaleEffect(scale)
                     .frame(width: family.width * scale, height: family.height * scale)
@@ -177,7 +178,7 @@ struct LianxinView: View {
     }
     private var previewItems: [TodoItem] { WallpaperContentSource.lianxin(model.publication).items }
     private var previewAppearance: TodoAppearance {
-        var value = store.appearance; value.widget = value.style(in: .lianxin); value.defaultMarker = TodoMarker(kind: .none); return value
+        var value = store.appearance; value.widget = value.style(in: .lianxin); value.defaultMarker = value.lianxinWallpaperMarker ?? TodoMarker(kind: .none); value.markerStyle = value.lianxinWallpaperMarkerStyle ?? MarkerStyle(); return value
     }
     private func syncPreview() async {
         do {

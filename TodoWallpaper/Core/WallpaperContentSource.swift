@@ -14,5 +14,5 @@ enum WallpaperContentSource {
     }
 }
 extension LianxinPublication {
-    var shareText: String { text + (translation.flatMap { $0.isEmpty ? nil : "\n" + $0 } ?? "") + "\n—— " + idol + " · " + contentLabel }
+    var shareText: String { text + (translation.flatMap { $0.isEmpty ? nil : "\n" + $0 } ?? "") + "\n—— " + idol + (signatureSubtitle.map { " · " + $0 } ?? "") + " · " + contentLabel }
 }

@@ -10,12 +10,15 @@ struct LianxinPublication: Codable, Equatable {
     let date: Date
     var example: Bool?
     var translation: String?
+    // 公开署名摘要，供可开关的标题右侧团体文字使用；不是角色设定。
+    var signatureSubtitle: String?
     var contentLabel: String { example == true ? "示例内容，非 AI 生成" : "AI 创作" }
 
     func validate() throws {
         guard schemaVersion == 1, !idol.isEmpty, idol.count <= 100,
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 200,
               (translation?.count ?? 0) <= 200,
+              (signatureSubtitle?.count ?? 0) <= 100,
               (photo?.count ?? 0) <= 12 * 1024 * 1024 else { throw TodoDataError.invalidDocument }
     }
     static func load(directory: URL) throws -> LianxinPublication? {

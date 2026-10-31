@@ -60,11 +60,16 @@ extension WallpaperLayout {
         let y = min(canvas.height - panel.height - 8, max(8, desiredY - panel.height / 2))
         let moved = CGRect(x: x, y: y, width: panel.width, height: panel.height)
         let delta = moved.minY - panel.minY
+        let deltaX = moved.minX - panel.minX
         let movedRows = rows.map { WallpaperRow(item: $0.item, block: $0.block, top: $0.top + delta,
-            marker: $0.marker, markerTop: $0.markerTop + delta, markerSize: $0.markerSize) }
+            marker: $0.marker, markerTop: $0.markerTop + delta, markerSize: $0.markerSize, secondary: $0.secondary, secondaryTop: $0.secondaryTop + delta) }
+        func move(_ value: WallpaperSupplement) -> WallpaperSupplement {
+            WallpaperSupplement(block: value.block, top: value.top + delta, x: value.x.map { $0 + deltaX }, width: value.width, alignment: value.alignment)
+        }
         return WallpaperLayout(canvas: canvas, panel: moved, markerColumn: markerColumn, textWidth: textWidth,
             rows: movedRows, hiddenCount: hiddenCount, footer: footer, footerTop: footerTop + delta,
             emptyText: emptyText, emptyTop: emptyTop + delta,
-            supplements: supplements.map { WallpaperSupplement(block: $0.block, top: $0.top + delta) }, lianxinOverflow: lianxinOverflow)
+            supplements: supplements.map(move), lianxinOverflow: lianxinOverflow, headings: headings.map(move), drawMarkerStyle: drawMarkerStyle,
+            lianxinLineOverflow: lianxinLineOverflow, lianxinMissingTranslation: lianxinMissingTranslation, revision: revision)
     }
 }

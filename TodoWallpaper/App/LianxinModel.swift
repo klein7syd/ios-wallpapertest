@@ -104,7 +104,8 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var syncError: String?
     var publication: LianxinPublication { currentContent ?? LianxinPublication(idol: "连心", text: "", photo: nil, date: .distantPast) }
     private var draftContent: LianxinPublication {
-        LianxinPublication(idol: profile.idolName.isEmpty ? profile.messageIdol : profile.idolName, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent, translation: profile.translationEnabled == true ? profile.translation : nil)
+        LianxinPublication(idol: profile.idolName.isEmpty ? profile.messageIdol : profile.idolName, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent, translation: profile.translationEnabled == true ? profile.translation : nil,
+            signatureSubtitle: LianxinRoleRules.effective(profile.groupName, profile.verifiedProfile?.result.group).isEmpty ? nil : LianxinRoleRules.effective(profile.groupName, profile.verifiedProfile?.result.group))
     }
     private var syncTask: Task<Void, Never>?
     private var styleObserver: AnyCancellable?
@@ -377,8 +378,8 @@ final class LianxinModel: ObservableObject {
         syncTask?.cancel()
         let draft = draftContent
         guard (try? draft.validate()) != nil else { return } // 无效输入不覆盖上一份有效内容。
-        if currentContent?.text != draft.text || currentContent?.idol != draft.idol || currentContent?.example != draft.example || currentContent?.translation != draft.translation {
-            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example, translation: draft.translation)
+        if currentContent?.text != draft.text || currentContent?.idol != draft.idol || currentContent?.example != draft.example || currentContent?.translation != draft.translation || currentContent?.signatureSubtitle != draft.signatureSubtitle {
+            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example, translation: draft.translation, signatureSubtitle: draft.signatureSubtitle)
         }
         let content = publication
         syncTask = Task {

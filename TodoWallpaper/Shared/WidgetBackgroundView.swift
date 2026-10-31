@@ -22,6 +22,12 @@ struct WidgetBackgroundView: View {
     var contentFamily: WidgetPreviewFamily = .medium
     var contentMargins = EdgeInsets()
     var effectsFamily: WidgetFamily?
+    var contentSecondaryText: [UUID: String] = [:]
+    var contentSummaryText: String?
+    var contentAnnotations: [String] = []
+    var contentMaximumLines: Int?
+    var contentSecondaryScale = 0.85
+    var alignsMarkerToFirstLine = false
     @ScaledMetric(relativeTo: .body) private var bodyUnit = 15.0
     @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
     @ScaledMetric(relativeTo: .caption2) private var footerUnit = 11.0
@@ -35,7 +41,9 @@ struct WidgetBackgroundView: View {
                 WidgetContentLayout.make(document: contentDocument, appearance: $0, family: contentFamily,
                     width: max(0, geometry.size.width - contentMargins.leading - contentMargins.trailing),
                     height: max(0, geometry.size.height - contentMargins.top - contentMargins.bottom),
-                    bodyUnit: bodyUnit, headerUnit: headerUnit, footerUnit: footerUnit).geometry
+                    bodyUnit: bodyUnit, headerUnit: headerUnit, footerUnit: footerUnit,
+                    secondaryText: contentSecondaryText, summaryText: contentSummaryText, annotations: contentAnnotations,
+                    maximumLinesOverride: contentMaximumLines, secondaryScale: contentSecondaryScale, alignsMarkerToFirstLine: alignsMarkerToFirstLine).geometry
             }
             let effectiveInset = measured.map { ReadableRules.inset(scrimExtraInset, anchor: scrimAnchor,
                 canvasHeight: $0.canvasHeight, textHeight: $0.textHeight) } ?? scrimExtraInset

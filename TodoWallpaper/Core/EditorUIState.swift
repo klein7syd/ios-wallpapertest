@@ -14,15 +14,17 @@ enum AppPage: String, CaseIterable, Identifiable {
     }
 }
 enum WallpaperTool: String, CaseIterable, Identifiable {
-    case background, panel, text, marker, output
+    case background, panel, text, marker, output, header, content
     var id: String { rawValue }
     var title: String {
         switch self { case .background: return "背景"; case .panel: return "面板"; case .text: return "文字"
-        case .marker: return "标记"; case .output: return "导出" }
+        case .marker: return "标记"; case .output: return "导出"
+        case .header: return "标题"; case .content: return "内容" }
     }
     var icon: String {
         switch self { case .background: return "photo"; case .panel: return "rectangle.center.inset.filled"
-        case .text: return "textformat"; case .marker: return "face.smiling"; case .output: return "square.and.arrow.up" }
+        case .text: return "textformat"; case .marker: return "face.smiling"; case .output: return "square.and.arrow.up"
+        case .header: return "textformat.size"; case .content: return "text.alignleft" }
     }
 }
 struct AppNavigationState: Equatable {

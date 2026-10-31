@@ -17,6 +17,13 @@ struct TodoWidgetContent: View {
     var onPreviewHeader: (() -> Void)?
     var textAlignment: TextAlignment = .leading
     var effectsFamily: WidgetFamily?
+    var secondaryText: [UUID: String] = [:]
+    var summaryText: String?
+    var annotations: [String] = []
+    var maximumLinesOverride: Int?
+    var secondaryScale = 0.85
+    var secondaryOpacity = 0.8
+    var alignsMarkerToFirstLine = false
     @ScaledMetric(relativeTo: .body) private var bodyUnit = 15.0
     @ScaledMetric(relativeTo: .headline) private var headerUnit = 17.0
     @ScaledMetric(relativeTo: .caption2) private var footerUnit = 11.0
@@ -55,7 +62,9 @@ struct TodoWidgetContent: View {
             let items = document?.items ?? []
             let layout = WidgetContentLayout.make(document: document, appearance: appearance, family: family,
                 width: geometry.size.width, height: geometry.size.height,
-                bodyUnit: bodyUnit, headerUnit: headerUnit, footerUnit: footerUnit)
+                bodyUnit: bodyUnit, headerUnit: headerUnit, footerUnit: footerUnit,
+                secondaryText: secondaryText, summaryText: summaryText, annotations: annotations,
+                maximumLinesOverride: maximumLinesOverride, secondaryScale: secondaryScale, alignsMarkerToFirstLine: alignsMarkerToFirstLine)
             let headingMetrics = layout.header, metrics = layout.metrics, shown = layout.shown
             let inset = layout.inset
             VStack(alignment: .leading, spacing: 0) {
@@ -94,6 +103,13 @@ struct TodoWidgetContent: View {
                                   enabled: tone.enabled)
                         .frame(height: metrics.footerHeight).padding(.top, metrics.spacing)
                 }
+                ForEach(Array(annotations.enumerated()), id: \.offset) { _, text in
+                    Text(text).font(.system(size: footerUnit)).lineLimit(1)
+                        .foregroundStyle(foreground).opacity(0.8)
+                        .readableText(isLightText: textIsLight, intensity: settings.intensity, enabled: tone.enabled)
+                        .frame(maxWidth: .infinity, alignment: textAlignment == .center ? .center : .leading)
+                        .padding(.top, 3)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
             .foregroundStyle(foreground).clipped()
@@ -120,7 +136,7 @@ struct TodoWidgetContent: View {
                     .accessibilityLabel("小组件标题：\(heading.text)")
             }
             if heading.showsSummary {
-                Text("\(items.filter { !$0.isCompleted }.count) 未完成")
+                Text(summaryText ?? "\(items.filter { !$0.isCompleted }.count) 未完成")
                     .font(.system(size: footerUnit)).opacity(0.7).lineLimit(1).minimumScaleFactor(0.7)
                     .readableText(isLightText: textIsLight, intensity: settings.intensity,
                                   enabled: tone.enabled)
@@ -167,7 +183,7 @@ struct TodoWidgetContent: View {
         // 标题与日期共用同一份颜色与淡出，避免日期不跟随完成效果
         let rowColor = item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground
         let rowFade = item.isCompleted && style.textCompletion.fades ? 0.55 : 1
-        return VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: textAlignment == .center ? .center : .leading, spacing: 0) {
             Text(item.title).font(Font(titleFont))
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(rowFade)
@@ -177,15 +193,24 @@ struct TodoWidgetContent: View {
                 .readableText(isLightText: textIsLight, intensity: settings.intensity,
                               enabled: tone.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+            if let secondary = secondaryText[item.id], row.secondaryLineLimit > 0 {
+                Text(secondary).font(Font(NativeTypography.font(family: style.font, weight: style.weight, size: fontSize * secondaryScale)))
+                    .foregroundStyle(rowColor).opacity(secondaryOpacity * rowFade)
+                    .lineLimit(row.secondaryLineLimit).multilineTextAlignment(textAlignment)
+                    .frame(maxWidth: .infinity, alignment: textAlignment == .center ? .center : .leading)
+                    .readableText(isLightText: textIsLight, intensity: settings.intensity, enabled: tone.enabled)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, max(0, style.spacing) / 2)
+            }
             if let schedule = item.schedule {
                 // 日期不划线；淡出与标题一致
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1)
-                    .opacity(0.75 * rowFade)
+                    .padding(.top, 2).opacity(0.75 * rowFade)
                     .foregroundStyle(rowColor)
                     .readableText(isLightText: textIsLight, intensity: settings.intensity,
                                   enabled: tone.enabled)
             }
         }
+        .padding(.top, row.textTopInset)
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: row.height, alignment: .top).clipped()
 
     }
@@ -200,7 +225,9 @@ struct WidgetContentLayout {
     let inset: Double
 
     static func make(document: TodoDocument?, appearance: TodoAppearance, family: WidgetPreviewFamily,
-                     width: Double, height: Double, bodyUnit: Double, headerUnit: Double, footerUnit: Double) -> WidgetContentLayout {
+                     width: Double, height: Double, bodyUnit: Double, headerUnit: Double, footerUnit: Double,
+                     secondaryText: [UUID: String] = [:], summaryText: String? = nil, annotations: [String] = [],
+                     maximumLinesOverride: Int? = nil, secondaryScale: Double = 0.85, alignsMarkerToFirstLine: Bool = false) -> WidgetContentLayout {
         let items = document?.items ?? [], style = appearance.widget, settings = style.readable
         let fontSize = style.fontSize * bodyUnit / 15
         let font = NativeTypography.font(family: style.font, weight: style.weight, size: fontSize)
@@ -208,16 +235,18 @@ struct WidgetContentLayout {
         let heading = style.heading
         let headingFont = NativeTypography.font(family: heading.font, weight: heading.weight, size: heading.fontSize * headerUnit / 17)
         let title = measure(heading.text, font: headingFont)
-        let summary = measure("\(items.filter { !$0.isCompleted }.count) 未完成",
+        let summary = measure(summaryText ?? "\(items.filter { !$0.isCompleted }.count) 未完成",
             font: NativeTypography.font(family: .system, weight: .regular, size: footerUnit))
         let header = WidgetHeaderLayout.make(style: heading, width: width, maximumHeight: height * 0.6,
             measuredTitleWidth: title.width, titleLineHeight: title.height,
             measuredSummaryWidth: summary.width, summaryHeight: summary.height)
         let edge = ReadableRules.inset(settings.edgeInset, anchor: settings.anchor, canvasHeight: height, textHeight: 0)
+        let annotationHeight = Double(annotations.count) * (WidgetTitleMeasure.lineHeight("署名", font: NativeTypography.font(family: .system, weight: .regular, size: footerUnit)) + 3)
         let metrics = WidgetLayoutMetrics.make(items: items, appearance: appearance, family: family, width: width,
-            height: max(0, height - (settings.anchor == .center ? 0 : abs(edge))), fontLineHeight: lineHeight,
+            height: max(0, height - annotationHeight - (settings.anchor == .center ? 0 : abs(edge))), fontLineHeight: lineHeight,
             headerHeight: header.height, footerHeight: ceil(footerUnit * 1.3), font: font,
-            dateLineHeight: measure("日期", font: NativeTypography.font(family: .system, weight: .regular, size: max(10, fontSize * 0.68))).height)
+            dateLineHeight: measure("日期", font: NativeTypography.font(family: .system, weight: .regular, size: max(10, fontSize * 0.68))).height,
+            secondaryText: secondaryText, secondaryScale: secondaryScale, maximumLinesOverride: maximumLinesOverride, alignsMarkerToFirstLine: alignsMarkerToFirstLine)
         let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         let shown = metrics.rows.compactMap { byID[$0.id] }
         let rows: Double
@@ -225,7 +254,7 @@ struct WidgetContentLayout {
         else if items.isEmpty { rows = lineHeight }
         else { rows = metrics.usedHeight }
         let textHeight = (header.height > 0 ? header.height + metrics.spacing : 0) + rows
-            + (metrics.showsFooter ? metrics.footerHeight + metrics.spacing : 0)
+            + (metrics.showsFooter ? metrics.footerHeight + metrics.spacing : 0) + annotationHeight
         let geometry = ReadableContentGeometry(canvasHeight: height, textHeight: textHeight)
         return WidgetContentLayout(header: header, metrics: metrics, shown: shown, geometry: geometry,
             inset: ReadableRules.inset(settings.edgeInset, anchor: settings.anchor, canvasHeight: height, textHeight: textHeight))

@@ -147,6 +147,7 @@ enum WallpaperRenderChecks {
         try FeedbackRepairRenderChecks.run(out: out)
         try PhotoRepairRenderChecks.run(out: out, fixture: fixture)
         try await LianxinWallpaperChecks.run(out: out)
+        try await LianxinDisplayRenderChecks.run(out: out, fixture: fixture)
         let report: [String: Any] = [
             "result": "passed", "engine": "production CoreGraphics + CoreText + CoreImage on macOS",
             "iphone_device_validation": "pending", "synthetic_fixture_only": true,

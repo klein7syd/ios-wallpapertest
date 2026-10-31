@@ -242,3 +242,9 @@ systemMaterial 只保留兼容解码，渲染始终普通背景。创作标注�
 LianxinProfile 的角色字段、verifiedProfile（含确认时间）、最近名字/团体、说话语言和翻译参数均为可选，旧JSON保持兼容并默认中文/不翻译。LianxinRoleRules按团体、示例、定位、粉丝名、性格、口头禅优先组装2000字角色预算，用户输入覆盖已确认资料；空字段省略，未知个人事实禁止编造。system固定顺序为任务、角色、写作、语言、格式，user仍逐字原文，无temperature/照片。
 LianxinRoleView仅主动点击核对TA时通过LianxinProfileChecking发一个请求；LianxinRoleResult宽容解析已知公开字段。未确认结果只在内存pendingRole，低置信/未识别不预填，确认才回填私有profile并立即保存。LianxinLanguageRules处理语言冲突与自定义语言长度；LianxinGeneratedMessage宽容JSON/围栏/前后说明，失败保留整段原文并提示译文失败。LianxinSamples提供中/韩/日/英对应模板，Mock分支先于网络分派。
 共享LianxinPublication只新增可选translation（≤200字），原文/译文编辑均走同一个400ms同步器；复制分享包含两者与创作后缀。角色信息、核对结果、语言参数、提示词、接口和密钥均不进入内容共享文件。组件/壁纸译文排版在第3组复用现有布局继续接入。
+
+## 连心反馈第3组（当前显示模型）
+Core/LianxinPresentation以已同步内容产生原文/译文/双语展示和成员名回退标题。WidgetAppearance可选lianxinDisplayStyle、lianxinCustomTitle、lianxinMarker保留旧JSON；未配置标记默认无，不复活以前复制待办的markerOverride。WallpaperSettings有独立的display/header/customTitle/edgeInset，翻译默认双语、0.85字号/0.8不透明度；壁纸默认不限，组件自动小号2行其余3行。旧署名/居中/标注/组件行数值通过有效样式回退，schema仍为1。
+TodoWidgetContent与WidgetLayoutMetrics增加次要行参数，统一测量原文、译文、日期、大标记首行位置与容量，译文无标记/分隔线；署名/可选标注计入同一内容高度。LianxinWidgetBackground复用WidgetContentLayout，预览/真实组件使用相同边距、内容和可读性几何，Provider仍携分析快照且不分析图片。
+壁纸在原WallpaperRenderer中增加可选secondary、headings及独立supplements，标题复用WidgetHeaderLayout；原文/译文均为同一CoreText测量与drawText，保留像素渲染、可读色、面板和照片路径。WallpaperLayout.revision随新字形布局产生，positioned保留revision及各块相对位置，拖动仍不重建字形。高度不足、手选行数截断和仅译文但没有译文分别给出明确提示并拒绝不完整导出。
+公开署名可含signatureSubtitle（团体摘要，≤100字）用于标题右侧，用户输入与确认后的公开团体才会进入它；这只是发表署名的一部分，角色详细资料、示例、核对原结果/时间、接口、提示词和密钥均不共享。TodoAppearance另有可选lianxinWallpaperMarker/Style，独立于待办与组件标记，PhotoAssetReferences覆盖当前/备份/撤销引用。壁纸连心工具含标题/内容/标记，七工具使用原生菜单；待办继续原五工具。

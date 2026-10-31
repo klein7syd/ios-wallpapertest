@@ -22,13 +22,21 @@ struct WallpaperEditorView: View {
     private var contentItems: [TodoItem] { isLianxin ? WallpaperContentSource.lianxin(lianxinModel.publication).items : store.items }
     private var editingAppearance: TodoAppearance {
         var root = store.appearance
-        if isLianxin { root.widget = root.style(in: .lianxin); root.defaultMarker = TodoMarker(kind: .none) }
+        if isLianxin {
+            root.widget = root.style(in: .lianxin)
+            root.defaultMarker = root.lianxinWallpaperMarker ?? TodoMarker(kind: .none)
+            root.markerStyle = root.lianxinWallpaperMarkerStyle ?? MarkerStyle()
+        }
         return root
     }
     @discardableResult private func setEditingAppearance(_ value: TodoAppearance) -> Bool {
         var root = store.appearance
-        if isLianxin { root.lianxin = value.widget } else { root = value }
-        return store.setAppearance(root)
+        if isLianxin {
+            root.lianxin = value.widget; root.lianxinWallpaperMarker = value.defaultMarker; root.lianxinWallpaperMarkerStyle = value.markerStyle
+        } else { root = value }
+        let accepted = store.setAppearance(root)
+        if accepted && isLianxin { lianxinModel.scheduleSync() }
+        return accepted
     }
     private var textFits: Bool { !isLianxin || (model.layout?.lianxinOverflow == false && (try? lianxinModel.publication.validate()) != nil) }
     private func syncPhoto() async {
@@ -72,7 +80,7 @@ struct WallpaperEditorView: View {
     private var editState: WallpaperEditState {
         WallpaperEditState(settings: model.settings, photoName: model.photoName, previewScale: previewScale,
             marker: editingAppearance.defaultMarker, markerStyle: editingAppearance.markerStyle,
-            taskMarkers: Dictionary(uniqueKeysWithValues: contentItems.compactMap { item in item.marker.map { (item.id, $0) } }),
+            taskMarkers: isLianxin ? [:] : Dictionary(uniqueKeysWithValues: contentItems.compactMap { item in item.marker.map { (item.id, $0) } }),
             widgetStyle: editingAppearance.widget)
     }
     private var layoutScale: Binding<Double> {
@@ -142,12 +150,12 @@ struct WallpaperEditorView: View {
                 if isLianxin { await lianxinModel.load(); await lianxinModel.prepareStyle(store) }
                 await model.start(items: contentItems, appearance: editingAppearance, content: isLianxin ? lianxinModel.publication : nil)
                 if isLianxin {
-                    model.settings.usesTaskMarkers = true
-                    if navigation.wallpaperTool == .marker { navigation.selectTool(.text) }
+                    model.settings.usesTaskMarkers = false
                     await syncPhoto()
-                }
+                } else if tool == .header || tool == .content { navigation.selectTool(.text) }
                 syncOutputFields()
             }
+            .onChange(of: model.settings) { _, _ in if isLianxin { lianxinModel.scheduleSync() } }
             .onChange(of: model.busy) { _, busy in if !busy { Task { await syncPhoto() } } }
             .onChange(of: store.appearance.lianxin?.photoName(at: .now)) { _, _ in Task { await syncPhoto() } }
             .onChange(of: model.ready) { _, ready in
@@ -237,7 +245,7 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
-            if !textFits { Text("文字超出面板，请增大面板高度、减小字号或缩短话语").font(.caption).foregroundStyle(.red) }
+            if !textFits { Text(model.lianxinContentIssue ?? "请先在连心生成有效话语。").font(.caption).foregroundStyle(.red) }
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +
                     (tool == .marker ? (selectedMarkerTask?.id.uuidString ?? ".uniform") : "")) {
@@ -249,6 +257,8 @@ struct WallpaperEditorView: View {
                     case .text: textControls
                     case .marker: markerControls
                     case .output: outputControls
+                    case .header: lianxinHeaderControls
+                    case .content: LianxinContentControls(value: lianxinDisplay, wallpaper: true, hasTranslation: !(lianxinModel.publication.translation ?? "").isEmpty)
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -264,11 +274,11 @@ struct WallpaperEditorView: View {
     }
     private var toolSelector: some View {
         HStack(spacing: 6) {
-            EditorToolPicker(choices: WallpaperTool.allCases.filter { !isLianxin || $0 != .marker },
+            EditorToolPicker(choices: isLianxin ? [.background, .panel, .header, .text, .marker, .content, .output] : [.background, .panel, .text, .marker, .output],
                 selection: Binding(get: { tool }, set: { next in
                     edits.finish(editState)
                     withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.selectTool(next) }
-                }), title: { $0.title })
+                }), title: { $0.title }, compact: isLianxin)
             Button {
                 toggleInspector()
             } label: {
@@ -357,6 +367,28 @@ struct WallpaperEditorView: View {
             model.settings = model.settings.nudged(in: layout, dx: dx, dy: dy)
         } label: { Image(systemName: icon).frame(minWidth: 44, minHeight: 44) }.buttonStyle(.bordered).accessibilityLabel("面板移动一个像素 \(icon)")
     }
+    private var lianxinDisplay: Binding<LianxinDisplayStyle> {
+        Binding(get: { model.settings.lianxinDisplay }, set: { model.settings.lianxinDisplayStyle = $0 })
+    }
+    private var lianxinHeading: Binding<WidgetHeaderAppearance> {
+        Binding(get: { model.settings.lianxinHeader ?? WidgetHeaderAppearance() }, set: { model.settings.lianxinHeader = $0 })
+    }
+    @ViewBuilder private var lianxinHeaderControls: some View {
+        InspectorGroupTitle(title: "标题与位置", detail: "留空使用成员名，团体摘要可单独显示。")
+        PreciseSlider(title: "顶部留白", value: Binding(get: { model.settings.lianxinEdgeInset ?? 0 }, set: { model.settings.lianxinEdgeInset = $0 }), range: -min(12, model.settings.padding)...40, standard: 0)
+        Toggle("显示标题", isOn: lianxinHeading.showsTitle)
+        Toggle("显示团体摘要", isOn: lianxinHeading.showsSummary)
+        Text("团体摘要属于公开署名，详细角色设定不会共享。").font(.caption).foregroundStyle(.secondary)
+        if lianxinHeading.wrappedValue.showsTitle {
+            TextField("默认：" + lianxinModel.publication.idol, text: Binding(get: { model.settings.lianxinCustomTitle ?? "" }, set: { model.settings.lianxinCustomTitle = String($0.filter { !$0.isNewline }.prefix(40)) })).textFieldStyle(LianxinFieldStyle())
+            Toggle("标题颜色跟随文字", isOn: lianxinHeading.followsTextColor)
+            StyleColorControl(title: "标题颜色", value: lianxinHeading.color).disabled(lianxinHeading.wrappedValue.followsTextColor)
+            Picker("标题位置", selection: Binding(get: { lianxinHeading.wrappedValue.horizontalPosition < 0.25 ? 0 : lianxinHeading.wrappedValue.horizontalPosition > 0.75 ? 2 : 1 }, set: { lianxinHeading.wrappedValue.horizontalPosition = Double($0) / 2 })) { Text("左").tag(0); Text("中").tag(1); Text("右").tag(2) }.pickerStyle(.segmented)
+            Picker("标题字体", selection: lianxinHeading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            Picker("标题字重", selection: lianxinHeading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            PreciseSlider(title: "标题大小", value: lianxinHeading.fontSize, range: 12...32, standard: 17)
+        }
+    }
     @ViewBuilder private var textControls: some View {
         InspectorGroupTitle(title: "文字排版", detail: "先调字号与颜色，再选择显示哪些事项。")
         StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
@@ -370,14 +402,13 @@ struct WallpaperEditorView: View {
         }
         Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        if isLianxin {
-            Toggle("在小组件/壁纸上显示创作标注", isOn: Binding(get: { model.settings.lianxinShowsCreationLabel == true }, set: { model.settings.lianxinShowsCreationLabel = $0 }))
-        } else {
+        if !isLianxin {
         Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
         Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
         }
         if advanced {
-            Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            if !isLianxin { Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented) }
+            if isLianxin { LianxinTranslationControls(value: lianxinDisplay) }
             PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20, standard: 4)
             PreciseSlider(title: "事项间距", value: $model.settings.itemSpacing, range: 0...36, standard: 12)
             if !isLianxin { Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8) }
@@ -389,7 +420,7 @@ struct WallpaperEditorView: View {
         return ids.compactMap { id in contentItems.first { $0.id == id } }
     }
     private var selectedMarkerTask: TodoItem? {
-        guard model.settings.inheritsTaskMarkers else { return nil }
+        guard !isLianxin, model.settings.inheritsTaskMarkers else { return nil }
         return MarkerEditorTarget.selected(items: contentItems, visibleIDs: markerTasks.map(\.id), preferredID: markerTaskID)
     }
     private var wallpaperMarkerChoice: Binding<TodoMarker> {
@@ -409,6 +440,11 @@ struct WallpaperEditorView: View {
         })
     }
     @ViewBuilder private var markerControls: some View {
+        if isLianxin {
+            MarkerChoiceEditor(choice: wallpaperMarkerChoice)
+            MarkerStyleEditor(style: appearance.markerStyle, kind: wallpaperMarkerChoice.wrappedValue.kind, advanced: advanced, showsCompletion: false)
+            Text("标记只画在原文前，译文不带标记。").font(.caption).foregroundStyle(.secondary)
+        } else {
         Toggle("使用待办的单项标记", isOn: Binding(get: { model.settings.inheritsTaskMarkers }, set: {
             model.settings.usesTaskMarkers = $0; markerTaskID = nil
         }))
@@ -435,6 +471,7 @@ struct WallpaperEditorView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         if advanced { Button("将壁纸样式应用到小组件") { applyWidgetStyle() }.buttonStyle(.bordered) }
+        }
     }
     @ViewBuilder private var outputControls: some View {
         InspectorGroupTitle(title: "成品设置", detail: "确认比例和清晰度后，保存或分享。")
@@ -509,6 +546,10 @@ struct WallpaperEditorView: View {
         let completionEmoji = next.widget.markerStyle.completionEmoji
         let completionColor = next.widget.markerStyle.completedColor
         next.widget.markerStyle = next.markerStyle; next.widget.markerOverride = next.defaultMarker
+        if isLianxin {
+            next.widget.lianxinMarker = next.defaultMarker; next.widget.lianxinDisplayStyle = model.settings.lianxinDisplay
+            next.widget.header = model.settings.lianxinHeader; next.widget.lianxinCustomTitle = model.settings.lianxinCustomTitle
+        }
         next.widget.markerStyle.completion = completion
         next.widget.markerStyle.completionEmoji = completionEmoji
         next.widget.markerStyle.completedColor = completionColor

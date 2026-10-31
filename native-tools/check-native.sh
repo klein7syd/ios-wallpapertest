@@ -7,7 +7,7 @@ python3 tools/test_check_handoff.py 2>&1 | tee TodoWallpaper/out/handoff-regress
 bash tools/check_handoff.sh | tee TodoWallpaper/out/handoff-checks.log
 python3 native-tools/check-ui-structure.py
 bash native-tools/check-photo-analysis.sh
-swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetWrappingChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift TodoWallpaper/Tests/MediaInteractionChecks.swift TodoWallpaper/Tests/PhotoRepairChecks.swift TodoWallpaper/Tests/PhotoAssetMaintenanceChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
+swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/Tests/RepositoryChecks.swift TodoWallpaper/Tests/MigrationChecks.swift TodoWallpaper/Tests/UIStateChecks.swift TodoWallpaper/Tests/WidgetWrappingChecks.swift TodoWallpaper/Tests/LianxinDisplayChecks.swift TodoWallpaper/Tests/WidgetFeedbackChecks.swift TodoWallpaper/Tests/EditorRefinementChecks.swift TodoWallpaper/Tests/FeedbackRepairChecks.swift TodoWallpaper/Tests/MediaInteractionChecks.swift TodoWallpaper/Tests/PhotoRepairChecks.swift TodoWallpaper/Tests/PhotoAssetMaintenanceChecks.swift -o "$RUNNER_TEMP/todo-repository-checks"
 REPOSITORY_CHECKS_PASSED=true
 if "$RUNNER_TEMP/todo-repository-checks" | tee TodoWallpaper/out/repository-checks.log; then :; else REPOSITORY_CHECKS_PASSED=false; fi
 mkdir -p TodoWallpaper/out/render-checks
@@ -16,7 +16,7 @@ python3 native-tools/make-render-fixture.py TodoWallpaper/out/render-checks/fixt
 swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
     TodoWallpaper/Wallpaper/WallpaperSettings.swift TodoWallpaper/Wallpaper/WallpaperRenderer.swift \
     TodoWallpaper/Wallpaper/WallpaperDraftStore.swift TodoWallpaper/Wallpaper/WallpaperGeometry.swift \
-    TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift TodoWallpaper/Tests/WidgetFeedbackRenderChecks.swift TodoWallpaper/Tests/FeedbackRepairRenderChecks.swift TodoWallpaper/Tests/PhotoRepairRenderChecks.swift TodoWallpaper/Tests/LianxinWallpaperChecks.swift \
+    TodoWallpaper/Tests/WallpaperRenderChecks.swift TodoWallpaper/Tests/D34Checks.swift TodoWallpaper/Tests/WidgetFeedbackRenderChecks.swift TodoWallpaper/Tests/FeedbackRepairRenderChecks.swift TodoWallpaper/Tests/PhotoRepairRenderChecks.swift TodoWallpaper/Tests/LianxinWallpaperChecks.swift TodoWallpaper/Tests/LianxinDisplayRenderChecks.swift \
     -o "$RUNNER_TEMP/todo-wallpaper-render-checks" 2>&1 | tee TodoWallpaper/out/render-compile.log
 "$RUNNER_TEMP/todo-wallpaper-render-checks" TodoWallpaper/out/render-checks | tee TodoWallpaper/out/render-checks.log
 

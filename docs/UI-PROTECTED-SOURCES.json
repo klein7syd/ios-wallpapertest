@@ -10,7 +10,7 @@
   "TodoWallpaper/Core/VisualTypes.swift": "7d142915762691b4a60b4f24172fe75065b7e8d14529090192bf1673b21fd8c8",
   "TodoWallpaper/Shared/SetTodoCompletionIntent.swift": "919f131b6b95e08be2e967531007730603a6c8aceb9ac7c5e5d860ffa4f3ee53",
   "TodoWallpaper/Wallpaper/WallpaperDraftStore.swift": "0f8fa400ff901f6f355cb9af0e65e9b7073bb49e88d0e9641407a9a3206ee0a6",
-  "TodoWallpaper/Wallpaper/WallpaperGeometry.swift": "ec7e2051698ab8fe190c76e850a4f68e65b8bc612a9c9af3681271a8ea9bf6cd",
+  "TodoWallpaper/Wallpaper/WallpaperGeometry.swift": "ac9cc2988b04815a8a6cd0d5d7d0e46123a6cca840dc34eb175ad289d59527b6",
   "TodoWallpaper/Widget/Info.plist": "938aa3b4d74f690ad6429b6213185f43983a912d7737ca3e3c52de52f411301c",
   "TodoWallpaper/Widget/TodoWallpaper.entitlements": "74d082a37edd0beb507296d3e97832c8241925891dac15352ebe7fc6cc9c535b",
   "native-tools/windows/Install-TodoWallpaper.cmd": "a38f8c8a6d40acfe1560afb01dc69253a066c077f15a1a2f6d87c7c1f0a4e7a4",

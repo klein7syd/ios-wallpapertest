@@ -50,6 +50,7 @@ final class WallpaperEditorModel: ObservableObject {
 
     var busy: Bool { isExporting || isImporting }
     var hasPhoto: Bool { photoURL != nil }
+    var lianxinContentIssue: String? { layout?.lianxinIssue?.localizedDescription }
 
     func start(items: [TodoItem], appearance: TodoAppearance, content: LianxinPublication? = nil) async {
         self.items = items
@@ -60,6 +61,11 @@ final class WallpaperEditorModel: ObservableObject {
         do {
             let loaded = try await files.load()
             settings = loaded.draft.settings
+            if content != nil && settings.lianxinDisplayStyle == nil {
+                var display = settings.lianxinDisplay
+                display.showsSignature = appearance.widget.lianxinShowsSignature != false
+                settings.lianxinDisplayStyle = display
+            }
             photoURL = loaded.photoURL
             photoName = loaded.draft.photoFileName
             if let photoURL { livePhoto = try await renderer.loadPhoto(at: photoURL) }
@@ -238,7 +244,7 @@ final class WallpaperEditorModel: ObservableObject {
 
     func export(saveToPhotos: Bool) async {
         guard ready, !busy, !draftBlocked else { return }
-        if layout?.lianxinOverflow == true { message = WallpaperError.contentOverflow.localizedDescription; return }
+        if let issue = layout?.lianxinIssue { message = issue.localizedDescription; return }
         isExporting = true; needsPhotoPermission = false
         previewTask?.cancel(); isRendering = false
         let snapshot: WallpaperSettings
