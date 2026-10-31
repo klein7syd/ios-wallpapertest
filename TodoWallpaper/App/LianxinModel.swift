@@ -80,7 +80,7 @@ actor LianxinStorage {
 
 @MainActor
 final class LianxinModel: ObservableObject {
-    @Published var profile = LianxinProfile()
+    @Published var profile = LianxinProfile() { didSet { if loaded && oldValue != profile { scheduleInputSave() } } }
     @Published var key = ""
     @Published private(set) var photo: UIImage?
     @Published private(set) var loaded = false
@@ -135,6 +135,22 @@ final class LianxinModel: ObservableObject {
             return true
         } catch { self.error = "设置未能完整保存，请重试。"; return false }
     }
+
+    private var inputSaveTask: Task<Void, Never>?
+    private func scheduleInputSave() {
+        inputSaveTask?.cancel()
+        let value = profile
+        inputSaveTask = Task {
+            do { try await Task.sleep(for: .milliseconds(400)); try Task.checkCancellation(); try await storage.save(value) }
+            catch is CancellationError { }
+            catch { self.error = "输入暂未保存，请重试。" }
+        }
+    }
+    func saveInputsNow() async {
+        inputSaveTask?.cancel()
+        do { try await storage.save(profile) } catch { self.error = "输入未保存，请重试。" }
+    }
+    func wallpaperPhotoData() async throws -> Data? { try await storage.photoData(profile.photoName, original: true) }
 
     func selectProvider(_ id: String) async {
         guard !busy else { return }

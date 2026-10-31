@@ -3,7 +3,13 @@ import SwiftUI
 import PhotosUI
 
 struct LianxinView: View {
-    @StateObject private var model = LianxinModel()
+    @ObservedObject var model: LianxinModel
+    @ObservedObject var store: TodoStore
+    @ObservedObject var wallpaper: WallpaperEditorModel
+    @Binding var navigation: AppNavigationState
+    @State private var family = WidgetPreviewFamily.small
+    @State private var lastPreviewPhoto: String?
+    @AppStorage("editor.contentMode") private var contentMode = "todo"
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
@@ -27,18 +33,15 @@ struct LianxinView: View {
                         Label("体验模式：示例内容，非 AI 生成", systemImage: "sparkles").font(.footnote)
                         Button("连接我自己的AI") { model.exampleMode = false }
                     }
+                    previews
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("你的称呼", text: $model.profile.userName)
-                        TextField("IDOL 名字", text: $model.profile.idolName)
-                        TextField("提示词", text: $model.profile.prompt, axis: .vertical).lineLimit(4...10)
-                    }.textFieldStyle(.roundedBorder)
-                    card
+                        TextField("你的称呼（最多100字）", text: limited(\.userName, 100))
+                        TextField("IDOL 名字（最多100字）", text: limited(\.idolName, 100))
+                        TextField("提示词（最多12000字）", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10)
+                    }.textFieldStyle(.roundedBorder).disabled(model.busy)
+                    actions
                     Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成。连接自己的AI后，语气与情境由你的提示词决定。" : "由你的提示词决定语气与情境。这里的话语是 AI 创作，不代表本人真实言论。")
                         .font(.footnote).foregroundStyle(.secondary)
-                    if model.profile.prompt.isEmpty {
-                        Button("先填写名字、提示词和 API") { openSettings() }
-                            .buttonStyle(.bordered).frame(minHeight: 44).disabled(!model.loaded || model.busy)
-                    }
                     if !model.profile.message.isEmpty {
                         outputControls
                         HStack {
@@ -65,16 +68,18 @@ struct LianxinView: View {
                         .disabled(!model.loaded || model.busy || loadingPhoto)
                 }
             }
-            .safeAreaInset(edge: .bottom) { actions }
+
             .task { await model.load(); outputText = model.profile.message }
             .sheet(isPresented: $showsSettings) { settings }
             .sheet(item: $model.wallpaperRequest) { LianxinWallpaperView(request: $0) }
             .onChange(of: model.profile.message) { _, value in outputText = value }
+            .onChange(of: outputText) { _, value in if value.count <= 200 && value != model.profile.message { model.profile.message = value } }
             .alert("连心", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
                 Button("好") { model.error = nil }
             } message: { Text(model.error ?? "") }
-            .onDisappear { model.cancel() }
+            .onDisappear { model.cancel(); Task { await model.saveInputsNow() } }
             .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } }
+            .task(id: model.profile.message + (model.profile.photoName ?? "")) { await syncPreview() }
             .task(id: selection) { await importSelection() }
         }
     }
@@ -89,38 +94,67 @@ struct LianxinView: View {
             Button { Task { await model.output(text: outputText, wallpaper: false) } } label: {
                 Label("发布到连心小组件", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.borderedProminent).disabled(!canOutput)
-            Button { Task { await model.output(text: outputText, wallpaper: true) } } label: {
-                Label("制作连心壁纸", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
+            Button { openEditor(.wallpaper) } label: {
+                Label("去调整壁纸样式", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.bordered).disabled(!canOutput)
+            Button("去调整小组件样式") { openEditor(.widget) }.frame(minHeight: 44)
         }.disabled(model.busy || loadingPhoto)
     }
 
     private var canOutput: Bool { !outputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && outputText.count <= 200 }
 
-    private var card: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Label(model.profile.message.isEmpty ? (model.profile.idolName.isEmpty ? "期待与你连心" : model.profile.idolName) : model.profile.messageIdol,
-                  systemImage: "heart").font(.headline)
-                .padding(10).background(.regularMaterial, in: Capsule())
-            Spacer(minLength: 160)
-            VStack(alignment: .leading, spacing: 12) {
-                Text(model.profile.message.isEmpty ? "写下你期待的情境，让一句话来到你身边。" : model.profile.message)
-                    .font(.title3).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                Text(model.profile.exampleContent == true ? "示例内容，非 AI 生成 · 连心" : "AI 创作 · 连心").font(.caption)
-            }
-            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    private func limited(_ path: WritableKeyPath<LianxinProfile, String>, _ limit: Int) -> Binding<String> {
+        Binding(get: { model.profile[keyPath: path] }, set: { model.profile[keyPath: path] = String($0.prefix(limit)) })
+    }
+    private func openEditor(_ page: AppPage) { contentMode = "lianxin"; navigation.selectPage(page) }
+    private var previews: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) { wallpaperPreview.frame(width: 140); widgetPreview.frame(width: 170) }
+            VStack(spacing: 16) { wallpaperPreview; widgetPreview }
         }
-        .padding(20).frame(maxWidth: .infinity, minHeight: 390, alignment: .leading)
-        .background {
-            GeometryReader { proxy in
-                if let photo = model.photo {
-                    Image(uiImage: photo).resizable().scaledToFill().frame(width: proxy.size.width, height: proxy.size.height).clipped()
-                } else { Color.secondary.opacity(0.12) }
-            }
+    }
+    private var wallpaperPreview: some View {
+        VStack {
+            Text("壁纸预览").font(.headline)
+            WallpaperLiveCanvas(model: wallpaper, editsBackground: false, editable: false).frame(height: 280)
+                .onTapGesture { openEditor(.wallpaper) }
+            Button("调整壁纸") { openEditor(.wallpaper) }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-
+    }
+    private var widgetPreview: some View {
+        VStack {
+            Menu("小组件 · " + family.title) {
+                ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
+            }
+            TodoWidgetContent(document: TodoDocument(items: previewItems), appearance: previewAppearance, error: nil, family: family, interactive: false)
+                .padding(12).frame(width: 170, height: family == .large ? 280 : 170)
+                .background { if let image = model.photo { Image(uiImage: image).resizable().scaledToFill() } }
+                .clipped().clipShape(RoundedRectangle(cornerRadius: 22)).allowsHitTesting(false)
+                .overlay { Color.clear.contentShape(Rectangle()).onTapGesture { openEditor(.widget) } }
+            Button("调整小组件") { openEditor(.widget) }
+        }
+    }
+    private var previewItems: [TodoItem] {
+        [TodoItem(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
+                  title: model.profile.message.isEmpty ? "写下提示词，生成一句话。" : model.profile.message,
+                  marker: TodoMarker(kind: .none), isCompleted: false, createdAt: .distantPast, updatedAt: .distantPast)]
+    }
+    private var previewAppearance: TodoAppearance {
+        var value = store.appearance; value.defaultMarker = TodoMarker(kind: .none)
+        value.widget.header = WidgetHeaderAppearance(text: model.profile.idolName.isEmpty ? "连心" : String(model.profile.idolName.prefix(40)))
+        return value
+    }
+    private func syncPreview() async {
+        do {
+            try await Task.sleep(for: .milliseconds(350)); try Task.checkCancellation()
+            await wallpaper.start(items: previewItems, appearance: previewAppearance)
+            if model.profile.photoName != lastPreviewPhoto {
+                if let data = try await model.wallpaperPhotoData() { try await wallpaper.importPhotoData(data) }
+                else { wallpaper.removePhoto() }
+                lastPreviewPhoto = model.profile.photoName
+            }
+        } catch is CancellationError { }
+        catch { model.notice = "壁纸预览暂未更新，请重试。" }
     }
 
     private var actions: some View {

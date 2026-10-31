@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct TodoWallpaperApp: App {
     @StateObject private var store = TodoStore()
+    @StateObject private var lianxinModel = LianxinModel()
+    @StateObject private var lianxinWallpaperModel = WallpaperEditorModel(files: WallpaperDraftStore(directory: URL.applicationSupportDirectory.appendingPathComponent("LianxinWallpaper"), exportDirectory: URL.cachesDirectory.appendingPathComponent("LianxinExports")))
     @StateObject private var wallpaperModel = WallpaperEditorModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var navigation = AppNavigationState()
@@ -68,7 +70,7 @@ struct TodoWallpaperApp: App {
                 NavigationStack { WidgetAppearanceEditor(store: store) }
                     .tabItem { Label("小组件", systemImage: "square.grid.2x2") }
                     .tag(AppPage.widget)
-                LianxinView()
+                LianxinView(model: lianxinModel, store: store, wallpaper: lianxinWallpaperModel, navigation: $navigation)
                     .tabItem { Label("连心", systemImage: "heart") }
                     .tag(AppPage.lianxin)
                 AboutView(store: store)
