@@ -51,6 +51,12 @@ enum LianxinChecks {
         let oversized = LianxinPublication(idol: "角色", text: String(repeating: "心", count: 201), photo: nil, date: .now)
         try rejects { try oversized.save(directory: directory) }
         try require(try LianxinPublication.load(directory: directory) == published, "非法发布不覆盖已有组件")
+        for sample in [false, true] {
+            let content = LianxinPublication(idol: "名字", text: "中韩混排잘 자요🧑🏽‍💻", photo: nil, date: .now, example: sample)
+            let source = WallpaperContentSource.lianxin(content).items
+            try require(source.count == 1 && source[0].marker?.kind == MarkerKind.none && source[0].title.contains(content.contentLabel), "壁纸来源含不可移除标签")
+            try require(content.shareText.contains(sample ? "示例内容，非 AI 生成" : "AI 创作"), "分享/复制强制标注")
+        }
         let bytes = try Data(contentsOf: directory.appendingPathComponent("lianxin-published-v1.json"))
         let json = String(decoding: bytes, as: UTF8.self)
         try require(!json.contains("endpoint") && !json.contains("prompt") && !json.contains("test-only-placeholder"), "共享数据不含连接凭证或私有提示词")
