@@ -128,7 +128,10 @@ final class LianxinModel: ObservableObject {
 
 
     func load() async {
+        let span = EditorModePerformance.beginStage("LoadLianxin"); defer { EditorModePerformance.endStage("LoadLianxin", span) }
+        EditorModePerformance.count("profile_load_calls")
         guard !loaded else { return }
+        EditorModePerformance.count("profile_disk_reads")
         do {
             let saved = try await storage.load()
             profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
@@ -199,11 +202,14 @@ final class LianxinModel: ObservableObject {
     }
 
     func prepareStyle(_ store: TodoStore) async {
+        let span = EditorModePerformance.beginStage("PrepareLianxinStyle"); defer { EditorModePerformance.endStage("PrepareLianxinStyle", span) }
+        EditorModePerformance.count("prepare_style_calls")
         styleStore = store
         if styleObserver == nil {
             styleObserver = store.$appearance.map(\.lianxin).removeDuplicates().dropFirst().sink { [weak self] _ in self?.scheduleSync() }
         }
         guard store.appearance.lianxin == nil else { return }
+        EditorModePerformance.count("style_initializations")
         do {
             var name: String?
             let legacyPhoto = try await storage.photoData(profile.photoName)
