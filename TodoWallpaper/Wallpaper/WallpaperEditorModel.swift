@@ -53,6 +53,8 @@ final class WallpaperEditorModel: ObservableObject {
     var lianxinContentIssue: String? { layout?.lianxinIssue?.localizedDescription }
 
     func start(items: [TodoItem], appearance: TodoAppearance, content: LianxinPublication? = nil) async {
+        let span = EditorModePerformance.beginStage("StartWallpaper"); defer { EditorModePerformance.endStage("StartWallpaper", span) }
+        EditorModePerformance.count("wallpaper_start_calls")
         self.items = items
         self.appearance = appearance
         self.lianxinContent = content
@@ -122,6 +124,8 @@ final class WallpaperEditorModel: ObservableObject {
     }
 
     private func applyPhotoData(_ data: Data) async throws {
+        let span = EditorModePerformance.beginStage("ImportWallpaperPhoto"); defer { EditorModePerformance.endStage("ImportWallpaperPhoto", span) }
+        EditorModePerformance.count("wallpaper_photo_imports")
         saveTask?.cancel()
         let url = try await files.importPhoto(data)
         var next = settings
@@ -202,6 +206,7 @@ final class WallpaperEditorModel: ObservableObject {
         // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
         if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle || layoutContent != lianxinContent || (lianxinContent != nil && layoutAppearance.widget != appearance.widget) {
             do {
+                let span = EditorModePerformance.beginStage("WallpaperTextLayout"); defer { EditorModePerformance.endStage("WallpaperTextLayout", span) }
                 layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance, content: lianxinContent)
                 layoutContent = lianxinContent
                 layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance; previewError = nil
