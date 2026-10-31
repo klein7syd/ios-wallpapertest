@@ -14,11 +14,11 @@ private struct WallpaperEditState: Equatable {
 
 struct WallpaperEditorView: View {
     @ObservedObject var store: TodoStore
+    let mode: ContentMode
+    let active: Bool
     @EnvironmentObject private var lianxinModel: LianxinModel
     @AppStorage(ContentMode.key) private var contentMode = "todo"
-    @State private var hasSyncedPhoto = false
-    @State private var appliedSharedPhoto: String?
-    private var isLianxin: Bool { contentMode == "lianxin" }
+    private var isLianxin: Bool { mode == .lianxin }
     private var contentItems: [TodoItem] { isLianxin ? WallpaperContentSource.lianxin(lianxinModel.publication).items : store.items }
     private var editingAppearance: TodoAppearance {
         var root = store.appearance
@@ -40,13 +40,13 @@ struct WallpaperEditorView: View {
     }
     private var textFits: Bool { !isLianxin || (model.layout?.lianxinOverflow == false && (try? lianxinModel.publication.validate()) != nil) }
     private func syncPhoto() async {
-        guard isLianxin, model.ready, !model.busy else { return }
+        let span = EditorModePerformance.beginStage("SyncWallpaperPhoto"); defer { EditorModePerformance.endStage("SyncWallpaperPhoto", span) }
+        EditorModePerformance.count("sync_photo_calls")
+        guard active, isLianxin, model.ready, !model.busy else { return }
         let name = store.appearance.lianxin?.photoName(at: .now)
-        guard !hasSyncedPhoto || name != appliedSharedPhoto else { return }
         do {
-            if let data = try await lianxinModel.wallpaperPhotoData() { try await model.importPhotoData(data) }
-            else { model.removePhoto() }
-            appliedSharedPhoto = name; hasSyncedPhoto = true
+            try await model.syncSharedPhoto(reference: name) { try await lianxinModel.wallpaperPhotoData() }
+        } catch is CancellationError {
         } catch { model.message = "连心底图暂未更新，请重试。" }
     }
     private func removeBackdrop() {
@@ -121,7 +121,7 @@ struct WallpaperEditorView: View {
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" }.disabled(model.busy)
+                    Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .wallpaper, current: contentMode) { contentMode = $0 } }.disabled(model.busy)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
@@ -146,7 +146,8 @@ struct WallpaperEditorView: View {
     }
     private var lifecycleEditor: some View {
         editorSurface
-            .task {
+            .task(id: active) {
+                guard active else { return }
                 if isLianxin { await lianxinModel.load(); await lianxinModel.prepareStyle(store) }
                 await model.start(items: contentItems, appearance: editingAppearance, content: isLianxin ? lianxinModel.publication : nil)
                 if isLianxin {
@@ -154,22 +155,28 @@ struct WallpaperEditorView: View {
                     await syncPhoto()
                 } else if tool == .header || tool == .content { navigation.selectTool(.text) }
                 syncOutputFields()
+                isVisible = true
+                if model.ready { edits.synchronize(editState) }
+                EditorModePerformance.shared.presented(page: .wallpaper, mode: mode.rawValue)
             }
-            .onChange(of: model.settings) { _, _ in if isLianxin { lianxinModel.scheduleSync() } }
+            .onChange(of: active) { _, visible in
+                if !visible { edits.finish(editState); isVisible = false; store.flushAppearance(); Task { await model.saveNow() } }
+            }
+            .onChange(of: model.settings) { _, _ in if active && isLianxin { lianxinModel.scheduleSync() } }
             .onChange(of: model.busy) { _, busy in if !busy { Task { await syncPhoto() } } }
             .onChange(of: store.appearance.lianxin?.photoName(at: .now)) { _, _ in Task { await syncPhoto() } }
             .onChange(of: model.ready) { _, ready in
-                if ready { syncOutputFields(); edits.synchronize(editState) }
+                if active && ready { syncOutputFields(); edits.synchronize(editState) }
             }
-            .onAppear { isVisible = true; configureAssetRetention(); if model.ready { edits.synchronize(editState) } }
+            .onAppear { configureAssetRetention() }
             .onChange(of: editState) { _, state in if model.ready && isVisible { edits.observe(state) } }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
     }
     private var dataEditor: some View {
         lifecycleEditor
-            .onChange(of: lianxinModel.publication) { _, value in if isLianxin { model.updateContent(value) } }
-            .onChange(of: contentItems) { _, items in model.updateItems(items) }
-            .onChange(of: editingAppearance) { _, value in model.updateAppearance(value) }
+            .onChange(of: lianxinModel.publication) { _, value in if active && isLianxin { model.updateContent(value) } }
+            .onChange(of: contentItems) { _, items in if active { model.updateItems(items) } }
+            .onChange(of: editingAppearance) { _, value in if active { model.updateAppearance(value) } }
             .onChange(of: selectedPhoto) { _, selection in
                 guard let selection else { return }
                 Task {
@@ -214,7 +221,7 @@ struct WallpaperEditorView: View {
                 result.formUnion(PhotoAssetReferences.widget(value.widgetStyle))
                 for marker in value.taskMarkers.values { result.formUnion(PhotoAssetReferences.marker(marker)) }
             }
-            store.retainPhotoAssets(names, owner: "wallpaper")
+            store.retainPhotoAssets(names, owner: "wallpaper." + mode.rawValue)
         }
         edits.retainedValuesChanged(edits.retainedValues)
     }
