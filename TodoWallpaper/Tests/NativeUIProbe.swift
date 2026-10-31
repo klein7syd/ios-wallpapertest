@@ -581,8 +581,7 @@ enum NativeUIProbe {
                         let budget = WidgetLayoutMetrics.make(items: items, appearance: appearance, family: family,
                             width: width - 32, height: height - 32, fontLineHeight: line,
                             headerHeight: max(22, points * 1.3), footerHeight: max(15, points))
-                        let count = budget.capacity
-                        let used = Double(count) * budget.rowHeight + Double(max(0, count - 1)) * (budget.spacing + budget.separatorHeight)
+                        let used = budget.usedHeight
                         try require(used <= budget.availableRowHeight + 0.001, "Real UIFontMetrics size must fit allocated rows")
                         let image = try render(TodoWidgetContent(document: TodoDocument(items: items), appearance: appearance,
                             error: nil, family: family, interactive: false).padding(16).frame(width: width, height: height)

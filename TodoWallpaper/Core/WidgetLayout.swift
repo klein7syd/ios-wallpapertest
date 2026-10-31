@@ -1,9 +1,16 @@
 import Foundation
+import CoreText
 
-/// Fixed Widget space is a budget. Large markers/fonts reduce rows, never silently
-/// clamp a slider's effect. Both the extension and its interactive preview use this.
+// 每个任务独立分配文字行数和高度；编辑预览与扩展共用。
+struct WidgetRowMetrics: Equatable {
+    let id: UUID
+    let lineLimit: Int
+    let height: Double
+    let dateHeight: Double
+}
 struct WidgetLayoutMetrics: Equatable {
-    let rowHeight: Double
+    let rows: [WidgetRowMetrics]
+    var rowHeight: Double { rows.map(\.height).max() ?? 0 }
     let markerWidth: Double
     let gap: Double
     let lineHeight: Double
@@ -11,42 +18,72 @@ struct WidgetLayoutMetrics: Equatable {
     let footerHeight: Double
     let separatorHeight: Double
     let spacing: Double
-    let capacity: Int
-    let lineLimit: Int
+    var capacity: Int { rows.count }
+    var lineLimit: Int { rows.map(\.lineLimit).max() ?? 1 }
     let showsFooter: Bool
     let availableRowHeight: Double
+    var usedHeight: Double { rows.reduce(0) { $0 + $1.height } + Double(max(0, rows.count - 1)) * spacing }
     static func make(items: [TodoItem], appearance: TodoAppearance, family: WidgetPreviewFamily,
                      width: Double, height: Double, fontLineHeight: Double,
-                     headerHeight: Double, footerHeight: Double) -> WidgetLayoutMetrics {
+                     headerHeight: Double, footerHeight: Double, font: CTFont? = nil,
+                     dateLineHeight: Double? = nil) -> WidgetLayoutMetrics {
         let style = appearance.widget
-        let marks = items.map { MarkerDrawing.extent(marker: appearance.marker(for: $0, widgetContext: true), style: style.markerStyle, completed: $0.isCompleted) }
+        let candidates = style.rows(items, capacity: style.maximumItems)
+        let marks = candidates.map { MarkerDrawing.extent(marker: appearance.marker(for: $0, widgetContext: true), style: style.markerStyle, completed: $0.isCompleted) }
         let marker = marks.max() ?? 0
         let gap = marker > 0 ? style.markerStyle.gap : 0
         let vertical = marker > 0 ? abs(style.markerStyle.verticalOffset) * 2 : 0
-        // 负行距改为压缩行高而不是让行重叠：每 1 个刻度收紧 0.2pt，最多 2pt，
-        // 行与行永不重叠，分隔线也不会被下一行盖住。
-        let shrink = max(-2, min(0, style.spacing) * 0.2)
         let spacing = max(0, style.spacing)
-        // 分隔线画在行的 overlay 上，不占布局高度，否则每行间距会被它撑得不均匀。
-        let separator = 0.0
+        // 负行距只移除装饰留白，不压缩字形自身所需高度。
+        let padding = style.compact ? 0 : max(0, min(4, spacing * 0.8) + max(-2, min(0, style.spacing) * 0.2))
         let header = min(max(0, height), max(0, headerHeight))
         let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
-        let dateHeight = items.contains(where: { $0.schedule != nil }) ? max(11, fontLineHeight * 0.65) + 2 : 0
-        let padding = style.compact ? 0.0 : min(4, max(0, spacing) * 0.8)
-        let minimumRow = max(marker + vertical, fontLineHeight + dateHeight) + padding
-        let footerFits = style.footerVisible && afterHeader >= minimumRow + footerHeight + spacing
+        let line = max(1, fontLineHeight)
+        let date = dateLineHeight ?? max(11, line * 0.65)
+        func rowHeight(_ index: Int, _ lines: Int) -> Double {
+            max(marks[index] + (marks[index] > 0 ? vertical : 0), line * Double(lines) + (candidates[index].schedule == nil ? 0 : date + 2)) + padding
+        }
+        let minimum = candidates.isEmpty ? line : rowHeight(0, 1)
+        let footerFits = style.footerVisible && afterHeader >= minimum + footerHeight + spacing
         let footer = footerFits ? footerHeight : 0
         let rowSpace = max(0, afterHeader - (footerFits ? footer + spacing : 0))
-        let proposedLines = style.maximumTitleLines ?? (family == .large && !style.compact && spacing > 2 && fontLineHeight < 30 ? 2 : 1)
-        let lines = proposedLines == 2 && rowSpace >= max(marker + vertical, fontLineHeight * 2 + dateHeight) + padding ? 2 : 1
-        // 行高只随负行距轻微压缩，且不小于文字自身高度。
-        let row = max(marker + vertical, fontLineHeight * Double(lines) + dateHeight) + padding + shrink
-        let pitch = max(1, row + spacing + separator)
-        let raw = row > 0 ? Int(max(0, (rowSpace + spacing + separator) / pitch).rounded(.down)) : 0
-        return WidgetLayoutMetrics(rowHeight: row, markerWidth: marker, gap: gap, lineHeight: fontLineHeight,
-            headerHeight: header, footerHeight: footer, separatorHeight: separator, spacing: spacing,
-            capacity: min(style.maximumItems, max(0, raw)), lineLimit: lines,
+        let limit = style.maximumTitleLines ?? (family == .small ? 2 : 3)
+        let actualFont = font ?? NativeTypography.font(family: style.font, weight: style.weight, size: style.fontSize)
+        let columnWidth = max(1, width - marker - gap)
+        var rows: [WidgetRowMetrics] = [], used = 0.0
+        for (index, item) in candidates.enumerated() {
+            let needed = WidgetTitleMeasure.lines(item.title, font: actualFont, width: columnWidth)
+            var lines = min(limit, needed)
+            let remaining = rowSpace - used - (rows.isEmpty ? 0 : spacing)
+            while lines > 0 && rowHeight(index, lines) > remaining + 0.00001 { lines -= 1 }
+            guard lines > 0 else { break }
+            let row = WidgetRowMetrics(id: item.id, lineLimit: lines, height: rowHeight(index, lines), dateHeight: item.schedule == nil ? 0 : date + 2)
+            used += row.height + (rows.isEmpty ? 0 : spacing); rows.append(row)
+            if lines < min(limit, needed) { break }
+        }
+        return WidgetLayoutMetrics(rows: rows, markerWidth: marker, gap: gap, lineHeight: line,
+            headerHeight: header, footerHeight: footer, separatorHeight: 0, spacing: spacing,
             showsFooter: footerFits, availableRowHeight: rowSpace)
+    }
+}
+
+// 字体名称/字号/字重描述、完整标题和列宽共同组成有界缓存键。
+enum WidgetTitleMeasure {
+    private static let cache = NSCache<NSString, NSNumber>()
+    static func lines(_ text: String, font: CTFont, width: Double) -> Int {
+        let key = "\(CTFontCopyPostScriptName(font)):\(CTFontGetSize(font)):\(CTFontCopyTraits(font)):\(width):\(text)" as NSString
+        if let value = cache.object(forKey: key) { return value.intValue }
+        let attributed = NSAttributedString(string: text.isEmpty ? " " : text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])
+        let setter = CTFramesetterCreateWithAttributedString(attributed as CFAttributedString)
+        // 列宽减1pt，给CoreText与SwiftUI的换行边界留容差。
+        let measuredWidth = max(1, width - 1)
+        let size = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: measuredWidth, height: .greatestFiniteMagnitude), nil)
+        let path = CGPath(rect: CGRect(x: 0, y: 0, width: measuredWidth, height: ceil(size.height) + 1), transform: nil)
+        let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil)
+        let count = max(1, CFArrayGetCount(CTFrameGetLines(frame)))
+        cache.countLimit = 512; cache.setObject(NSNumber(value: count), forKey: key)
+        return count
     }
 }
 

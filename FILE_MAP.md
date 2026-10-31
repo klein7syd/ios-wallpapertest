@@ -38,7 +38,7 @@
 | Core/TodoSharedStorage.swift | App + Widget | App Group目录、迁移锁/回执、仓库及已校验文档快照 | TodoWidgetConstants, TodoSharedStorage, TodoRepositorySnapshot, TodoMigrationReceipt, TodoMigration |
 | Core/VisualTypes.swift | App + Widget | 共享颜色、字体、字重与对齐枚举 | WallpaperColor, WallpaperFont, WallpaperWeight |
 | Core/WidgetHeaderLayout.swift | App + Widget | 标题栏度量 | WidgetHeaderLayout |
-| Core/WidgetLayout.swift | App + Widget | 小组件行高、容量、间距计算 | WidgetLayoutMetrics, WidgetPreviewState |
+| Core/WidgetLayout.swift | App + Widget | 小组件行高、容量、间距计算 | WidgetLayoutMetrics, WidgetRowMetrics, WidgetTitleMeasure, WidgetPreviewState |
 | Core/WidgetPhotoReference.swift | App + Widget | 小组件照片命名与读取 | WidgetPhotoReference |
 | Shared/AppearanceStore.swift | App + Widget | 原子分析封套/请求、短内存锁与后台文件锁、清理接口、旧设置迁移 | AppearanceStore, Key, AppGroup |
 | Shared/ReadableLayer.swift | App + Widget | 蒙层、文字/标记阴影、色调、模式门禁与内容几何偏好 | ScrimView, TextStyleModifier, ReadableTone, ReadableGeometryPreference |
@@ -77,3 +77,4 @@
 | Core/LianxinPublication.swift | App + Widget | 用户明确发布的文案与底图原子快照 | LianxinPublication |
 | Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
 | Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
+| Tests/WidgetWrappingChecks.swift | 独立 macOS 原生检查 | 逐项多行、容量与旧数据兼容检查 | WidgetWrappingChecks |

@@ -73,7 +73,7 @@ struct TodoWidgetContent: View {
                     VStack(alignment: .leading, spacing: metrics.spacing) {
                         ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
                             VStack(spacing: 0) {
-                                task(item, metrics: metrics)
+                                task(item, metrics: metrics, row: metrics.rows[index])
                                     .overlay(alignment: .bottom) {
                                         if style.separatesRows && index < shown.count - 1 {
                                             // 画在行底部，不参与布局：每行间距才会完全一致。
@@ -130,39 +130,39 @@ struct TodoWidgetContent: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(height: layout.height, alignment: .topLeading).clipped()
     }
-    @ViewBuilder private func task(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
+    @ViewBuilder private func task(_ item: TodoItem, metrics: WidgetLayoutMetrics, row: WidgetRowMetrics) -> some View {
         if interactive {
             Button(intent: SetTodoCompletionIntent(taskID: item.id, completed: !item.isCompleted)) {
-                HStack(spacing: metrics.gap) { mark(item, metrics: metrics); title(item, metrics: metrics) }
-                    .frame(height: metrics.rowHeight).contentShape(Rectangle())
+                HStack(alignment: .top, spacing: metrics.gap) { mark(item, metrics: metrics, row: row); title(item, metrics: metrics, row: row) }
+                    .frame(height: row.height, alignment: .top).contentShape(Rectangle())
             }
             .buttonStyle(.plain).invalidatableContent()
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
         } else {
-            HStack(spacing: metrics.gap) {
+            HStack(alignment: .top, spacing: metrics.gap) {
                 Button { onPreviewMarker?(item.id) } label: {
-                    mark(item, metrics: metrics).contentShape(Rectangle())
+                    mark(item, metrics: metrics, row: row).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).accessibilityLabel("编辑\(item.title)的标记")
                 .accessibilityIdentifier("preview.marker.\(item.id.uuidString)")
-                Button { onPreviewToggle?(item.id) } label: { title(item, metrics: metrics).contentShape(Rectangle()) }
+                Button { onPreviewToggle?(item.id) } label: { title(item, metrics: metrics, row: row).contentShape(Rectangle()) }
                     .buttonStyle(.plain).accessibilityLabel("仅预览\(item.isCompleted ? "恢复" : "完成")：\(item.title)")
                     .accessibilityIdentifier("preview.toggle.\(item.id.uuidString)")
-            }.frame(height: metrics.rowHeight).contentShape(Rectangle())
+            }.frame(height: row.height, alignment: .top).contentShape(Rectangle())
         }
     }
-    private func mark(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
+    private func mark(_ item: TodoItem, metrics: WidgetLayoutMetrics, row: WidgetRowMetrics) -> some View {
         TodoMarkerView(marker: appearance.marker(for: item, widgetContext: true), completed: item.isCompleted,
             style: style.markerStyle, textColor: foreground)
             .readableText(isLightText: textIsLight, intensity: settings.intensity, enabled: tone.enabled)
-            .frame(width: metrics.markerWidth, height: metrics.rowHeight)
+            .frame(width: metrics.markerWidth, height: max(metrics.lineHeight, MarkerDrawing.extent(marker: appearance.marker(for: item, widgetContext: true), style: style.markerStyle, completed: item.isCompleted) + abs(style.markerStyle.verticalOffset) * 2), alignment: .center)
             .background {
                 if !interactive && selectedTaskID == item.id {
                     RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.opacity(0.12))
                 }
             }
     }
-    private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics) -> some View {
+    private func title(_ item: TodoItem, metrics: WidgetLayoutMetrics, row: WidgetRowMetrics) -> some View {
         // 标题与日期共用同一份颜色与淡出，避免日期不跟随完成效果
         let rowColor = item.isCompleted && style.textCompletion == .color ? safeColor(style.completionColor) : foreground
         let rowFade = item.isCompleted && style.textCompletion.fades ? 0.55 : 1
@@ -171,9 +171,10 @@ struct TodoWidgetContent: View {
                 .strikethrough(item.isCompleted && style.textCompletion.strikes)
                 .opacity(rowFade)
                 .foregroundStyle(rowColor)
-                .lineLimit(metrics.lineLimit).multilineTextAlignment(.leading)
+                .lineLimit(row.lineLimit).multilineTextAlignment(.leading)
                 .readableText(isLightText: textIsLight, intensity: settings.intensity,
                               enabled: tone.enabled)
+                .fixedSize(horizontal: false, vertical: true)
             if let schedule = item.schedule {
                 // 日期不划线；淡出与标题一致
                 Text(schedule.label).font(.system(size: max(10, fontSize * 0.68))).lineLimit(1)
@@ -183,7 +184,7 @@ struct TodoWidgetContent: View {
                                   enabled: tone.enabled)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading).frame(height: metrics.rowHeight).clipped()
+        .frame(maxWidth: .infinity, alignment: .leading).frame(height: row.height, alignment: .top).clipped()
 
     }
 }
@@ -213,12 +214,14 @@ struct WidgetContentLayout {
         let edge = ReadableRules.inset(settings.edgeInset, anchor: settings.anchor, canvasHeight: height, textHeight: 0)
         let metrics = WidgetLayoutMetrics.make(items: items, appearance: appearance, family: family, width: width,
             height: max(0, height - (settings.anchor == .center ? 0 : abs(edge))), fontLineHeight: lineHeight,
-            headerHeight: header.height, footerHeight: ceil(footerUnit * 1.3))
-        let shown = metrics.capacity > 0 ? style.rows(items, capacity: metrics.capacity) : []
+            headerHeight: header.height, footerHeight: ceil(footerUnit * 1.3), font: font,
+            dateLineHeight: measure("日期", font: NativeTypography.font(family: .system, weight: .regular, size: max(10, fontSize * 0.68))).height)
+        let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let shown = metrics.rows.compactMap { byID[$0.id] }
         let rows: Double
         if document == nil || shown.isEmpty && !items.isEmpty { rows = ceil(footerUnit * 1.3) }
         else if items.isEmpty { rows = lineHeight }
-        else { rows = Double(shown.count) * metrics.rowHeight + Double(max(0, shown.count - 1)) * metrics.spacing }
+        else { rows = metrics.usedHeight }
         let textHeight = (header.height > 0 ? header.height + metrics.spacing : 0) + rows
             + (metrics.showsFooter ? metrics.footerHeight + metrics.spacing : 0)
         let geometry = ReadableContentGeometry(canvasHeight: height, textHeight: textHeight)

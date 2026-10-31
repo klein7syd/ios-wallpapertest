@@ -412,7 +412,7 @@ struct WidgetAppearanceEditor: View {
         }
         Toggle("紧凑布局", isOn: widget.compact)
         Picker("每项文字行数", selection: Binding(get: { store.appearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
-            Text("自动").tag(0); Text("单行").tag(1); Text("最多两行").tag(2)
+            Text("自动").tag(0); Text("1 行").tag(1); Text("2 行").tag(2); Text("3 行").tag(3); Text("4 行").tag(4)
         }.pickerStyle(.menu)
         Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { store.appearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {

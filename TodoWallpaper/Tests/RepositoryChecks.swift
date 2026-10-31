@@ -62,6 +62,7 @@ enum RepositoryChecks {
         print("PASS: CRUD, Unicode, completion/restore, reorder, fresh-instance persistence, backup, rejected writes, unknown schema and corruption preservation.")
         try MigrationChecks.run()
         try UIStateChecks.run()
+        try WidgetWrappingChecks.run()
         try WidgetFeedbackChecks.run()
         try EditorRefinementChecks.run()
         try FeedbackRepairChecks.run()

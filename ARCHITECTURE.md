@@ -52,7 +52,7 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 字段表（只列已从源码确认的字段；完整默认值以源码为准）：
 
 `TodoAppearance`：`schemaVersion = 1`、`defaultMarker: TodoMarker`、`markerStyle: MarkerStyle`、`widget: WidgetAppearance`。
-`WidgetAppearance`：`theme`、`backdrop`、`panelColor`、`followsSystemText`、`textColor`、`font`、`weight`、`fontSize`(12…20)、`markerOverride: TodoMarker?`、`markerStyle`、`spacing`(-10…40)、`compact`、`maximumItems`(1…10)、`completed`、`completedTextStyle`、`completedTextColor`、`showsSeparators`、`header: WidgetHeaderAppearance?`、`backgroundPhotoName`、`backgroundCrop`、`backgroundPhotoOpacity`(0…1)、`photoRotation`、`systemMaterial`、`showsFooter`、`maximumTitleLines`(1…2)、`unifiedMarkers`、`hidesCompletedTasks`、`readableAnchor`、`readableIntensity`、`readableScrimOverride`(0…0.8)、`readableHeightRatio`(0.25…0.7)、`readableShadowPreset`、`readableEdgeInset`（居中存储允许有限值；顶部/底部兼容旧 -40…40，编辑与渲染夹取到 -12…40）。
+`WidgetAppearance`：`theme`、`backdrop`、`panelColor`、`followsSystemText`、`textColor`、`font`、`weight`、`fontSize`(12…20)、`markerOverride: TodoMarker?`、`markerStyle`、`spacing`(-10…40)、`compact`、`maximumItems`(1…10)、`completed`、`completedTextStyle`、`completedTextColor`、`showsSeparators`、`header: WidgetHeaderAppearance?`、`backgroundPhotoName`、`backgroundCrop`、`backgroundPhotoOpacity`(0…1)、`photoRotation`、`systemMaterial`、`showsFooter`、`maximumTitleLines`(1…4)、`unifiedMarkers`、`hidesCompletedTasks`、`readableAnchor`、`readableIntensity`、`readableScrimOverride`(0…0.8)、`readableHeightRatio`(0.25…0.7)、`readableShadowPreset`、`readableEdgeInset`（居中存储允许有限值；顶部/底部兼容旧 -40…40，编辑与渲染夹取到 -12…40）。
 `WidgetHeaderAppearance`：`text`(≤40 无换行)、`fontSize`(12…32)、`color`、`followsTextColor`、`showsTitle`、`showsSummary`、`horizontalPosition`(0…1)、`topInset`(0…24，已不参与布局)。
 `ReadableSettings`：`anchor`、`intensity`、`scrimOverride: Double?`、`heightRatio`、`shadowPreset`、`edgeInset`。
 `WidgetAlbumRotation`：`title`(≤100)、`photos`(1…60)、`anchor: Date`、`enabled`。
@@ -101,7 +101,8 @@ UserDefaults（实际签名后的 App Group suite）：旧 `readable.analysis.<�
 
 ## e. 布局与测量
 
-`WidgetLayoutMetrics.make`：行高 = `max(标记高度, 行高×行数 + 日期高) + padding`；`padding = min(4, spacing×0.8)`（负 spacing 时为 0）；容量 = `(行空间 + spacing) / (行高 + spacing)` 向下取整，再与 `maximumItems` 取小。`WidgetHeaderLayout.make`：`titleY = 0`、标题高度与摘要高度参与 header 高度。CoreText 测量结果按「字体:字重:字号:前 10 条标题」缓存到 `WidgetMeasureCache.heights`（`NSCache`，上限 96）。
+`WidgetLayoutMetrics.make` 对已排序/过滤的项目逐项分配 WidgetRowMetrics（ID、行数、行高、日期高度）。WidgetTitleMeasure 用 NativeTypography 的实际 CTFont、完整标题、列宽（扣标记列与gap）做 CTFramesetter 测量；列宽减1pt容差，512项有界缓存。自动上限小号2行，中/大号3行，显式1…4行。按顺序累加高度，只有末项可缩行；不足一行停止。日期只占本项目高度，负行距只压装饰留白。WidgetContentLayout 用实际逐项累计高度决定锚点范围，同一个结果用于 App 预览、背景和 Widget。header测量缓存继续保留。
+
 
 ## f. 编辑页与撤销
 

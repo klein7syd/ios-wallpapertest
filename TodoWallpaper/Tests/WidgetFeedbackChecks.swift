@@ -51,8 +51,7 @@ enum WidgetFeedbackChecks {
                             look.widget.markerStyle.emojiSize = size; look.widget.showsSeparators = separators
                             let m = WidgetLayoutMetrics.make(items: [item], appearance: look, family: family,
                                 width: 112, height: height, fontLineHeight: line, headerHeight: max(22, line), footerHeight: max(15, line * 0.6))
-                            let count = m.capacity
-                            let used = Double(count) * m.rowHeight + Double(max(0, count - 1)) * (m.spacing + m.separatorHeight)
+                            let used = m.usedHeight
                             try require(used <= m.availableRowHeight + 0.00001, "Dynamic fonts/large markers/reduced logical size cannot overflow rows")
                             try require(m.markerWidth == size && m.gap == 32, "Fit by reducing rows, never by silent marker/gap clamps")
                         }
