@@ -12,7 +12,9 @@ struct TodoWallpaperApp: App {
     #if TODO_UI_CHECKS
     @State private var didRunUIProbe = false
     @MainActor init() {
-        if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
+        if ProcessInfo.processInfo.arguments.contains("--native-mode-performance") {
+            _store = StateObject(wrappedValue: ModePerformanceFixture.makeStore())
+        } else if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
             _store = StateObject(wrappedValue: NativeUIProbe.makeStore())
             UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--native-advanced"), forKey: EditorStandards.advancedKey)
         }
@@ -25,6 +27,12 @@ struct TodoWallpaperApp: App {
             .onChange(of: contentMode) { _, value in if value == "lianxin" { Task { await lianxinModel.load(); await lianxinModel.prepareStyle(store) } } }
             .task {
                 #if TODO_UI_CHECKS
+                if ProcessInfo.processInfo.arguments.contains("--native-mode-performance") {
+                    guard !didRunUIProbe else { return }; didRunUIProbe = true
+                    await ModePerformanceFixture.run(store: store, lianxin: lianxinModel, todo: wallpaperModel, heart: lianxinWallpaperModel,
+                        getMode: { contentMode }, setMode: { contentMode = $0 }, selectPage: { navigation.selectPage($0) })
+                    return
+                }
                 if ProcessInfo.processInfo.arguments.contains("--native-ui-probe") {
                     guard !didRunUIProbe else { return }
                     didRunUIProbe = true
