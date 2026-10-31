@@ -16,15 +16,32 @@ struct LianxinProfile: Codable, Equatable, Sendable {
     var photoName: String?
     var message = ""
     var messageIdol = ""
+    var groupName: String?
+    var otherNames: [String]?
+    var position: String?
+    var fanName: String?
+    var personality: String?
+    var catchphrases: String?
+    var exampleLines: [String]?
+    var notes: String?
+    var verifiedProfile: LianxinVerifiedProfile?
+    var recentNames: [String]?
+    var recentGroups: [String]?
+    var sourceLanguage: String?
+    var translationEnabled: Bool?
+    var translationLanguage: String?
+    var translation: String?
 }
 
 enum LianxinError: LocalizedError {
-    case invalidEndpoint, requiresHTTPS, missingInput, invalidKey, invalidResponse, http(Int), storage, balance, network
+    case invalidEndpoint, requiresHTTPS, missingInput, invalidKey, invalidResponse, http(Int), storage, balance, network, invalidLanguage, invalidRole
     var errorDescription: String? {
         switch self {
         case .invalidEndpoint: return "请填写完整的 HTTPS 接口地址，不能包含账号、密码、查询参数或锚点。"
         case .missingInput: return "请填写你的称呼、IDOL 名字、提示词和模型名称。"
         case .invalidKey: return "请填写有效的 API 密钥，不能包含空格或换行。"
+        case .invalidRole: return "请填写名字，并检查公开形象信息的字数。其他角色信息都可留空。"
+        case .invalidLanguage: return "请填写自定义语言名称（最多20字），说话语言与译文语言需要不同。"
         case .invalidResponse: return "接口没有返回可用文字，或内容过长。请确认它支持 Chat Completions 格式。"
         case .requiresHTTPS: return "需要 https，请向服务商确认安全的接口地址后再填。"
         case .balance: return "账户余额不足，请到服务商充值，再回来测试连接。"
@@ -55,24 +72,30 @@ final class LianxinRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
 
 struct LianxinAPIService: AIServiceProtocol {
     static func request(profile: LianxinProfile, key: String) throws -> URLRequest {
+        try LianxinRoleRules.validate(profile)
+        try LianxinLanguageRules.validate(profile)
+        guard !profile.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              profile.userName.count <= 100, profile.prompt.count <= 12000 else { throw LianxinError.missingInput }
+        var request = try authorizedRequest(profile: profile, key: key)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": profile.model.trimmingCharacters(in: .whitespacesAndNewlines), "stream": false,
+            "messages": [["role": "system", "content": LianxinWritingRules.system(profile)], ["role": "user", "content": profile.prompt]]
+        ])
+        return request
+    }
+    // 连接测试/角色核对共用传输安全校验，不受尚未填写的创作提示词或语言影响。
+    static func authorizedRequest(profile: LianxinProfile, key: String) throws -> URLRequest {
         let address = profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: address), components.scheme?.lowercased() == "https",
               let host = components.host, !host.isEmpty, components.user == nil, components.password == nil,
               components.query == nil, components.fragment == nil, let url = components.url else { throw LianxinError.invalidEndpoint }
-        let fields = [profile.prompt, profile.model]
-        guard fields.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
-              profile.userName.count <= 100, profile.idolName.count <= 100,
-              profile.prompt.count <= 12000, profile.model.count <= 200 else { throw LianxinError.missingInput }
+        guard !profile.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, profile.model.count <= 200 else { throw LianxinError.missingInput }
         guard !key.isEmpty, key.count <= 4096, key.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { throw LianxinError.invalidKey }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 60
         request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "model": profile.model.trimmingCharacters(in: .whitespacesAndNewlines), "stream": false,
-            "messages": [["role": "system", "content": LianxinWritingRules.system(profile)], ["role": "user", "content": profile.prompt]]
-        ])
         return request
     }
 
@@ -137,7 +160,7 @@ extension LianxinAPIService: LianxinConnectionService {
     static func testRequest(profile: LianxinProfile, key: String) throws -> URLRequest {
         var fixture = profile
         fixture.userName = "测试"; fixture.idolName = "测试"; fixture.prompt = "回复好"
-        var request = try Self.request(profile: fixture, key: key)
+        var request = try Self.authorizedRequest(profile: fixture, key: key)
         request.httpBody = try JSONSerialization.data(withJSONObject: ["model": fixture.model, "stream": false,
             "max_tokens": 1, "messages": [["role": "user", "content": "Hi"]]])
         return request
@@ -164,29 +187,29 @@ extension LianxinAPIService: LianxinConnectionService {
 // 体验模式由独立分支分发，不构造网络请求，也不接收真实密钥。
 enum LianxinGeneration {
     static func generate(example: Bool, profile: LianxinProfile, key: String, service: any AIServiceProtocol) async throws -> String {
-        if example { return try await MockLianxinService(text: LianxinWritingRules.example(profile)).generate(profile: profile, key: "") }
+        if example { return try await MockLianxinService(text: LianxinSamples.response(profile)).generate(profile: profile, key: "") }
         return try await service.generate(profile: profile, key: key)
     }
 }
 
 // 中文硬规则集中在一处，用户提示词原文始终单独作为user消息。
 enum LianxinWritingRules {
-    static let task = "你为用户创作粉丝向的应援话语。"
-    static let rules = "语气、关系、情境、语言和长度按用户提示词决定。要求：不编造真实发生过的事件、行程、作品、数据或私人信息；不声称这是本人真实发言；只输出话语本身，不加引号、解释或前缀；不超过200字。"
+    static let task = "你为用户创作粉丝向的应援话语。话语是创作，不是真实人物的真实言论。"
+    static let writing = """
+    写作准则：口语化，像发给对方的一条私信或一段语音。用短句，句式有长短变化，不要整齐的排比。可以有一个虚构的小场景或细节（时间、动作、感受），但不编造真实发生过的事件。称呼自然使用，最多一两次。避免鸡汤、空洞抒情、客套话和书面套话。不要自称 AI，不解释自己在做什么，不出现“作为……”。默认1~3句，中文约60字以内；长度、语气、情境以用户提示词为准，但最终原文和译文各不超过200字，安全规则始终有效。表情符号除非用户要求，否则不用。
+    以下仅为虚构人物的风格对照，不得照抄，不代表目标人物真实经历。
+    反例：“愿你在人生的旅途中，如星辰般闪耀，岁月不负，前程似锦。”
+    正例：“今天练习到很晚，刚坐上车就想到你了。{称呼}回家路上慢点走，到家说一声。”
+    """
+    static let plainOutput = "输出格式：只输出话语本身，不加引号、前缀、标题或解释，不使用 Markdown，不超过200字。"
+    static let translatedOutput = "输出格式：只返回一个 JSON 对象，不要代码围栏，不要任何前后文字：{\"text\":\"原文\",\"translation\":\"译文\"}。text 和 translation 各不超过200字。"
     static func system(_ profile: LianxinProfile) -> String {
-        let idol = profile.idolName.trimmingCharacters(in: .whitespacesAndNewlines)
         let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return ([task] + (idol.isEmpty ? [] : ["创作对象：" + idol + "。话语必须明显围绕" + idol + "，按提示词设定以其口吻或对其表达。"])
-            + (user.isEmpty ? [] : ["读者的称呼：" + user + "。在合适处自然地称呼" + user + "。"])
-            + [rules]).joined(separator: "\n")
+        return [task, LianxinRoleRules.block(profile), writing.replacingOccurrences(of: "{称呼}", with: user.isEmpty ? "" : user + "，"),
+                LianxinLanguageRules.block(profile), profile.translationEnabled == true ? translatedOutput : plainOutput].joined(separator: "\n\n")
     }
     static func example(_ profile: LianxinProfile) -> String {
-        let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let idol = profile.idolName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lead = user.isEmpty ? "" : user + "，"
-        let subject = idol.isEmpty ? "喜欢的那束光" : idol
-        let templates = ["今天也辛苦啦。愿想起\(subject)时的那份暖意，陪你做个甜甜的梦。", "把对\(subject)的喜欢，也分一点给努力生活的自己吧。", "今天先好好休息，明天带着喜欢\(subject)的心情，继续向前走。", "愿\(subject)带给你的勇气，陪你走过平凡而闪亮的一天。"]
-        return lead + templates[abs((profile.exampleIndex ?? 0) % templates.count)]
+        LianxinSamples.text(profile, language: LianxinLanguageRules.source(profile))
     }
     static func connected(profile: LianxinProfile, hasKey: Bool) -> Bool {
         let id = LianxinProviderPreset.preset(profile.providerID).id

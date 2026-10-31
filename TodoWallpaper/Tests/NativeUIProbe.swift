@@ -241,9 +241,12 @@ enum NativeUIProbe {
             analysisCache.registerMissing(actualRequest)
             analysisStore.resumePhotoAnalysis()
             for _ in 0..<70 {
-                if analysisCache.contains(actualRequest) && analysisCache.knownRequests().count == 8 { break }
+                // 缓存由后台先落盘，observable通知稍后到MainActor；必须等同一断言的两部分。
+                if analysisStore.analysisRevision > 0 && analysisCache.contains(actualRequest) && analysisCache.knownRequests().count == 8 { break }
                 try await Task.sleep(for: .milliseconds(100))
             }
+            report["photo_analysis_at_assertion"] = ["revision": analysisStore.analysisRevision,
+                "request_count": analysisCache.knownRequests().count, "actual_request_present": analysisCache.contains(actualRequest)] as [String: Any]
             try require(analysisStore.analysisRevision > 0 && analysisCache.contains(actualRequest)
                         && analysisCache.knownRequests().count == 8
                         && analysisCache.knownRequests().allSatisfy { $0.crop == PhotoCrop(zoom: 2, panX: 0.5) },
