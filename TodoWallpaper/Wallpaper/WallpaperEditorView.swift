@@ -40,6 +40,8 @@ struct WallpaperEditorView: View {
     }
     private var textFits: Bool { !isLianxin || (model.layout?.lianxinOverflow == false && (try? lianxinModel.publication.validate()) != nil) }
     private func syncPhoto() async {
+        let span = EditorModePerformance.beginStage("SyncWallpaperPhoto"); defer { EditorModePerformance.endStage("SyncWallpaperPhoto", span) }
+        EditorModePerformance.count("sync_photo_calls")
         guard isLianxin, model.ready, !model.busy else { return }
         let name = store.appearance.lianxin?.photoName(at: .now)
         guard !hasSyncedPhoto || name != appliedSharedPhoto else { return }
@@ -121,7 +123,7 @@ struct WallpaperEditorView: View {
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" }.disabled(model.busy)
+                    Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .wallpaper, current: contentMode) { contentMode = $0 } }.disabled(model.busy)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
@@ -154,6 +156,7 @@ struct WallpaperEditorView: View {
                     await syncPhoto()
                 } else if tool == .header || tool == .content { navigation.selectTool(.text) }
                 syncOutputFields()
+                EditorModePerformance.shared.presented(page: .wallpaper, mode: contentMode)
             }
             .onChange(of: model.settings) { _, _ in if isLianxin { lianxinModel.scheduleSync() } }
             .onChange(of: model.busy) { _, busy in if !busy { Task { await syncPhoto() } } }
