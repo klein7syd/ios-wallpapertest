@@ -55,6 +55,8 @@ struct TodoWallpaperApp: App {
                 }
                 #endif
                 store.reload()
+                await lianxinModel.load()
+                if contentMode == "lianxin" { await lianxinModel.prepareStyle(store) }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { store.reload() } else { store.flushAppearance() }
@@ -66,7 +68,7 @@ struct TodoWallpaperApp: App {
                 TodoListView(store: store)
                     .tabItem { Label("待办", systemImage: "checklist") }
                     .tag(AppPage.todos)
-                WallpaperEditorView(store: store, navigation: $navigation, model: wallpaperModel)
+                WallpaperEditorView(store: store, navigation: $navigation, model: contentMode == "lianxin" ? lianxinWallpaperModel : wallpaperModel).id(contentMode)
                     .tabItem { Label("壁纸", systemImage: "photo") }
                     .tag(AppPage.wallpaper)
                 NavigationStack { WidgetAppearanceEditor(store: store) }.id(contentMode)
