@@ -83,7 +83,10 @@ actor LianxinStorage {
 
 @MainActor
 final class LianxinModel: ObservableObject {
-    @Published var profile = LianxinProfile() { didSet { if loaded && oldValue != profile { scheduleInputSave(); scheduleSync() } } }
+    @Published var profile = LianxinProfile() { didSet {
+        if oldValue.idolName != profile.idolName || oldValue.groupName != profile.groupName { pendingRole = nil }
+        if loaded && oldValue != profile { scheduleInputSave(); scheduleSync() }
+    } }
     @Published var key = ""
     @Published private(set) var photo: UIImage?
     @Published private(set) var loaded = false
@@ -94,13 +97,14 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var availableModels: [String] = []
     @Published private(set) var keySaved = false
     @Published var connectionNotice: String?
+    @Published var pendingRole: LianxinRoleResult?
     weak var styleStore: TodoStore?
     @Published private(set) var currentContent: LianxinPublication?
     @Published private(set) var syncedAt: Date?
     @Published private(set) var syncError: String?
     var publication: LianxinPublication { currentContent ?? LianxinPublication(idol: "连心", text: "", photo: nil, date: .distantPast) }
     private var draftContent: LianxinPublication {
-        LianxinPublication(idol: profile.idolName.isEmpty ? profile.messageIdol : profile.idolName, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent)
+        LianxinPublication(idol: profile.idolName.isEmpty ? profile.messageIdol : profile.idolName, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent, translation: profile.translationEnabled == true ? profile.translation : nil)
     }
     private var syncTask: Task<Void, Never>?
     private var styleObserver: AnyCancellable?
@@ -110,8 +114,9 @@ final class LianxinModel: ObservableObject {
     private var generationID = UUID()
 
     private let connection: any LianxinConnectionService
-    init(service: any AIServiceProtocol = LianxinAPIService(), connection: any LianxinConnectionService = LianxinAPIService()) {
-        self.service = service; self.connection = connection
+    private let checking: any LianxinProfileChecking
+    init(service: any AIServiceProtocol = LianxinAPIService(), connection: any LianxinConnectionService = LianxinAPIService(), checking: any LianxinProfileChecking = LianxinAPIService()) {
+        self.service = service; self.connection = connection; self.checking = checking
     }
     var provider: LianxinProviderPreset { LianxinProviderPreset.preset(profile.providerID) }
     private var credentialAccount: String { LianxinSetupRules.account(provider.id) }
@@ -292,6 +297,7 @@ final class LianxinModel: ObservableObject {
 
     func generate() {
         guard loaded, !busy else { return }
+        profile = LianxinLanguageRules.normalized(profile)
         let input = profile
         let secret = key.trimmingCharacters(in: .whitespacesAndNewlines)
         do { if !exampleMode { _ = try LianxinAPIService.request(profile: input, key: secret) } }
@@ -302,16 +308,21 @@ final class LianxinModel: ObservableObject {
         generation = Task {
             defer { if generationID == id { busy = false; generation = nil } }
             do {
-                let text = try await LianxinGeneration.generate(example: isExample, profile: input, key: secret, service: service)
+                let raw = try await LianxinGeneration.generate(example: isExample, profile: input, key: secret, service: service)
+                let result = LianxinGeneratedMessage.parse(raw, translated: input.translationEnabled == true)
                 try Task.checkCancellation()
                 guard generationID == id else { return }
                 var updated = input
-                updated.message = text; updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
+                updated.message = result.text; updated.translation = result.translation
+                updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
                 updated.exampleContent = isExample
                 if isExample { updated.exampleIndex = ((input.exampleIndex ?? 0) % 4) + 1 }
                 else { updated.connectedSignature = signature }
+                LianxinRoleRules.remember(&updated)
                 try await storage.save(updated)
                 profile = updated
+                notice = result.notice
+                if isExample && !LianxinLanguageRules.choices.contains(LianxinLanguageRules.source(input)) { notice = "体验模式暂用中文示例；自定义语言请连接自己的 AI。" }
             } catch is CancellationError { }
             catch let failure as URLError where failure.code == .cancelled { }
             catch {
@@ -324,13 +335,48 @@ final class LianxinModel: ObservableObject {
 
     func cancel() { generation?.cancel() }
 
+    func checkRole() {
+        guard loaded, !busy, connected, !exampleMode else { notice = "核对 TA 需要先连接自己的 AI；仅主动点击时才会请求。"; return }
+        let input = profile, secret = key
+        do { _ = try LianxinAPIService.roleRequest(profile: input, key: secret) }
+        catch { self.error = error.localizedDescription; return }
+        busy = true; pendingRole = nil
+        let id = UUID(); generationID = id
+        generation = Task {
+            defer { if generationID == id { busy = false; generation = nil } }
+            do {
+                let raw = try await checking.checkRole(profile: input, key: secret)
+                try Task.checkCancellation()
+                guard generationID == id else { return }
+                let result = LianxinRoleResult.parse(raw)
+                if result.reviewable { pendingRole = result }
+                else { notice = "AI 对这个名字不够确定，建议补充团体或手动填写设定。" }
+            } catch is CancellationError { }
+            catch let failure as URLError where failure.code == .cancelled { }
+            catch { self.error = (error as? LianxinError)?.localizedDescription ?? LianxinError.network.localizedDescription }
+        }
+    }
+    func confirmRole() async {
+        guard let result = pendingRole, result.reviewable, !LianxinRoleRules.clean(result.member).isEmpty else { return }
+        profile = LianxinRoleRules.confirmed(result, in: profile)
+        pendingRole = nil
+        await saveInputsNow()
+    }
+    func updateLanguage(source: String? = nil, target: String? = nil, enabled: Bool? = nil) {
+        var next = profile
+        if let source { next.sourceLanguage = source }
+        if let target { next.translationLanguage = target }
+        if let enabled { next.translationEnabled = enabled }
+        profile = LianxinLanguageRules.normalized(next)
+    }
+
     func scheduleSync() {
         guard loaded else { return }
         syncTask?.cancel()
         let draft = draftContent
         guard (try? draft.validate()) != nil else { return } // 无效输入不覆盖上一份有效内容。
-        if currentContent?.text != draft.text || currentContent?.idol != draft.idol || currentContent?.example != draft.example {
-            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example)
+        if currentContent?.text != draft.text || currentContent?.idol != draft.idol || currentContent?.example != draft.example || currentContent?.translation != draft.translation {
+            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example, translation: draft.translation)
         }
         let content = publication
         syncTask = Task {

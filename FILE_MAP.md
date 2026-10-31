@@ -72,7 +72,7 @@
 | Widget/TodoWallpaperWidget.swift | Widget | Widget bundle：Provider、View、Timeline 策略 | TodoWidgetEntry, TodoWidgetProvider, TodoWidgetView |
 | App/LianxinService.swift | App + macOS检查 | 连心资料、可替换 AI 协议与 HTTPS 请求/解码 | LianxinProfile, AIServiceProtocol, LianxinAPIService, MockLianxinService, LianxinWritingRules |
 | App/LianxinModel.swift | App | 连心状态、钥匙串、输入保存与共享底图桥接 | LianxinKeychain, LianxinStorage, LianxinModel, LianxinSystemCredentials |
-| App/LianxinView.swift | App | 连心双预览、输入自动保存、内容发布和编辑器跳转 | LianxinView, LianxinFieldStyle |
+| App/LianxinView.swift | App | 连心双预览、角色/语言卡片、输入保存、内容自动同步和编辑器跳转 | LianxinView, LianxinFieldStyle |
 | Core/LianxinPublication.swift | App + Widget | 当前有效连心内容的原子共享快照 | LianxinPublication |
 | Widget/LianxinWidget.swift | Widget | 连心组件五种尺寸及双组件 Bundle | LianxinEntry, LianxinProvider, LianxinWidgetView, LianxinWidget, TodoWallpaperWidgetBundle |
 | Tests/LianxinChecks.swift | 独立 macOS 原生检查 | 请求校验、错误处理、发布和凭证隔离 | LianxinChecks |
@@ -84,3 +84,7 @@
 | Shared/LianxinWidgetContent.swift | App + Widget | 连心共用正文、署名与默认关闭的可选标注 | LianxinWidgetContent |
 | Core/WallpaperContentSource.swift | App + Widget | 待办/连心壁纸内容来源和强制分享标注 | WallpaperContentSource |
 | Tests/LianxinWallpaperChecks.swift | 独立 macOS 原生检查 | 连心长文完整折行、溢出阻止导出、PNG元数据和旧材质兼容 | LianxinWallpaperChecks |
+| App/LianxinRole.swift | App + macOS检查 | 私有角色资料、确认结果、提示词角色块、语言、宽容JSON与核对协议 | LianxinRoleResult, LianxinVerifiedProfile, LianxinJSON, LianxinFit, LianxinRoleRules, LianxinLanguageRules, LianxinGeneratedMessage, LianxinProfileChecking |
+| App/LianxinSamples.swift | App + macOS检查 | 四种语言的离线对应示例 | LianxinSamples |
+| App/LianxinRoleView.swift | App | 角色折叠表单、主动核对确认、语言与翻译卡片 | LianxinRoleView, LianxinLanguageView |
+| Tests/LianxinRoleChecks.swift | 独立 macOS原生检查 | 角色提示词、确认隔离、语言解析、共享隐私及离线模板 | LianxinRoleChecks |

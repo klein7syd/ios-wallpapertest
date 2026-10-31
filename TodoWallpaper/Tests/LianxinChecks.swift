@@ -61,6 +61,7 @@ enum LianxinChecks {
         let json = String(decoding: bytes, as: UTF8.self)
         try require(!json.contains("endpoint") && !json.contains("prompt") && !json.contains("test-only-placeholder"), "共享数据不含连接凭证或私有提示词")
         try await LianxinWizardChecks.run()
+        try await LianxinRoleChecks.run()
         print("PASS: 连心请求校验、用户提示词、响应错误、Mock替换、组件原子发布及凭证隔离；未调用真实 API。")
     }
 }
