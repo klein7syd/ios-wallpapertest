@@ -17,9 +17,11 @@ private struct WidgetEditState: Equatable {
 }
 struct WidgetAppearanceEditor: View {
     @ObservedObject var store: TodoStore
+    let mode: ContentMode
+    let active: Bool
+    @Binding var selectedContentMode: String
     @EnvironmentObject private var lianxinModel: LianxinModel
-    @AppStorage(ContentMode.key) private var contentMode = "todo"
-    private var isLianxin: Bool { contentMode == ContentMode.lianxin.rawValue }
+    private var isLianxin: Bool { mode == .lianxin }
     private var editingAppearance: TodoAppearance {
         var root = store.appearance; root.widget = root.style(in: isLianxin ? .lianxin : .todo); return root
     }
@@ -94,11 +96,11 @@ struct WidgetAppearanceEditor: View {
             .onChange(of: tool) { _, next in edits.finish(editState); if next != .theme { cropPhoto = false } }
             .onChange(of: editingAppearance.widget.backdrop) { _, _ in cropPhoto = false }
             .onChange(of: advanced) { _, _ in edits.finish(editState) }
-            .onChange(of: previousWidgetMarker) { _, value in store.retainPhotoAssets(PhotoAssetReferences.marker(value), owner: "widget.previousMarker") }
+            .onChange(of: previousWidgetMarker) { _, value in store.retainPhotoAssets(PhotoAssetReferences.marker(value), owner: "widget.previousMarker." + mode.rawValue) }
     }
     private var analysisObservers: some View {
         editingObservers
-            .onChange(of: systemScheme) { _, value in store.updateAnalysisSystemTheme(dark: value == .dark) }
+            .onChange(of: systemScheme) { _, value in if active { store.updateAnalysisSystemTheme(dark: value == .dark) } }
             .onChange(of: previewDay) { _, _ in updateAnalysisPriority() }
             .onChange(of: family) { _, _ in updateAnalysisPriority() }
             .onChange(of: currentAnalysisPhotoName) { _, _ in updateAnalysisPriority() }
@@ -167,7 +169,7 @@ struct WidgetAppearanceEditor: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { contentMode = isLianxin ? "todo" : "lianxin" } }
+            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .widget, current: mode.rawValue) { selectedContentMode = $0 } } }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil || importingPhoto)
@@ -183,16 +185,16 @@ struct WidgetAppearanceEditor: View {
     private var configuredEditor: some View {
         editorSurface
         .onAppear {
-            isVisible = true
             configureAssetRetention()
-            updateAnalysisPriority()
-            store.updateAnalysisSystemTheme(dark: systemScheme == .dark)
-            store.resumePhotoAnalysis()
-            edits.synchronize(editState)
+            if active { activateEditor() }
             #if TODO_UI_CHECKS
             if ProcessInfo.processInfo.arguments.contains("--native-widget-text") { tool = .text }
             if ProcessInfo.processInfo.arguments.contains("--native-widget-header") { tool = .header }
             #endif
+        }
+        .onChange(of: active) { _, visible in
+            if visible { activateEditor() }
+            else { edits.finish(editState); isVisible = false; store.flushAppearance() }
         }
         .onChange(of: editState) { previous, next in
             guard isVisible else { return }
@@ -213,7 +215,8 @@ struct WidgetAppearanceEditor: View {
                 } catch { self.error = error.localizedDescription }
             }
         }
-        .task {
+        .task(id: active) {
+            guard active else { return }
             if let legacy = ReadableSettingsMigration.take() {
                 var next = editingAppearance.widget
                 if next.readableAnchor == nil { next.readableAnchor = legacy.anchor }
@@ -232,13 +235,21 @@ struct WidgetAppearanceEditor: View {
             }
         }
     }
+    private func activateEditor() {
+        isVisible = true
+        updateAnalysisPriority()
+        store.updateAnalysisSystemTheme(dark: systemScheme == .dark)
+        store.resumePhotoAnalysis()
+        edits.synchronize(editState)
+        EditorModePerformance.shared.presented(page: .widget, mode: mode.rawValue)
+    }
     private func configureAssetRetention() {
         edits.retainedValuesChanged = { values in
             let names = values.reduce(into: Set<String>()) { result, value in
                 result.formUnion(PhotoAssetReferences.widget(value.style))
                 for item in value.markers { result.formUnion(PhotoAssetReferences.marker(item.marker)) }
             }
-            store.retainPhotoAssets(names, owner: "widget")
+            store.retainPhotoAssets(names, owner: "widget." + mode.rawValue)
         }
         edits.retainedValuesChanged(edits.retainedValues)
     }
@@ -483,6 +494,7 @@ struct WidgetAppearanceEditor: View {
         return settings.autoScrim(analysis: analysis, isLightText: tone.isLightText)
     }
     private func updateAnalysisPriority() {
+        guard active else { return }
         store.prioritizePhotoAnalysis(photoName: editingAppearance.widget.photoName(at: photoDate), canvasAspect: family.width / family.height)
     }
     private var readableAnchor: Binding<TextAnchor> {

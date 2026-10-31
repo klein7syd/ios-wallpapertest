@@ -69,6 +69,9 @@ actor LianxinStorage {
         let source = root.appendingPathComponent(name + ".source")
         return try Data(contentsOf: original && FileManager.default.fileExists(atPath: source.path) ? source : thumbnail)
     }
+    func sharedPhotoData(name: String, directory: URL) throws -> Data {
+        try Data(contentsOf: WidgetPhotoReference.url(for: name, in: directory))
+    }
     func publish(_ content: LianxinPublication, directory: URL) throws {
         try Task.checkCancellation()
         try content.save(directory: directory)
@@ -128,7 +131,10 @@ final class LianxinModel: ObservableObject {
 
 
     func load() async {
+        let span = EditorModePerformance.beginStage("LoadLianxin"); defer { EditorModePerformance.endStage("LoadLianxin", span) }
+        EditorModePerformance.count("profile_load_calls")
         guard !loaded else { return }
+        EditorModePerformance.count("profile_disk_reads")
         do {
             let saved = try await storage.load()
             profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
@@ -178,7 +184,7 @@ final class LianxinModel: ObservableObject {
         if let store = styleStore, store.appearance.lianxin != nil {
             guard let name = store.appearance.lianxin?.photoName(at: .now) else { return nil }
             if name == profile.sharedPhotoName, let original = try await storage.photoData(profile.photoName, original: true) { return original }
-            return try Data(contentsOf: WidgetPhotoReference.url(for: name, in: mediaDirectory()))
+            return try await storage.sharedPhotoData(name: name, directory: mediaDirectory())
         }
         return try await storage.photoData(profile.photoName, original: true)
     }
@@ -199,11 +205,14 @@ final class LianxinModel: ObservableObject {
     }
 
     func prepareStyle(_ store: TodoStore) async {
+        let span = EditorModePerformance.beginStage("PrepareLianxinStyle"); defer { EditorModePerformance.endStage("PrepareLianxinStyle", span) }
+        EditorModePerformance.count("prepare_style_calls")
         styleStore = store
         if styleObserver == nil {
             styleObserver = store.$appearance.map(\.lianxin).removeDuplicates().dropFirst().sink { [weak self] _ in self?.scheduleSync() }
         }
         guard store.appearance.lianxin == nil else { return }
+        EditorModePerformance.count("style_initializations")
         do {
             var name: String?
             let legacyPhoto = try await storage.photoData(profile.photoName)
