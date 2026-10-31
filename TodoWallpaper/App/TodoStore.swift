@@ -160,6 +160,8 @@ final class TodoStore: ObservableObject {
         guard let repository else { throw TodoDataError.migrationRequired }
         return repository
     }
+    // 生产返回App Group；显式注入的原生检查仓库返回同一媒体目录，不引入私有回退。
+    func mediaDirectory() throws -> URL { try activeAppearanceRepository().directory }
     private func activeAppearanceRepository() throws -> AppearanceRepository {
         if let appearanceRepository { return appearanceRepository }
         return try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory())

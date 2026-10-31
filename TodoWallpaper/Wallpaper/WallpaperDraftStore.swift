@@ -8,11 +8,14 @@ struct WallpaperLoadedDraft: Sendable {
 /// A private, local wallpaper draft. Never reads or writes the App Group todo files.
 actor WallpaperDraftStore {
     private let files = FileManager.default
+    private let initialSettings: WallpaperSettings
     let directory: URL
     let exportDirectory: URL
 
     init(directory: URL = URL.applicationSupportDirectory.appendingPathComponent("WallpaperEditor", isDirectory: true),
-         exportDirectory: URL = URL.cachesDirectory.appendingPathComponent("WallpaperExports", isDirectory: true)) {
+         exportDirectory: URL = URL.cachesDirectory.appendingPathComponent("WallpaperExports", isDirectory: true),
+         initialSettings: WallpaperSettings = WallpaperSettings()) {
+        self.initialSettings = initialSettings
         self.directory = directory
         self.exportDirectory = exportDirectory
     }
@@ -20,7 +23,7 @@ actor WallpaperDraftStore {
     func load() throws -> WallpaperLoadedDraft {
         let url = directory.appendingPathComponent("draft-v1.json")
         guard files.fileExists(atPath: url.path) else {
-            return WallpaperLoadedDraft(draft: WallpaperDraft(), photoURL: nil)
+            return WallpaperLoadedDraft(draft: WallpaperDraft(settings: initialSettings), photoURL: nil)
         }
         let data = try Data(contentsOf: url)
         guard let header = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

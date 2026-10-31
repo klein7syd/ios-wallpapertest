@@ -68,8 +68,8 @@ actor LianxinStorage {
         let source = root.appendingPathComponent(name + ".source")
         return try Data(contentsOf: original && FileManager.default.fileExists(atPath: source.path) ? source : thumbnail)
     }
-    func publish(_ content: LianxinPublication) throws {
-        try content.save(directory: TodoSharedStorage.sharedDirectory())
+    func publish(_ content: LianxinPublication, directory: URL) throws {
+        try content.save(directory: directory)
     }
     func removePhoto(_ name: String?) {
         guard let name, let root = try? directory(), let url = try? WidgetPhotoReference.url(for: name, in: root) else { return }
@@ -91,7 +91,6 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var availableModels: [String] = []
     @Published private(set) var keySaved = false
     @Published var connectionNotice: String?
-    @Published var wallpaperRequest: LianxinWallpaperRequest?
     weak var styleStore: TodoStore?
     var publication: LianxinPublication {
         LianxinPublication(idol: profile.messageIdol.isEmpty ? profile.idolName : profile.messageIdol, text: profile.message, photo: nil, date: .now, example: profile.exampleContent)
@@ -154,14 +153,43 @@ final class LianxinModel: ObservableObject {
         inputSaveTask?.cancel()
         do { try await storage.save(profile) } catch { self.error = "输入未保存，请重试。" }
     }
-    func wallpaperPhotoData() async throws -> Data? { try await storage.photoData(profile.photoName, original: true) }
+    private func mediaDirectory() throws -> URL {
+        if let store = styleStore { return try store.mediaDirectory() }
+        return try TodoSharedStorage.sharedDirectory()
+    }
+    func wallpaperPhotoData() async throws -> Data? {
+        if let store = styleStore, store.appearance.lianxin != nil {
+            guard let name = store.appearance.lianxin?.photoName(at: .now) else { return nil }
+            if name == profile.sharedPhotoName, let original = try await storage.photoData(profile.photoName, original: true) { return original }
+            return try Data(contentsOf: WidgetPhotoReference.url(for: name, in: mediaDirectory()))
+        }
+        return try await storage.photoData(profile.photoName, original: true)
+    }
+    func syncBackdrop() async throws {
+        guard let store = styleStore else { return }
+        var root = store.appearance; root.initializeLianxin()
+        if let data = try await storage.photoData(profile.photoName) {
+            let name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: mediaDirectory())
+            root.lianxin?.backgroundPhotoName = name; root.lianxin?.backdrop = .photo
+            root.lianxin?.photoRotation?.enabled = false; root.lianxin?.backgroundCrop = PhotoCrop()
+            try store.saveAppearance(root)
+            profile.sharedPhotoName = name
+        } else {
+            root.lianxin?.backgroundPhotoName = nil; root.lianxin?.photoRotation = nil; root.lianxin?.backdrop = .system
+            try store.saveAppearance(root); profile.sharedPhotoName = nil
+        }
+        try await storage.save(profile)
+    }
 
     func prepareStyle(_ store: TodoStore) async {
         styleStore = store
         guard store.appearance.lianxin == nil else { return }
         do {
             var name: String?
-            if let data = try await storage.photoData(profile.photoName) { name = try await WidgetPhotoStore.shared.importPhoto(data) }
+            let legacyPhoto = try await storage.photoData(profile.photoName)
+            let publishedPhoto = try LianxinPublication.load(directory: mediaDirectory())?.photo
+            if let data = legacyPhoto ?? publishedPhoto { name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: mediaDirectory()) }
+            profile.sharedPhotoName = name
             var root = store.appearance; root.initializeLianxin(photoName: name)
             try store.saveAppearance(root)
         } catch { self.error = "连心样式初始化失败，请重试。" }
@@ -225,6 +253,7 @@ final class LianxinModel: ObservableObject {
         defer { busy = false }
         let oldName = profile.photoName
         var importedName: String?
+        var privatePhotoCommitted = false
         do {
             var updated = profile
             var image: UIImage?
@@ -236,10 +265,13 @@ final class LianxinModel: ObservableObject {
             } else { updated.photoName = nil }
             try Task.checkCancellation()
             try await storage.save(updated)
+            privatePhotoCommitted = true
             profile = updated; photo = image
+            try await syncBackdrop()
             await storage.removePhoto(oldName)
         } catch {
-            await storage.removePhoto(importedName)
+            if !privatePhotoCommitted { await storage.removePhoto(importedName) }
+            if privatePhotoCommitted { self.error = "照片已保留，但共享样式尚未更新，请重新选择后重试。"; return }
             if !(error is CancellationError) { self.error = "底图未能保存，原来的照片已保留。" }
         }
     }
@@ -278,7 +310,7 @@ final class LianxinModel: ObservableObject {
 
     func cancel() { generation?.cancel() }
 
-    func output(text: String, wallpaper: Bool) async {
+    func output(text: String) async {
         guard loaded, !busy else { return }
         busy = true
         defer { busy = false }
@@ -286,13 +318,10 @@ final class LianxinModel: ObservableObject {
             let content = LianxinPublication(idol: profile.messageIdol, text: text.trimmingCharacters(in: .whitespacesAndNewlines),
                                             photo: try await storage.photoData(profile.photoName), date: .now, example: profile.exampleContent)
             try content.validate()
-            if wallpaper {
-                wallpaperRequest = LianxinWallpaperRequest(content: content, sourcePhoto: try await storage.photoData(profile.photoName, original: true))
-            } else {
-                try await storage.publish(content)
-                WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
-                notice = "已发布到连心小组件。首次使用请长按桌面，添加“连心”；锁屏也可添加。刷新时间由系统决定。"
-            }
+            try await storage.publish(content, directory: mediaDirectory())
+            WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
+            notice = "已发布到连心小组件，系统决定刷新时间。"
+
         } catch { self.error = "未能输出。请确认文案为 1–200 字，并检查共享存储和剩余空间。原有小组件内容已保留。" }
     }
 }
