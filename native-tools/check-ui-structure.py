@@ -20,7 +20,16 @@ viewport = read('TodoWallpaper/App/InspectorComponents.swift')
 extension = read('TodoWallpaper/Widget/TodoWallpaperWidget.swift')
 shared = read('TodoWallpaper/Shared/TodoWidgetContent.swift')
 require(all(f'.tag(AppPage.{page})' in app for page in ['todos','wallpaper','widget','lianxin','about']), 'Five selectable native TabView root pages including Lianxin')
-require('TabView(selection:' in app and 'NavigationStack { WidgetAppearanceEditor(store: store) }' in app, 'Widget editor is real root-tab content')
+require('TabView(selection:' in app and 'NavigationStack { WidgetAppearanceEditor(store: store, mode: mode, active: active, selectedContentMode: $contentMode) }' in app, 'Widget editor is real root-tab content')
+mode_host = read('TodoWallpaper/App/RetainedModeEditors.swift')
+require(app.count('RetainedModeEditors(selection:') == 2 and '.id(contentMode)' not in app
+    and 'visited.contains(mode) || selection == mode' in mode_host
+    and '.allowsHitTesting(pageIsActive && selection == mode)' in mode_host
+    and '.accessibilityHidden(!pageIsActive || selection != mode)' in mode_host,
+    'Both root editors lazily retain fixed-mode sessions and exclude inactive controls from touch/accessibility')
+require('syncSharedPhoto(reference:' in wallpaper and 'syncSharedPhoto(reference:' in read('TodoWallpaper/App/LianxinView.swift')
+    and 'mode_shared_photo_dedup_crop_relaunch_and_cancel' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
+    'Preview/editor share model-owned source synchronization, with native dedup/crop/relaunch/cancellation assertions')
 require('WidgetAppearanceEditor' not in app[app.index('struct AboutView:'):] and 'WidgetAppearanceEditor' not in wallpaper, 'No duplicate pushed Widget-editor entrances')
 require('if navigation.isEditing {' not in app and 'primaryTabs' in app and '@StateObject private var wallpaperModel' in app, 'System TabView stays mounted while editing; cached model remains stable')
 require('CircularDock' not in wallpaper + viewport and 'toolDock(' not in wallpaper, 'Obsolete circular navigation Dock removed')
@@ -169,7 +178,7 @@ require('WidgetPhotoStore().import' not in widget + marker + album and 'transact
     and 'cleanOrphanAnalysis' in photo_store,
     '回收保护导入、十分钟新文件、权威数据和备份，并清除孤立分析')
 require('retainedValuesChanged' in widget and 'retainedValuesChanged' in wallpaper and 'steps.flatMap' in read('TodoWallpaper/Core/EditorHistory.swift')
-    and 'owner: "widget"' in widget and 'owner: "wallpaper"' in wallpaper and 'store.collectPhotoAssets()' in widget,
+    and 'owner: "widget." + mode.rawValue' in widget and 'owner: "wallpaper." + mode.rawValue' in wallpaper and 'store.collectPhotoAssets()' in widget,
     '两个编辑器所有撤销快照都进入保留集合，相册和移除照片后触发回收')
 require('TodoSharedStorage.appSnapshot()' in store and 'accept(snapshot.document)' in store
     and 'TodoSharedStorage.widgetSnapshot().document' in extension and 'existingSnapshot' in read('TodoWallpaper/Core/TodoRepository.swift'),

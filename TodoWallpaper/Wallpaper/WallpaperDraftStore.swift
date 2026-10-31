@@ -59,6 +59,12 @@ actor WallpaperDraftStore {
         }
     }
 
+    // actor内比较源文件，首次恢复同一底图时也保留原裁剪，不重复导入/解码。
+    func photoMatches(_ data: Data, name: String?) throws -> Bool {
+        guard let url = try photoURL(for: name), files.fileExists(atPath: url.path) else { return false }
+        return try Data(contentsOf: url, options: .mappedIfSafe) == data
+    }
+
     func save(_ draft: WallpaperDraft, replaceUnreadable: Bool = false) throws {
         try files.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("draft-v1.json")
