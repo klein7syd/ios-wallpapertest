@@ -42,11 +42,55 @@ enum NativeUIProbe {
         try png.write(to: directory.appendingPathComponent(name + ".png"))
         return image
     }
+    static func checkSharedPhotoSync() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mode-photo-\(UUID())")
+        let files = WallpaperDraftStore(directory: directory)
+        let model = WallpaperEditorModel(files: files)
+        await model.start(items: [], appearance: TodoAppearance())
+        let painter = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 180))
+        guard let first = painter.image(actions: { UIColor.red.setFill(); $0.fill(CGRect(x: 0, y: 0, width: 120, height: 180)) }).pngData(),
+              let second = painter.image(actions: { UIColor.blue.setFill(); $0.fill(CGRect(x: 0, y: 0, width: 120, height: 180)) }).pngData() else { throw WallpaperError.encodingFailed }
+        var reads = 0
+        let pending = Task { @MainActor in
+            try await model.syncSharedPhoto(reference: "first") { reads += 1; try await Task.sleep(for: .milliseconds(30)); return first }
+        }
+        try await Task.sleep(for: .milliseconds(5))
+        try await model.syncSharedPhoto(reference: "first") { reads += 1; return first }
+        try await pending.value
+        let originalName = model.photoName
+        model.settings.backgroundZoom = 2; model.settings.backgroundPanX = 0.3
+        for _ in 0..<20 { try await model.syncSharedPhoto(reference: "first") { reads += 1; return first } }
+        try require(reads == 1 && model.photoName == originalName && model.settings.backgroundZoom == 2 && model.settings.backgroundPanX == 0.3,
+                    "Concurrent preview/editor and 20 reactivations reuse one source import, keeping crop")
+        await model.saveNow()
+        let restored = WallpaperEditorModel(files: files)
+        await restored.start(items: [], appearance: TodoAppearance())
+        try await restored.syncSharedPhoto(reference: "first") { first }
+        try require(restored.photoName == originalName && restored.settings.backgroundZoom == 2 && restored.settings.backgroundPanX == 0.3,
+                    "First sync after relaunch compares identical source off-main, keeping draft and crop")
+        try await restored.syncSharedPhoto(reference: "second") { second }
+        try require(restored.photoName != originalName && restored.settings.backgroundZoom == 1, "A changed source really imports and resets crop")
+        try await restored.syncSharedPhoto(reference: nil) { nil }
+        try require(!restored.hasPhoto, "Removing shared source also removes wallpaper source")
+        var rejected = false
+        do { _ = try await files.photoMatches(first, name: "../outside.source") } catch { rejected = true }
+        try require(rejected, "Same-source optimization retains validated sandbox paths")
+        try await restored.syncSharedPhoto(reference: "slow") { try await Task.sleep(for: .milliseconds(2)); return first }
+        let slow = Task { @MainActor in try await restored.syncSharedPhoto(reference: "cancelled") { try await Task.sleep(for: .milliseconds(50)); return first } }
+        try await Task.sleep(for: .milliseconds(5))
+        try await restored.syncSharedPhoto(reference: "latest") { second }
+        _ = try? await slow.value
+        let latestName = restored.photoName
+        try await restored.syncSharedPhoto(reference: "latest") { throw WallpaperError.unreadablePhoto }
+        try require(restored.photoName == latestName && restored.hasPhoto, "Superseded read cannot overwrite latest source; stable reference does not re-read")
+    }
     static func run() async {
         let output = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("native-ui-checks")
         var report: [String: Any] = ["result": "failed", "environment": "iOS Simulator; not a real iPhone", "system": UIDevice.current.systemVersion]
         do {
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+            try await checkSharedPhotoSync()
+            report["mode_shared_photo_dedup_crop_relaunch_and_cancel"] = "passed"
             try await Task.sleep(for: .milliseconds(200))
             // Execute the production editing-session coordinator on iOS, including
             // gesture coalescing, retry after failure, and the draft/photo restore path.

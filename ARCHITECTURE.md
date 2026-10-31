@@ -4,6 +4,11 @@
 
 ## a. 模块总览
 
+**模式切换与性能（App/RetainedModeEditors, App/EditorModePerformance）**
+两个壁纸模型继续由App的StateObject持有。两个编辑页各用RetainedModeEditors按模式首次懒建、之后保留；固定mode绑定各自样式与撤销会话，active决定加载、分析优先级和可交互性，隐藏页退出触摸与无障碍树。撤销资源保留owner包含模式名，避免互相覆盖。壁纸model统一syncSharedPhoto，主页预览与编辑器共享引用/在途任务；同引用零读取，新引用串行替换。首次恢复时WallpaperDraftStore actor比较源文件，相同则不重导入、不重置裁剪；共享照片读取也在LianxinStorage actor。原草稿目录、原图导出、独立裁剪和原有字形/实时层缓存保持。
+
+公开os_signpost记录EditorModeSwitch与分段；CFRunLoopObserver记录非等待区间，CADisplayLink在编辑器就绪后两帧结束。CI专用夹具用两张2400×3600合成图、200字中韩原文与译文，触发同一生产按钮action，区分首次与21次热切换。该数据是Simulator Debug程序触发、主循环墙钟时间，不能等同真机触摸延迟或独占CPU；Time Profiler原始trace与JSON放在构建产物mode-performance中，采集失败保留日志并失败，不伪造调用栈。
+
 **待办数据（Core/TodoItem, TodoRepository, TodoStore）**
 `TodoItem` / `TodoDocument` 是值类型模型；`TodoRepository` 负责 `todos-v1.json` 的加锁读写、备份与校验；`TodoStore`（`@MainActor` 观察者）持有内存状态并在变更后 `reloadTimelines`。入口：`TodoListView`、`SetTodoCompletionIntent`。
 
