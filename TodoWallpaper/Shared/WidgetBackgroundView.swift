@@ -65,11 +65,22 @@ struct WidgetBackgroundView: View {
     }
 }
 enum WidgetPhotoCache {
+    #if TODO_UI_CHECKS
+    // CI夹具使用显式仓库目录；生产与扩展仍只使用App Group。
+    static var checkDirectory: URL?
+    #endif
     private static let cache = NSCache<NSString, CGImage>()
+    private static let decodeLock = NSLock()
+    private static var decodes = 0
+    static var sourceDecodeCount: Int { decodeLock.lock(); defer { decodeLock.unlock() }; return decodes }
     static func releaseDecodedSources() { cache.removeAllObjects() }
     static func image(named name: String?, sharedDirectory: URL? = nil) -> CGImage? {
         guard let name, WidgetPhotoReference.isValid(name) else { return nil }
-        guard let directory = sharedDirectory ?? (try? TodoSharedStorage.sharedDirectory()),
+        var directory = sharedDirectory
+        #if TODO_UI_CHECKS
+        directory = directory ?? checkDirectory
+        #endif
+        guard let directory = directory ?? (try? TodoSharedStorage.sharedDirectory()),
               let url = try? WidgetPhotoReference.url(for: name, in: directory) else { return nil }
         let key = url.path as NSString
         if let cached = cache.object(forKey: key) { return cached }
@@ -78,6 +89,7 @@ enum WidgetPhotoCache {
                 kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 1024,
                 kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
         cache.totalCostLimit = 4 * 1024 * 1024
+        decodeLock.lock(); decodes += 1; decodeLock.unlock()
         cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
         return image
     }
