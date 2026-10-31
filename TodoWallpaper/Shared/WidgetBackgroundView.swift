@@ -66,6 +66,9 @@ struct WidgetBackgroundView: View {
 }
 enum WidgetPhotoCache {
     private static let cache = NSCache<NSString, CGImage>()
+    private static let decodeLock = NSLock()
+    private static var decodes = 0
+    static var sourceDecodeCount: Int { decodeLock.lock(); defer { decodeLock.unlock() }; return decodes }
     static func releaseDecodedSources() { cache.removeAllObjects() }
     static func image(named name: String?, sharedDirectory: URL? = nil) -> CGImage? {
         guard let name, WidgetPhotoReference.isValid(name) else { return nil }
@@ -78,6 +81,7 @@ enum WidgetPhotoCache {
                 kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 1024,
                 kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
         cache.totalCostLimit = 4 * 1024 * 1024
+        decodeLock.lock(); decodes += 1; decodeLock.unlock()
         cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
         return image
     }

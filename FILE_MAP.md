@@ -92,3 +92,4 @@
 | App/LianxinContentControls.swift | App | 两个编辑器的连心内容选项与译文高级参数 | LianxinContentControls, LianxinTranslationControls |
 | Tests/LianxinDisplayChecks.swift | 独立 macOS原生检查 | 次要行预算、标记、标题、三种显示及旧样式 | LianxinDisplayChecks |
 | Tests/LianxinDisplayRenderChecks.swift | 独立 macOS原生检查 | 生产壁纸双语、标题标记、字号及独立样式 | LianxinDisplayRenderChecks |
+| App/EditorModePerformance.swift | App | os_signpost切换采样、主线程忙碌区间及CI专用夹具 | EditorModeSample, EditorModePerformance, ModePerformanceFixture |
