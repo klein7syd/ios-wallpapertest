@@ -1,7 +1,20 @@
 // Target Membership：仅 App；网络协议检查在 macOS 独立编译。
 import Foundation
 
+struct LianxinProviderConfiguration: Codable, Equatable, Sendable {
+    var endpoint: String
+    var model: String
+    var connectedSignature: String?
+    var setupFinished: Bool?
+}
+
 struct LianxinProfile: Codable, Equatable, Sendable {
+    // 全部仅存App私有目录；nil兼容旧版，密钥不在此结构中。
+    var schemaVersion: Int?
+    var providerConfigurations: [String: LianxinProviderConfiguration]?
+    var messageGroup: String?
+    var messageIdentityCaptured: Bool?
+    var pendingPhotoSync: Bool?
     var providerID: String?
     var setupFinished: Bool?
     var connectedSignature: String?
@@ -54,20 +67,23 @@ struct LianxinProfile: Codable, Equatable, Sendable {
 }
 
 enum LianxinError: LocalizedError {
-    case invalidEndpoint, requiresHTTPS, missingInput, invalidKey, invalidResponse, http(Int), storage, balance, network, invalidLanguage, invalidRole
+    case invalidEndpoint, requiresHTTPS, missingInput, invalidKey, invalidResponse, http(Int), storage, balance, quota, missingModel, network, invalidLanguage, invalidRole
     var errorDescription: String? {
         switch self {
         case .invalidEndpoint: return "请填写完整的 HTTPS 接口地址，不能包含账号、密码、查询参数或锚点。"
-        case .missingInput: return "请填写你的称呼、IDOL 名字、提示词和模型名称。"
+        case .missingInput: return "请填写想听什么（最多12000字），并检查称呼是否超过100字。"
         case .invalidKey: return "请填写有效的 API 密钥，不能包含空格或换行。"
         case .invalidRole: return "请填写名字，并检查公开形象信息的字数。其他角色信息都可留空。"
         case .invalidLanguage: return "请填写自定义语言名称（最多20字），说话语言与译文语言需要不同。"
         case .invalidResponse: return "接口没有返回可用文字，或内容过长。请确认它支持 Chat Completions 格式。"
         case .requiresHTTPS: return "需要 https，请向服务商确认安全的接口地址后再填。"
+        case .missingModel: return "请在连接设置中选择或填写模型名称（最多200字）。"
+        case .quota: return "账户额度或用量上限已用完，请到服务商查看配额、预算和可用额度后再试。"
         case .balance: return "账户余额不足，请到服务商充值，再回来测试连接。"
         case .network: return "网络连不上或请求超时，请检查网络后重试；部分服务商可能需要特定网络。"
         case .http(let code):
-            if code == 401 || code == 403 { return "密钥不对或已失效，请检查是否复制完整，再重新保存并测试。" }
+            if code == 401 { return "密钥不对或已失效，请检查是否复制完整，再重新保存并测试。" }
+            if code == 403 { return "请求被服务商拒绝，请检查密钥是否复制完整，以及模型权限、账号或地域限制。" }
             if code == 402 { return LianxinError.balance.localizedDescription }
             if code == 404 { return "接口地址或模型名不对，请重新选择服务商/模型；自定义服务请核对最终地址。" }
             if code == 429 { return "请求太频繁或额度用完，请稍后重试，或到服务商查看额度。" }
@@ -109,7 +125,7 @@ struct LianxinAPIService: AIServiceProtocol {
         guard let components = URLComponents(string: address), components.scheme?.lowercased() == "https",
               let host = components.host, !host.isEmpty, components.user == nil, components.password == nil,
               components.query == nil, components.fragment == nil, let url = components.url else { throw LianxinError.invalidEndpoint }
-        guard !profile.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, profile.model.count <= 200 else { throw LianxinError.missingInput }
+        guard !profile.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, profile.model.count <= 200 else { throw LianxinError.missingModel }
         guard !key.isEmpty, key.count <= 4096, key.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { throw LianxinError.invalidKey }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -138,7 +154,8 @@ struct LianxinAPIService: AIServiceProtocol {
     static func error(status: Int, data: Data = Data()) -> LianxinError {
         if status == 401 || status == 403 { return .http(status) }
         let text = String(decoding: data.prefix(65536), as: UTF8.self).lowercased()
-        if status == 402 || ["insufficient_balance", "insufficient balance", "insufficient_quota", "余额不足", "balance not enough"].contains(where: { text.contains($0) }) { return .balance }
+        if status == 402 || ["insufficient_balance", "insufficient balance", "余额不足", "balance not enough"].contains(where: { text.contains($0) }) { return .balance }
+        if ["insufficient_quota", "quota_exceeded", "quota exceeded", "usage_limit", "用量上限", "配额不足"].contains(where: { text.contains($0) }) { return .quota }
         return .http(status)
     }
     static func fetch(_ request: URLRequest) async throws -> Data {
@@ -185,22 +202,52 @@ extension LianxinAPIService: LianxinConnectionService {
             "max_tokens": 1, "messages": [["role": "user", "content": "Hi"]]])
         return request
     }
+    // 极小请求可以因token上限返回空正文，但必须仍是有效Chat Completions响应。
+    static func validateTestResponse(_ data: Data) throws {
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["error"] == nil,
+              let choice = (object["choices"] as? [[String: Any]])?.first,
+              let message = choice["message"] as? [String: Any],
+              message["role"] as? String == "assistant",
+              message["content"] is String || choice["finish_reason"] as? String == "length" else { throw LianxinError.invalidResponse }
+    }
     static func models(_ data: Data) throws -> [String] {
-        struct List: Decodable { struct Model: Decodable { let id: String }; let data: [Model] }
-        guard let result = try? JSONDecoder().decode(List.self, from: data) else { throw LianxinError.invalidResponse }
-        return Array(Set(result.data.map(\.id).filter { !$0.isEmpty && $0.count <= 200 })).sorted()
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = object["data"] as? [[String: Any]] else { throw LianxinError.invalidResponse }
+        let candidates = entries.compactMap { entry -> String? in
+            guard let id = entry["id"] as? String, !id.isEmpty, id.count <= 200 else { return nil }
+            if let architecture = entry["architecture"] as? [String: Any],
+               let outputs = architecture["output_modalities"] as? [String], !outputs.contains("text") { return nil }
+            if let type = entry["sub_type"] as? String, type != "chat" { return nil }
+            // 无能力元数据的目录只排除明确的非聊天类型，未知型号仍允许用户手动验证。
+            let lower = id.lowercased()
+            if ["embedding", "rerank", "whisper", "transcribe", "tts-", "dall-e", "image-generation", "moderation"].contains(where: { lower.contains($0) }) { return nil }
+            return id
+        }
+        return Array(Set(candidates)).sorted()
+    }
+    static func modelsRequest(provider: LianxinProviderPreset, key: String) -> URLRequest? {
+        guard let endpoint = provider.modelsEndpoint, var parts = URLComponents(string: endpoint) else { return nil }
+        // 预设本身仍为无查询参数的官方地址；只在这里添加官方支持的受控目录过滤。
+        if provider.id == "siliconflow" { parts.queryItems = [URLQueryItem(name: "sub_type", value: "chat")] }
+        guard let url = parts.url else { return nil }
+        var request = URLRequest(url: url); request.timeoutInterval = 8
+        request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
+        return request
     }
     func test(profile: LianxinProfile, key: String, provider: LianxinProviderPreset) async throws -> [String] {
-        // OpenRouter公开模型列表不证明密钥有效，先做最小生成请求。
-        if provider.modelsEndpoint == nil || provider.id == "openrouter" {
-            _ = try await Self.fetch(Self.testRequest(profile: profile, key: key))
-        }
-        guard let endpoint = provider.modelsEndpoint, let url = URL(string: endpoint) else { return [profile.model] }
-        var request = URLRequest(url: url); request.timeoutInterval = 30
-        request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
-        let models = try Self.models(await Self.fetch(request))
-        guard !models.isEmpty else { throw LianxinError.invalidResponse }
-        return models
+        // 每次用户主动测试仅发一条极短生成请求，不自动重试；目录不能证明所选模型可用。
+        let response = try await Self.fetch(Self.testRequest(profile: profile, key: key))
+        try Self.validateTestResponse(response)
+        try Task.checkCancellation()
+        guard let request = Self.modelsRequest(provider: provider, key: key) else { return [profile.model] }
+        do {
+            let models = try Self.models(await Self.fetch(request))
+            try Task.checkCancellation()
+            return [profile.model] + models.filter { $0 != profile.model }
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as URLError where error.code == .cancelled { throw error }
+        catch { return [profile.model] } // 目录是可选增强；已验证的模型不因目录失败变成不可用。
     }
 }
 

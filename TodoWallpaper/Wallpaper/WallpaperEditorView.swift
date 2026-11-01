@@ -268,7 +268,9 @@ struct WallpaperEditorView: View {
                     case .marker: markerControls
                     case .output: outputControls
                     case .header: lianxinHeaderControls
-                    case .content: LianxinContentControls(value: lianxinDisplay, wallpaper: true, hasTranslation: !(lianxinModel.publication.translation ?? "").isEmpty)
+                    case .content:
+                        LianxinContentControls(value: lianxinDisplay, wallpaper: true, hasTranslation: LianxinPresentation.translatedCount(lianxinModel.publication) > 0)
+                        Text(LianxinPresentation.translationSummary(lianxinModel.publication)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -562,6 +564,7 @@ struct WallpaperEditorView: View {
         if isLianxin {
             next.widget.lianxinMarker = next.defaultMarker; next.widget.lianxinDisplayStyle = model.settings.lianxinDisplay
             next.widget.header = model.settings.lianxinHeader; next.widget.lianxinCustomTitle = model.settings.lianxinCustomTitle
+            next.widget.lianxinCustomSubtitle = model.settings.lianxinCustomSubtitle
         }
         next.widget.markerStyle.completion = completion
         next.widget.markerStyle.completionEmoji = completionEmoji

@@ -222,17 +222,47 @@ struct LianxinGeneratedBatch {
         "输出格式：只返回JSON，不加围栏或前后文字：{\"understood\":\"团体 · 成员 · 定位（一句话≤40字，不确定写unknown）\",\"confidence\":\"high|medium|low\",\"lines\":[{\"text\":\"话语\"" + (p.translationEnabled == true ? ",\"translation\":\"译文\"" : "") + "}]}。lines恰好" + String(p.requestedCount) + "条；围绕用户同一个需求，每条从不同的小场景、动作、关心方式或情绪切入，不换个同义词重复上一句，不统一用称呼开头；名字团体只出现在understood，话语默认省略。输出前检查整批是否重复点名、重复句式、硬塞TMI，改自然后再返回。每条中文约60字以内，text及translation各不超过200字。不使用 Markdown。"
     }
     static func parse(_ raw: String, count: Int, translated: Bool) -> Self {
+        let requested = min(8, max(1, count))
         let json = LianxinJSON.object(raw)
-        let entries = json?["lines"] as? [[String: Any]]
-        var values = (entries ?? []).compactMap { value -> LianxinLine? in
-            guard let text = value["text"] as? String else { return nil }
-            let line = LianxinLine(text: text, translation: translated ? value["translation"] as? String : nil)
-            return line.isValid ? line : nil
+        var entries: [[String: Any]] = []
+        if let array = json?["lines"] as? [Any] { entries = array.compactMap { $0 as? [String: Any] } }
+        else if let json, json["lines"] == nil, json["text"] is String { entries = [json] } // 兼容旧单句协议。
+        var values = entries.compactMap { value -> LianxinLine? in
+            let text = LianxinRoleRules.clean(value["text"] as? String)
+            guard !text.isEmpty, text.count <= 200 else { return nil }
+            let candidate = LianxinRoleRules.clean(value["translation"] as? String)
+            let translation = translated && !candidate.isEmpty && candidate.count <= 200 ? candidate : nil
+            return LianxinLine(text: text, translation: translation)
         }
-        let parsed = entries != nil
-        if !parsed { values = LianxinJSON.unfenced(raw).components(separatedBy: .newlines).map { LianxinLine(text: $0.trimmingCharacters(in: .whitespacesAndNewlines), translation: nil) }.filter(\.isValid) }
-        values = Array(values.prefix(min(8, max(1, count))))
-        return Self(lines: values, understood: parsed ? String(LianxinRoleRules.clean(json?["understood"] as? String).prefix(40)) : "", confidence: parsed ? (["high", "medium", "low"].contains(LianxinRoleRules.clean(json?["confidence"] as? String).lowercased()) ? LianxinRoleRules.clean(json?["confidence"] as? String).lowercased() : "low") : "low",
-            notice: values.count < count ? "本次只生成了\(values.count)句，可以重新生成。" : translated && values.contains { ($0.translation ?? "").isEmpty } ? LianxinGeneratedMessage.translationWarning : nil)
+        if json == nil {
+            let plain = LianxinJSON.unfenced(raw)
+            // 结构化残片不能进入自动发布；无法可靠恢复时保留上一批内容，等待用户重试。
+            let looksStructured = plain.contains("{") || plain.contains("}") || plain.hasPrefix("[") || plain.contains("```")
+                || plain.range(of: #"["']?(?:text|translation|lines|understood|confidence)["']?\s*:"#, options: .regularExpression) != nil
+            if !looksStructured {
+                let rawLines = plain.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                let listPattern = #"^\s*(?:[0-9]{1,2}[.、)）]|[-•])\s*"#
+                let numbered = rawLines.filter { $0.range(of: listPattern, options: .regularExpression) != nil }
+                values = (numbered.isEmpty ? rawLines : numbered).compactMap { rawLine in
+                    let text = rawLine.replacingOccurrences(of: listPattern, with: "", options: .regularExpression)
+                    guard !text.isEmpty, text.count <= 200,
+                          !["以下是", "以下为", "这里是", "原文：", "译文："].contains(where: { text.hasPrefix($0) }) else { return nil }
+                    return LianxinLine(text: text, translation: nil)
+                }
+            }
+        }
+        var seen = Set<String>()
+        values = Array(values.filter { seen.insert($0.text).inserted }.prefix(requested))
+        var messages: [String] = []
+        if values.isEmpty { messages.append("没有解析到可用话语，请重新生成；原有内容已保留。") }
+        else {
+            if values.count < requested { messages.append("本次得到\(values.count)句有效话语，可以重新生成。") }
+            if translated && values.contains(where: { $0.translation == nil }) { messages.append(LianxinGeneratedMessage.translationWarning) }
+        }
+        let confidence = LianxinRoleRules.clean(json?["confidence"] as? String).lowercased()
+        return Self(lines: values,
+            understood: values.isEmpty ? "" : String(LianxinRoleRules.clean(json?["understood"] as? String).prefix(40)),
+            confidence: ["high", "medium", "low"].contains(confidence) ? confidence : "low",
+            notice: messages.isEmpty ? nil : messages.joined(separator: "\n"))
     }
 }

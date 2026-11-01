@@ -66,8 +66,13 @@ struct TodoWallpaperApp: App {
                 await lianxinModel.load()
                 if contentMode == "lianxin" { await lianxinModel.prepareStyle(store) }
             }
+            .onOpenURL { url in
+                guard url.scheme == "todowallpaper", url.host == "lianxin", url.query == nil else { return }
+                navigation.selectPage(.lianxin)
+            }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { store.reload() } else { store.flushAppearance() }
+                if phase == .active { store.reload() } else { store.flushAppearance(); Task { await lianxinModel.saveInputsNow() } }
+                if phase == .background { lianxinModel.cancel() }
             }
         }
     }
@@ -318,7 +323,7 @@ struct AboutView: View {
                     Text("原生待办与个性化壁纸")
                 }
                 Section("关于连心与 AI 创作") {
-                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；体验模式下的内容为示例，非 AI 生成。")
+                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；旧版本保留的体验内容为示例，非 AI 生成。")
                     Text("密钥只存在本机钥匙串，照片不会上传给 AI 服务商。复制、分享文字保留创作后缀，导出的 PNG 含创作说明元数据。")
                 }
                 Section("数据") {

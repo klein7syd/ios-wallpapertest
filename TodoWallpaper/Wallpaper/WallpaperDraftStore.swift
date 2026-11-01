@@ -99,14 +99,35 @@ actor WallpaperDraftStore {
         }
     }
 
+    // 历史归档保留的不只是参数；归档引用的源图也必须可恢复。
+    private func archivedPhotoReferences() throws -> Set<String> {
+        guard files.fileExists(atPath: directory.path) else { return [] }
+        var names = Set<String>()
+        for url in try files.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            where url.pathExtension == "json" && (url.lastPathComponent == "draft-v1.json" || url.lastPathComponent == "draft-before-d34.json" || url.lastPathComponent.hasPrefix("draft-preserved-")) {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else { throw WallpaperError.invalidDraft }
+            let draft = try JSONDecoder().decode(WallpaperDraft.self, from: Data(contentsOf: url))
+            guard draft.schemaVersion == 1 else { throw WallpaperError.unsupportedDraft }
+            if let name = draft.photoFileName { _ = try photoURL(for: name); names.insert(name) }
+        }
+        return names
+    }
+
     func cleanExpired(keeping photoName: String?) {
         let threshold = Date().addingTimeInterval(-86400)
+        // 任一归档不可读时，不推断它没有照片；本轮只清理可再生成的导出缓存。
+        let retained = try? archivedPhotoReferences().union(Set([photoName].compactMap { $0 }))
         for root in [directory, exportDirectory] {
             guard let urls = try? files.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
             for url in urls {
                 let isPhoto = url.lastPathComponent.hasPrefix("photo-") && url.pathExtension == "source"
                 let isExport = url.lastPathComponent.hasPrefix("TodoWallpaper-") && url.pathExtension == "png"
-                guard isPhoto || isExport, url.lastPathComponent != photoName,
+                guard isPhoto || isExport else { continue }
+                if isPhoto {
+                    guard let retained, !retained.contains(url.lastPathComponent) else { continue }
+                }
+                guard url.lastPathComponent != photoName,
                       let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]),
                       let date = values.contentModificationDate, date < threshold else { continue }
                 try? files.removeItem(at: url)
