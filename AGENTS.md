@@ -50,3 +50,11 @@
 
 ## 连心入口
 用户明确要求新增底栏业务入口，现为五页。连心私有资料与钥匙串不可写入组件；仅经校验的当前 LianxinPublication 自动同步进入 App Group。连心壁纸使用独立草稿目录，保留原待办/壁纸/组件行为。
+
+## 当前交付与验证规则（用户最新要求，优先于历史流程）
+- 默认只交付 Windows 安装包 zip 与不超过15行的 README；不默认生成 CodeReview.txt、SourceSnapshot.zip 或 Evidence。
+- 不默认更新 ARCHITECTURE.md、FILE_MAP.md、KNOWN_ISSUES.md；只有用户明确要求时才维护这些交接文档或运行 check_handoff。
+- 界面改动不新增原生检查；本轮仅增加明确要求的迁移、新旧数据兼容断言。已有检查随新产品行为调整，安全与兼容要求保留。
+- 每个任务完整CI最多运行一次，失败最多重试两次；能本地编译时优先本地编译，不反复运行完整CI排查采样工具。
+- 禁止在CI新增Instruments等性能采样门禁；编译不等于真机验证。
+- 按需源码审阅由用户自行运行 tools/export_review.sh，不经模型转写源码。

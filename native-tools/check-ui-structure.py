@@ -30,12 +30,6 @@ require(app.count('RetainedModeEditors(selection:') == 2 and '.id(contentMode)' 
 require('syncSharedPhoto(reference:' in wallpaper and 'syncSharedPhoto(reference:' in read('TodoWallpaper/App/LianxinView.swift')
     and 'mode_shared_photo_dedup_crop_relaunch_and_cancel' in read('TodoWallpaper/Tests/NativeUIProbe.swift'),
     'Preview/editor share model-owned source synchronization, with native dedup/crop/relaunch/cancellation assertions')
-mode_workflow = read('.github/workflows/todo-wallpaper.yml')
-mode_checks = read('native-tools/check-mode-performance.py')
-require('  mode-performance:' in mode_workflow and 'bash native-tools/record-mode-performance.sh' in mode_workflow
-    and 'continue-on-error' not in mode_workflow and '--metrics-only' in read('native-tools/check-ios-ui.sh')
-    and "assert sample_count>0" in mode_checks and 'not_run_metrics_only' in mode_checks,
-    'Numeric 44-action regression and strict Instruments job remain separate; neither represents the other as passed')
 require('WidgetAppearanceEditor' not in app[app.index('struct AboutView:'):] and 'WidgetAppearanceEditor' not in wallpaper, 'No duplicate pushed Widget-editor entrances')
 require('if navigation.isEditing {' not in app and 'primaryTabs' in app and '@StateObject private var wallpaperModel' in app, 'System TabView stays mounted while editing; cached model remains stable')
 require('CircularDock' not in wallpaper + viewport and 'toolDock(' not in wallpaper, 'Obsolete circular navigation Dock removed')

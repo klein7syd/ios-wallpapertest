@@ -10,23 +10,6 @@ concurrency:
   group: todo-wallpaper-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  mode-performance:
-    runs-on: macos-26
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Compile same production App and record mode switches
-        shell: bash
-        run: bash native-tools/record-mode-performance.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: editor-mode-performance-${{ github.run_number }}
-          path: TodoWallpaper/out/
-          retention-days: 7
-          if-no-files-found: error
   build-app:
     runs-on: macos-26
     timeout-minutes: 20
@@ -45,7 +28,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               print('version=' + metadata['version'], file=output)
           PY
-      - name: Check handoff, persistence and native PNG rendering, then build app and Widget
+      - name: Check persistence and native PNG rendering, then build app and Widget
         shell: bash
         run: bash native-tools/build-product.sh
       - uses: actions/upload-artifact@v4
