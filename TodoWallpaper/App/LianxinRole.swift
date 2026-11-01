@@ -76,6 +76,13 @@ enum LianxinRoleRules {
     static let verification = """
     根据名字（和团体，如有）回忆你确定知道的公开信息。不确定就返回 unknown，不要编造，不要写私人信息。只返回 JSON：{"recognized":true|false,"confidence":"high|medium|low","group":"","member":"","otherNames":[],"position":"","fanName":"","notes":""}。notes 不超过100字。不要补充住址、联系方式、行程、感情、健康或金钱信息。
     """
+    static let inference = "创作对象：{对象}。先根据名字和团体，回忆你确定知道的公开信息：所属团体、定位、粉丝名、公开形象里的说话风格。只使用你确定的信息，不确定就不要写、不要猜具体身份；名字可能指多人且未提供团体时，采用中性写法。用户补充：{补充}（其中如含示例话语，只学语气，不得照抄）。"
+    static func inferredBlock(_ profile: LianxinProfile) -> String {
+        guard !clean(profile.idolName).isEmpty else { return safety }
+        return inference.replacingOccurrences(of: "{对象}", with: [clean(profile.groupName), clean(profile.idolName)].filter { !$0.isEmpty }.joined(separator: " · "))
+            .replacingOccurrences(of: "{补充}", with: String(clean(profile.notes).prefix(500)))
+            + "\n读者的称呼：" + clean(profile.userName) + "\n" + safety.replacingOccurrences(of: "只使用上面提供的信息。", with: "只使用确定的公开信息及用户补充。")
+    }
     static func clean(_ value: String?) -> String { (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
     static func effective(_ input: String?, _ confirmed: String?) -> String { let value = clean(input); return value.isEmpty ? clean(confirmed) : value }
     static func block(_ profile: LianxinProfile, limit: Int = 2000) -> String {
@@ -113,7 +120,7 @@ enum LianxinRoleRules {
               clean(profile.position).count <= 30, clean(profile.fanName).count <= 30,
               clean(profile.personality).count <= 200, clean(profile.catchphrases).count <= 100,
               (profile.exampleLines?.count ?? 0) <= 3, (profile.exampleLines ?? []).allSatisfy({ $0.count <= 100 }),
-              clean(profile.notes).count <= 300 else { throw LianxinError.invalidRole }
+              clean(profile.notes).count <= 500 else { throw LianxinError.invalidRole }
     }
     static func fit(_ profile: LianxinProfile) -> LianxinFit {
         let group = !effective(profile.groupName, profile.verifiedProfile?.result.group).isEmpty
@@ -188,6 +195,10 @@ struct LianxinGeneratedMessage: Equatable {
     let notice: String?
     static func parse(_ raw: String, translated: Bool) -> Self {
         let plain = LianxinJSON.unfenced(raw)
+        if let json = LianxinJSON.object(raw), let first = (json["lines"] as? [[String: Any]])?.first, let text = first["text"] as? String {
+            let value = translated ? first["translation"] as? String : nil
+            return Self(text: text, translation: value, notice: translated && value == nil ? translationWarning : nil)
+        }
         if let json = LianxinJSON.object(raw), let text = json["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 200 {
             let value = json["translation"] as? String
             let valid = value.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.count > 200 ? nil : $0 }
@@ -197,20 +208,27 @@ struct LianxinGeneratedMessage: Equatable {
     }
 }
 
-protocol LianxinProfileChecking: Sendable {
-    func checkRole(profile: LianxinProfile, key: String) async throws -> String
-}
-extension LianxinAPIService: LianxinProfileChecking {
-    static func roleRequest(profile: LianxinProfile, key: String) throws -> URLRequest {
-        guard !LianxinRoleRules.clean(profile.idolName).isEmpty, profile.idolName.count <= 100, (profile.groupName?.count ?? 0) <= 100 else { throw LianxinError.invalidRole }
-        var request = try Self.authorizedRequest(profile: profile, key: key)
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": profile.model, "stream": false,
-            "messages": [["role": "system", "content": LianxinRoleRules.verification],
-                         ["role": "user", "content": "名字：" + profile.idolName + (LianxinRoleRules.clean(profile.groupName).isEmpty ? "" : "\n团体：" + LianxinRoleRules.clean(profile.groupName))]]])
-        return request
+// 一次请求同时回忆公开形象并创作多句；识别说明只留在私有profile。
+struct LianxinGeneratedBatch {
+    var lines: [LianxinLine]
+    var understood: String
+    var confidence: String
+    var notice: String?
+    static func output(_ p: LianxinProfile) -> String {
+        "输出格式：只返回JSON，不加围栏或前后文字：{\"understood\":\"团体 · 成员 · 定位（一句话≤40字，不确定写unknown）\",\"confidence\":\"high|medium|low\",\"lines\":[{\"text\":\"话语\"" + (p.translationEnabled == true ? ",\"translation\":\"译文\"" : "") + "}]}。lines恰好" + String(p.requestedCount) + "条；每条换不同角度、场景或情绪，不重复句式；每条中文约60字以内，text及translation各不超过200字。不使用 Markdown。"
     }
-    func checkRole(profile: LianxinProfile, key: String) async throws -> String {
-        let data = try await Self.fetch(Self.roleRequest(profile: profile, key: key))
-        return try Self.decode(data, status: 200)
+    static func parse(_ raw: String, count: Int, translated: Bool) -> Self {
+        let json = LianxinJSON.object(raw)
+        let entries = json?["lines"] as? [[String: Any]]
+        var values = (entries ?? []).compactMap { value -> LianxinLine? in
+            guard let text = value["text"] as? String else { return nil }
+            let line = LianxinLine(text: text, translation: translated ? value["translation"] as? String : nil)
+            return line.isValid ? line : nil
+        }
+        let parsed = entries != nil
+        if !parsed { values = LianxinJSON.unfenced(raw).components(separatedBy: .newlines).map { LianxinLine(text: $0.trimmingCharacters(in: .whitespacesAndNewlines), translation: nil) }.filter(\.isValid) }
+        values = Array(values.prefix(min(8, max(1, count))))
+        return Self(lines: values, understood: parsed ? String(LianxinRoleRules.clean(json?["understood"] as? String).prefix(40)) : "", confidence: parsed ? (["high", "medium", "low"].contains(LianxinRoleRules.clean(json?["confidence"] as? String).lowercased()) ? LianxinRoleRules.clean(json?["confidence"] as? String).lowercased() : "low") : "low",
+            notice: values.count < count ? "本次只生成了\(values.count)句，可以重新生成。" : translated && values.contains { ($0.translation ?? "").isEmpty } ? LianxinGeneratedMessage.translationWarning : nil)
     }
 }

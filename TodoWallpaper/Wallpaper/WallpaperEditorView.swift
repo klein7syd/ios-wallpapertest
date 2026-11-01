@@ -252,6 +252,9 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
+            if isLianxin, let layout = model.layout, layout.hiddenCount > 0, !layout.rows.isEmpty {
+                Text("有 \(layout.hiddenCount) 条放不下，已省略").font(.caption).foregroundStyle(.secondary)
+            }
             if !textFits { Text(model.lianxinContentIssue ?? "请先在连心生成有效话语。").font(.caption).foregroundStyle(.red) }
             if navigation.inspectorExpanded {
                 InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") +

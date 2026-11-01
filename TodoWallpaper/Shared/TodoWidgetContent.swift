@@ -150,13 +150,13 @@ struct TodoWidgetContent: View {
     @ViewBuilder private func task(_ item: TodoItem, metrics: WidgetLayoutMetrics, row: WidgetRowMetrics) -> some View {
         if interactive {
             Button(intent: SetTodoCompletionIntent(taskID: item.id, completed: !item.isCompleted)) {
-                HStack(alignment: .top, spacing: metrics.gap) { mark(item, metrics: metrics, row: row); title(item, metrics: metrics, row: row) }
+                HStack(alignment: .center, spacing: metrics.gap) { mark(item, metrics: metrics, row: row); title(item, metrics: metrics, row: row) }
                     .frame(height: row.height, alignment: .top).contentShape(Rectangle())
             }
             .buttonStyle(.plain).invalidatableContent()
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
         } else {
-            HStack(alignment: .top, spacing: metrics.gap) {
+            HStack(alignment: .center, spacing: metrics.gap) {
                 Button { onPreviewMarker?(item.id) } label: {
                     mark(item, metrics: metrics, row: row).contentShape(Rectangle())
                 }
@@ -172,7 +172,7 @@ struct TodoWidgetContent: View {
         TodoMarkerView(marker: appearance.marker(for: item, widgetContext: true), completed: item.isCompleted,
             style: style.markerStyle, textColor: foreground)
             .readableText(isLightText: textIsLight, intensity: settings.intensity, enabled: tone.enabled)
-            .frame(width: metrics.markerWidth, height: max(metrics.lineHeight, MarkerDrawing.extent(marker: appearance.marker(for: item, widgetContext: true), style: style.markerStyle, completed: item.isCompleted) + abs(style.markerStyle.verticalOffset) * 2), alignment: .center)
+            .frame(width: metrics.markerWidth, height: row.height, alignment: .center)
             .background {
                 if !interactive && selectedTaskID == item.id {
                     RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.opacity(0.12))

@@ -18,9 +18,13 @@ enum LianxinSamples {
         return lead + templates[abs((profile.exampleIndex ?? 0) % templates.count)]
     }
     static func response(_ profile: LianxinProfile) throws -> String {
-        let original = text(profile, language: LianxinLanguageRules.source(profile))
-        guard profile.translationEnabled == true else { return original }
-        let data = try JSONSerialization.data(withJSONObject: ["text": original, "translation": text(profile, language: LianxinLanguageRules.target(profile))])
+        let lines: [[String: String]] = (0..<profile.requestedCount).map { index in
+            var p = profile; p.exampleIndex = (profile.exampleIndex ?? 0) + index
+            var line = ["text": text(p, language: LianxinLanguageRules.source(p))]
+            if p.translationEnabled == true { line["translation"] = text(p, language: LianxinLanguageRules.target(p)) }
+            return line
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["understood": "", "confidence": "medium", "lines": lines])
         return String(decoding: data, as: UTF8.self)
     }
 }

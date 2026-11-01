@@ -7,12 +7,10 @@ enum WallpaperContentSource {
         switch self {
         case .todo(let items): return items
         case .lianxin(let content):
-            return [TodoItem(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
-                title: content.text, marker: TodoMarker(kind: .none), isCompleted: false,
-                createdAt: .distantPast, updatedAt: .distantPast)]
+            return LianxinPresentation.items(content, style: LianxinDisplayStyle())
         }
     }
 }
 extension LianxinPublication {
-    var shareText: String { text + (translation.flatMap { $0.isEmpty ? nil : "\n" + $0 } ?? "") + "\n—— " + idol + (signatureSubtitle.map { " · " + $0 } ?? "") + " · " + contentLabel }
+    var shareText: String { resolvedLines.map { $0.text + ($0.translation.flatMap { $0.isEmpty ? nil : "\n" + $0 } ?? "") }.joined(separator: "\n\n") + "\n—— " + idol + (signatureSubtitle.map { " · " + $0 } ?? "") + " · " + contentLabel }
 }
