@@ -21,5 +21,5 @@ swiftc -O -parse-as-library TodoWallpaper/Core/*.swift \
 if [ "$REPOSITORY_CHECKS_PASSED" != true ]; then exit 1; fi
 
 # 连心协议与共享发布使用生产代码执行；不依赖真实密钥或外部网络。
-swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/App/LianxinService.swift TodoWallpaper/App/LianxinProvider.swift TodoWallpaper/App/LianxinRole.swift TodoWallpaper/App/LianxinPublicResearch.swift TodoWallpaper/App/LianxinSamples.swift TodoWallpaper/Tests/LianxinChecks.swift TodoWallpaper/Tests/LianxinWizardChecks.swift TodoWallpaper/Tests/LianxinRoleChecks.swift -o "$RUNNER_TEMP/lianxin-checks"
+swiftc -parse-as-library TodoWallpaper/Core/*.swift TodoWallpaper/App/LianxinStorage.swift TodoWallpaper/App/LianxinService.swift TodoWallpaper/App/LianxinProvider.swift TodoWallpaper/App/LianxinRole.swift TodoWallpaper/App/LianxinPublicResearch.swift TodoWallpaper/App/LianxinSamples.swift TodoWallpaper/Tests/LianxinChecks.swift TodoWallpaper/Tests/LianxinWizardChecks.swift TodoWallpaper/Tests/LianxinRoleChecks.swift -o "$RUNNER_TEMP/lianxin-checks"
 "$RUNNER_TEMP/lianxin-checks" | tee TodoWallpaper/out/lianxin-checks.log

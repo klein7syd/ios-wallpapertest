@@ -8,6 +8,11 @@ struct LianxinFieldStyle: TextFieldStyle {
             in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
+private struct LianxinEditableRow: Identifiable {
+    let id: UUID
+    let index: Int
+    let line: LianxinLine
+}
 private struct LianxinPreviewInput: Equatable {
     let content: LianxinPublication
     let style: WidgetAppearance
@@ -24,7 +29,9 @@ struct LianxinView: View {
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
-    private enum Field: Hashable { case prompt, message(Int), translation(Int) }
+    @State private var lineIDs = (0..<8).map { _ in UUID() }
+    private enum Field: Hashable { case prompt, message(UUID), translation(UUID) }
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var focused: Field?
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -33,21 +40,28 @@ struct LianxinView: View {
     private var scrollContent: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    if !model.loaded { Button("重新读取连心资料") { Task { await model.load() } } }
+                    if !model.loaded {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if model.loading { ProgressView("正在读取连心资料…") }
+                            else { Button("重新读取连心资料") { Task { await model.load() } } }
+                            if model.canRecoverProfile { Button("恢复上次有效资料") { Task { await model.recoverProfile() } } }
+                        }
+                    }
+                    if model.photoSyncPending { Button("重试同步已保存的底图") { Task { await model.retryPhotoSync() } }.disabled(model.busy) }
                     if model.connected {
-                        Button("已连接：\(model.provider.name)") { openSettings() }.font(.caption)
+                        Button("已连接：\(model.provider.name) · \(model.profile.model)") { openSettings() }.font(.caption)
                     } else {
                         HStack {
-                            Button("连接 AI（约 1 分钟）") { openSettings() }
+                            Button("连接 AI") { openSettings() }.disabled(!model.loaded || model.busy)
                         }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     previews
-                    LianxinRoleView(model: model)
-                    LianxinLanguageView(model: model)
+                    LianxinRoleView(model: model).disabled(!model.loaded)
+                    LianxinLanguageView(model: model).disabled(!model.loaded)
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("想听什么？比如：今天很累，想被哄一哄", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
                         Text("像平常聊天一样写就好，语气和表达会由连心整理。").font(.caption).foregroundStyle(.secondary)
-                    }.textFieldStyle(LianxinFieldStyle()).disabled(model.busy)
+                    }.textFieldStyle(LianxinFieldStyle()).disabled(!model.loaded || model.busy)
                     actions
                     if !model.profile.message.isEmpty || model.currentContent != nil {
                         outputControls
@@ -59,7 +73,7 @@ struct LianxinView: View {
                             ShareLink(item: model.publication.shareText) {
                                 Label("分享文字", systemImage: "square.and.arrow.up").frame(minHeight: 44)
                             }
-                        }
+                        }.disabled(!model.loaded || !canOutput || model.busy)
                     }
                     if store.appearance.lianxin?.backgroundPhotoName != nil {
                         Button("移除底图", role: .destructive) { Task { await model.setPhoto(nil) } }
@@ -94,34 +108,46 @@ struct LianxinView: View {
             .alert("连心", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
                 Button("好") { model.error = nil }
             } message: { Text(model.error ?? "") }
-            .onDisappear { model.cancel(); Task { await model.saveInputsNow() } }
-            .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancel() } else { Task { await syncPreview() } } }
+            .onDisappear { Task { await model.saveInputsNow() } }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.retryCredentials(); await syncPreview() } } }
             .task(id: LianxinPreviewInput(content: model.publication, style: store.appearance.style(in: .lianxin), marker: store.appearance.lianxinWallpaperMarker, markerStyle: store.appearance.lianxinWallpaperMarkerStyle)) { await syncPreview() }
             .task(id: selection) { await importSelection() }
     }
 
     private var outputControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(model.profile.resolvedLines.enumerated()), id: \.offset) { index, line in
+            ForEach(editableRows) { row in
+                let index = row.index
+                let line = row.line
                 VStack(alignment: .leading, spacing: 8) {
                     TextField("话语 \(index + 1)", text: lineBinding(index, translation: false), axis: .vertical)
-                        .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message(index))
+                        .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message(row.id))
                     if model.profile.translationEnabled == true {
                         TextField("译文", text: lineBinding(index, translation: true), axis: .vertical)
-                            .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .translation(index))
+                            .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .translation(row.id))
                     }
                     HStack {
                         Text("原文 \(line.text.count)/200 · 译文 \(line.translation?.count ?? 0)/200").font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("删除", role: .destructive) { var values = model.profile.resolvedLines; if values.indices.contains(index) { values.remove(at: index); model.profile.setLines(values) } }
+                        Button("删除", role: .destructive) { deleteLine(at: index) }
+                            .disabled(model.profile.resolvedLines.count == 1)
+                            .accessibilityLabel("删除第\(index + 1)句话语").frame(minHeight: 44)
+                    }
+                    if !line.isValid {
+                        Text(line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "请填写这句话语；暂未同步。" : line.text.count > 200 ? "这句原文超过200字，请缩短后同步。" : "这句译文超过200字，请缩短后同步。")
+                            .font(.caption).foregroundStyle(.red)
                     }
                 }
             }
+            if model.canUndoContentEdit {
+                Button("撤销删除或恢复上一批", systemImage: "arrow.uturn.backward") { focused = nil; model.undoContentEdit() }.frame(minHeight: 44)
+            }
+            if model.profile.resolvedLines.count == 1 { Text("至少保留一句；可以直接编辑替换，或重新生成。").font(.caption).foregroundStyle(.secondary) }
             if !canOutput { Text("每句话语需为1–200字，译文最多200字；无效输入保留上次内容。").font(.caption).foregroundStyle(.secondary) }
             if let error = model.syncError {
                 HStack { Text(error).font(.caption); Button("重试") { model.scheduleSync() } }
             } else if let date = model.syncedAt {
-                Text("小组件已更新 · " + date.formatted(date: .omitted, time: .standard)).font(.caption2).foregroundStyle(.tertiary)
+                Text("已保存并请求小组件刷新 · " + date.formatted(date: .omitted, time: .standard)).font(.caption2).foregroundStyle(.tertiary)
             }
             Button { openEditor(.wallpaper) } label: {
                 Label("去调整壁纸样式", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
@@ -129,9 +155,19 @@ struct LianxinView: View {
             Button { openEditor(.widget) } label: {
                 Label("去调整小组件样式", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.bordered)
-        }.disabled(model.busy || loadingPhoto)
+        }.disabled(!model.loaded || model.busy || loadingPhoto)
     }
 
+    private var editableRows: [LianxinEditableRow] {
+        model.profile.resolvedLines.prefix(8).enumerated().map { LianxinEditableRow(id: lineIDs[$0.offset], index: $0.offset, line: $0.element) }
+    }
+    private func deleteLine(at index: Int) {
+        var values = model.profile.resolvedLines
+        guard values.count > 1, values.indices.contains(index) else { return }
+        if focused == .message(lineIDs[index]) || focused == .translation(lineIDs[index]) { focused = nil }
+        lineIDs.remove(at: index); lineIDs.append(UUID())
+        values.remove(at: index); model.editLines(values)
+    }
     private var canOutput: Bool { !model.profile.resolvedLines.isEmpty && model.profile.resolvedLines.count <= 8 && model.profile.resolvedLines.allSatisfy(\.isValid) }
     private func lineBinding(_ index: Int, translation: Bool) -> Binding<String> {
         Binding(get: { let values = model.profile.resolvedLines; guard values.indices.contains(index) else { return "" }; return translation ? (values[index].translation ?? "") : values[index].text }, set: { value in
@@ -152,9 +188,12 @@ struct LianxinView: View {
     }
     private func openEditor(_ page: AppPage) { contentMode = "lianxin"; navigation.selectPage(page) }
     private var previews: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 12) { wallpaperPreview.frame(width: 140); widgetPreview.frame(width: 170) }
-            VStack(spacing: 16) { wallpaperPreview; widgetPreview }
+        Group {
+            if family != .small || typeSize.isAccessibilitySize { VStack(spacing: 16) { wallpaperPreview; widgetPreview } }
+            else { ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) { wallpaperPreview.frame(width: 140); widgetPreview.frame(width: 170) }
+                VStack(spacing: 16) { wallpaperPreview; widgetPreview }
+            } }
         }
     }
     private var wallpaperPreview: some View {
@@ -199,21 +238,23 @@ struct LianxinView: View {
     private var actions: some View {
         VStack(spacing: 8) {
             if model.busy || loadingPhoto { ProgressView(loadingPhoto ? "正在导入底图" : "正在处理") }
-            HStack {
+            generationLayout {
                 countControl
-                Button { model.generate() } label: {
-                    Text(model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 64)
+                Button { dismissKeyboard(); if model.connected { model.generate() } else { openSettings() } } label: {
+                    Text(!model.connected ? "连接 AI" : model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 64)
                 }.buttonStyle(.borderedProminent).buttonBorderShape(.roundedRectangle(radius: 18)).disabled(!model.loaded || model.busy || loadingPhoto)
             }
             HStack {
                 PhotosPicker(selection: $selection, matching: .images) { Label("底图", systemImage: "photo").frame(minHeight: 44) }
                     .buttonStyle(.bordered).disabled(!model.loaded || model.busy || loadingPhoto)
-                if model.busy { Button("取消") { model.cancel() }.frame(minHeight: 44) }
+                if model.isGenerating { Button("取消生成") { model.cancel() }.frame(minHeight: 44) }
             }
         }.padding(16).frame(maxWidth: .infinity)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
+
+    private var generationLayout: AnyLayout { typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12)) }
 
     private var countControl: some View {
         VStack(alignment: .leading, spacing: 4) {

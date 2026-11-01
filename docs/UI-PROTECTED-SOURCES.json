@@ -1,5 +1,5 @@
 {
-  "TodoWallpaper/App/Info.plist": "88ac0204c8ffc3e0be07ad35e4078c5ba104781e157d43907618f157014bf36a",
+  "TodoWallpaper/App/Info.plist": "0d9ac57d66705bc7e8f4fe1f13957c6c6254814fa2cf381cb19190f7e5e6b362",
   "TodoWallpaper/App/TodoStore.swift": "f1cec814444271f66dd9e2f3ed3397ed53ed65e5420d8a64ebd76520d060f0b4",
   "TodoWallpaper/App/TodoWallpaper.entitlements": "74d082a37edd0beb507296d3e97832c8241925891dac15352ebe7fc6cc9c535b",
   "TodoWallpaper/Core/AppearanceRepository.swift": "e9661e38c017a9300023b4ce8f9abde54c52b52b5cf9a6e635a4959425ce95f8",
@@ -9,7 +9,7 @@
   "TodoWallpaper/Core/TodoSharedStorage.swift": "6dd0a89ce2597d2f63d296b7e47305ff4d77265f84540a5f9b2e4d5cea4564a6",
   "TodoWallpaper/Core/VisualTypes.swift": "7d142915762691b4a60b4f24172fe75065b7e8d14529090192bf1673b21fd8c8",
   "TodoWallpaper/Shared/SetTodoCompletionIntent.swift": "919f131b6b95e08be2e967531007730603a6c8aceb9ac7c5e5d860ffa4f3ee53",
-  "TodoWallpaper/Wallpaper/WallpaperDraftStore.swift": "edd90177c390d25efc2932862e23586060af805a8a0bedc09e9495dfb7e9d6df",
+  "TodoWallpaper/Wallpaper/WallpaperDraftStore.swift": "dd8badd580b1c71450e8be4421f5636ad9c32a6159552ff165f80359d43d0a7a",
   "TodoWallpaper/Wallpaper/WallpaperGeometry.swift": "ac9cc2988b04815a8a6cd0d5d7d0e46123a6cca840dc34eb175ad289d59527b6",
   "TodoWallpaper/Widget/Info.plist": "938aa3b4d74f690ad6429b6213185f43983a912d7737ca3e3c52de52f411301c",
   "TodoWallpaper/Widget/TodoWallpaper.entitlements": "74d082a37edd0beb507296d3e97832c8241925891dac15352ebe7fc6cc9c535b",

@@ -6,6 +6,7 @@ enum LianxinRoleChecks {
         if !value { throw NSError(domain: "LianxinRoleChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
     }
     static func run() async throws {
+        try await reliabilityChecks()
         var profile = LianxinProfile(); profile.idolName = "虚构成员"; profile.userName = "读者甲"
         profile.endpoint = "https://example.invalid/v1/chat/completions"; profile.model = "fixture"
         profile.prompt = "  这是用户的原文\n保留空白和换行。  "
@@ -85,6 +86,53 @@ enum LianxinRoleChecks {
         try require(shared["translation"] as? String == "译文" && publication.shareText.contains("原文\n译文") && publication.shareText.contains("AI 创作"), "译文共享及复制分享带后缀")
         for key in ["endpoint", "key", "prompt", "groupName", "otherNames", "position", "fanName", "personality", "catchphrases", "exampleLines", "notes", "verifiedProfile", "userName", "sourceLanguage"] { try require(shared[key] == nil, "共享不含私有字段：" + key) }
         print("PASS: 角色块顺序/预算/空字段/歧义/示例、核对JSON及确认隔离、贴合度、语言翻译解析、旧JSON、共享隐私、离线双语零网络。")
+    }
+    static func reliabilityChecks() async throws {
+        for raw in [#"{"text":"晚安","translation":"잘 자요"}"#, "```json\n{\"lines\":[{\"text\":\"晚安\"}]}\n```", #"说明 {"lines":[{"text":"晚安"}]} 结束"#] {
+            let result = LianxinGeneratedBatch.parse(raw, count: 4, translated: true)
+            try require(result.lines.first?.text == "晚安" && result.lines.count == 1, "生产批量解析兼容旧对象与围栏")
+        }
+        for raw in [#"{"lines":[{"text":"坏数据"}"#, #"{"translation":"没有原文"}"#, #"{"lines":[]}"#] {
+            try require(LianxinGeneratedBatch.parse(raw, count: 4, translated: true).lines.isEmpty, "结构残片不能作为话语发布")
+        }
+        let body = try JSONSerialization.data(withJSONObject: ["lines": [["text": "有效原文", "translation": String(repeating: "长", count: 201)], ["text": "另一句", "translation": "   "]]])
+        let batch = LianxinGeneratedBatch.parse(String(decoding: body, as: UTF8.self), count: 4, translated: true)
+        try require(batch.lines.count == 2 && batch.lines.allSatisfy { $0.translation == nil } && batch.notice?.contains("译文") == true, "坏译文不丢原文并汇总不足提示")
+        let models = try LianxinAPIService.models(Data(#"{"data":[{"id":"chat-model","sub_type":"chat"},{"id":"vector-model","sub_type":"embedding"},{"id":"embedding-v3"}]}"#.utf8))
+        try require(models == ["chat-model"], "目录过滤明确非聊天能力")
+        try LianxinAPIService.validateTestResponse(Data(#"{"choices":[{"message":{"role":"assistant","content":null},"finish_reason":"length"}]}"#.utf8))
+        try require(LianxinAPIService.error(status: 429, data: Data("insufficient_quota".utf8)).localizedDescription.contains("配额"), "配额不冒充余额")
+        try require(LianxinPublicResearchService.identityScore(title: "Luna", excerpt: "Member of Aurora", name: "Luna", group: "Aurora") > 0 && LianxinPublicResearchService.identityScore(title: "Luna", excerpt: "Member of Aurora", name: "Luna", group: "Other") == 0, "同名候选按团体筛选")
+        let clean = LianxinPublicResearchService.usefulText("Luna (born January 1) is a singer in Aurora. Her address is private.", fanWiki: false)
+        try require(clean.contains("singer") && !clean.contains("born") && !clean.contains("address"), "出生括注与私人内容移除，公开职业保留")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("LianxinReliability-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = LianxinStorage(directory: root)
+        let loaded = try await storage.load()
+        var profile = loaded.profile; profile.idolName = "旧角色"
+        profile.providerConfigurations = ["custom": LianxinProviderConfiguration(endpoint: "https://example.invalid/v1/chat/completions", model: "saved-model")]
+        try await storage.save(profile, revision: 1)
+        profile.idolName = "新角色"
+        try await storage.save(profile, revision: 2)
+        var stale = profile; stale.idolName = "不该回写"
+        try await storage.save(stale, revision: 1)
+        try require(try await storage.load().profile.idolName == "新角色", "旧保存版本不能回写")
+        let file = root.appendingPathComponent("profile-v1.json")
+        let corrupted = Data("broken json".utf8); try corrupted.write(to: file)
+        do { _ = try await storage.load(); throw NSError(domain: "ExpectedLoadFailure", code: 1) } catch is DecodingError { }
+        do { try await storage.save(profile, revision: 3); throw NSError(domain: "ExpectedWriteBlock", code: 1) } catch is LianxinError { }
+        try require(try Data(contentsOf: file) == corrupted, "加载失败禁止覆盖坏文件")
+        try await storage.recover()
+        let restored = try await storage.load()
+        try require(restored.profile.idolName == "旧角色" && restored.profile.providerConfigurations?["custom"]?.model == "saved-model", "备份恢复私有资料与服务商配置")
+        var missing = restored.profile; missing.photoName = "widget-photo-" + UUID().uuidString + ".jpg"
+        try await storage.save(missing, revision: 4)
+        let missingPhoto = try await storage.load()
+        try require(missingPhoto.missingPhoto && missingPhoto.profile.idolName == "旧角色", "缺图不阻断文字资料")
+        var future = missing; future.schemaVersion = 99
+        let futureData = try JSONEncoder().encode(future); try futureData.write(to: file)
+        do { _ = try await storage.load(); throw NSError(domain: "ExpectedFutureBlock", code: 1) } catch is LianxinError { }
+        try require(try Data(contentsOf: file) == futureData, "未来版本原文件保留")
     }
     static func languageChecks(_ input: LianxinProfile) async throws {
         var profile = input

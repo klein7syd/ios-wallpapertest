@@ -305,8 +305,10 @@ struct WidgetAppearanceEditor: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 WidgetFamilyPicker(family: $family)
-                Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
-                    .accessibilityLabel("重置预览完成状态，不修改真实待办")
+                if !isLianxin {
+                    Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
+                        .accessibilityLabel("重置预览完成状态，不修改真实待办")
+                }
             }.zIndex(1)
             if !typeSize.isAccessibilitySize {
                 Text(isLianxin ? "连心预览" : "点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
@@ -358,7 +360,7 @@ struct WidgetAppearanceEditor: View {
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .frame(height: height).padding(.horizontal, 16).padding(.top, 6)
-        .accessibilityElement(children: .contain).accessibilityLabel("\(family.title)小组件外观预览，使用真实待办")
+        .accessibilityElement(children: .contain).accessibilityLabel("\(family.title)小组件外观预览，" + (isLianxin ? "使用当前连心话语" : "使用真实待办"))
         .accessibilityIdentifier("widget.fixedPreview")
     }
     @ViewBuilder private var themeControls: some View {
@@ -636,7 +638,8 @@ struct WidgetAppearanceEditor: View {
         }.pickerStyle(.menu).frame(minHeight: 44)
         Text("当前共有\(lianxinModel.publication.resolvedLines.count)句，按顺序显示；空间不足时会自动减少。这里不改变生成数量。")
             .font(.caption).foregroundStyle(.secondary)
-        LianxinContentControls(value: lianxinDisplay, hasTranslation: !(lianxinModel.publication.translation ?? "").isEmpty)
+        LianxinContentControls(value: lianxinDisplay, hasTranslation: LianxinPresentation.translatedCount(lianxinModel.publication) > 0)
+        Text(LianxinPresentation.translationSummary(lianxinModel.publication)).font(.caption).foregroundStyle(.secondary)
     }
     @ViewBuilder private var contentControls: some View {
         InspectorGroupTitle(title: "显示内容", detail: "控制数量、筛选和辅助说明。")

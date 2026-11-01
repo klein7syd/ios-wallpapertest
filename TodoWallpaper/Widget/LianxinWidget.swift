@@ -22,6 +22,10 @@ struct LianxinProvider: TimelineProvider {
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<LianxinEntry>) -> Void) {
         let initial = read(size: context.displaySize)
+        if initial.failed {
+            completion(Timeline(entries: [initial], policy: .after(initial.date.addingTimeInterval(15 * 60))))
+            return
+        }
         let dates = WidgetDayTimeline.dates(now: initial.date, count: initial.style.photoRotation?.enabled == true ? 2 : 1)
         let entries = [initial] + dates.dropFirst().map { read(size: context.displaySize, date: $0) }
         completion(Timeline(entries: entries, policy: dates.count > 1 ? .after(dates[1]) : .never))
@@ -29,8 +33,10 @@ struct LianxinProvider: TimelineProvider {
     private func read(size: CGSize, date: Date = .now) -> LianxinEntry {
         AppearanceStore.shared.clearMemoryCache()
         defer { WidgetPhotoCache.releaseDecodedSources() }
+        var retainedContent: LianxinPublication?
         do {
             let content = try LianxinPublication.load(directory: TodoSharedStorage.sharedDirectory())
+            retainedContent = content
             let root = try AppearanceRepository(directory: TodoSharedStorage.sharedDirectory()).load()
             let style = root.lianxin ?? root.widget
             var photo: CGImage?
@@ -50,7 +56,7 @@ struct LianxinProvider: TimelineProvider {
             }
             return LianxinEntry(date: date, content: content, photo: WidgetPhotoCache.prepared(style: style, size: size, date: date) ?? (root.lianxin == nil ? photo : nil), style: style, aspect: aspect, analyses: analyses)
 
-        } catch { return LianxinEntry(date: .now, content: nil, photo: nil, failed: true) }
+        } catch { return LianxinEntry(date: date, content: retainedContent, photo: nil, failed: true) }
     }
 }
 
@@ -64,16 +70,22 @@ struct LianxinWidgetView: View {
     private var accessory: Bool { family == .accessoryCircular || family == .accessoryRectangular }
     var body: some View {
         Group {
-            if family == .accessoryCircular {
+            if entry.failed && entry.content == nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("连心暂时无法读取", systemImage: "exclamationmark.circle").font(.caption)
+                    if family != .accessoryCircular { Text("点按打开连心重试").font(.caption2).foregroundStyle(.secondary) }
+                }
+            } else if family == .accessoryCircular {
                 VStack(spacing: 2) { Image(systemName: "heart"); Text(entry.content?.idol ?? "连心").font(.caption2).lineLimit(1); if entry.style.lianxinDisplay.showsCreationLabel { Text(entry.content?.contentLabel ?? "AI 创作").font(.system(size: 8)).lineLimit(1) } }
                     .accessibilityLabel((entry.content?.contentLabel ?? "连心") + "，" + (entry.content?.text ?? "在连心中发布一句话"))
             } else {
                 if accessory {
                     VStack(alignment: .leading) {
                         if let content = entry.content {
-                            let presentation = LianxinPresentation(content, style: entry.style.lianxinDisplay)
-                            Text(presentation.primary).font(.caption).lineLimit(2)
-                            if let secondary = presentation.secondary { Text(secondary).font(.caption2).opacity(entry.style.lianxinDisplay.translationOpacity).lineLimit(1) }
+                            if let presentation = LianxinPresentation.entries(content, style: entry.style.lianxinDisplay).first {
+                                Text(presentation.primary).font(.caption).lineLimit(2)
+                                if let secondary = presentation.secondary { Text(secondary).font(.caption2).opacity(entry.style.lianxinDisplay.translationOpacity).lineLimit(1) }
+                            } else { Text("请打开连心补充译文").font(.caption) }
                         } else { Text("打开连心").font(.caption) }
                         if entry.style.lianxinDisplay.showsCreationLabel { Text(entry.content?.contentLabel ?? "AI 创作").font(.caption2).lineLimit(1) }
                     }
@@ -81,6 +93,13 @@ struct LianxinWidgetView: View {
 
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if entry.failed && entry.content != nil {
+                Image(systemName: "exclamationmark.circle.fill").font(.caption)
+                    .accessibilityLabel("样式暂时无法读取，点按打开连心重试")
+            }
+        }
+        .widgetURL(URL(string: "todowallpaper://lianxin"))
         .containerBackground(for: .widget) {
             if !accessory {
                 LianxinWidgetBackground(content: entry.content, style: entry.style, family: previewFamily, date: entry.date,

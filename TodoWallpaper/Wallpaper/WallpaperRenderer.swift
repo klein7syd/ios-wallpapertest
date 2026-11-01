@@ -199,7 +199,7 @@ enum WallpaperRenderer {
         let headingHeight = CGFloat(headingMetrics?.height ?? 0)
         let headingGap = headingHeight > 0 ? itemSpacing : 0
         let edge = content == nil ? 0 : CGFloat(settings.lianxinEdgeInset ?? 0)
-        let empty = filtered.isEmpty ? text(sourceItems.isEmpty ? "还没有待办" : "今天的待办都完成了",
+        let empty = filtered.isEmpty ? text(content != nil ? (display.translationDisplay == .translation ? "请在连心补充译文" : "请在连心生成话语") : (sourceItems.isEmpty ? "还没有待办" : "今天的待办都完成了"),
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil
         let reserveFooter = text("另有 \(max(1, filtered.count)) 项未显示", width: panelWidth - 2 * padding,
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
@@ -265,7 +265,7 @@ enum WallpaperRenderer {
                 x: panel.minX + padding + metrics.summaryX, width: metrics.summaryWidth, alignment: .trailing)) }
         }
         let lineOverflow = rows.contains { $0.block.truncated || $0.secondary?.truncated == true }
-        let missingTranslation = content != nil && display.translationDisplay == .translation && rows.isEmpty
+        let missingTranslation = content != nil && display.translationDisplay == .translation && sourceItems.isEmpty
         return WallpaperLayout(canvas: canvas, panel: panel, markerColumn: markerColumn, textWidth: textWidth, rows: rows,
             hiddenCount: hidden, footer: content == nil ? footer : nil, footerTop: panel.maxY - padding - (footer?.height ?? 0),
             emptyText: fittedEmpty, emptyTop: panel.minY + padding, supplements: supplements,
