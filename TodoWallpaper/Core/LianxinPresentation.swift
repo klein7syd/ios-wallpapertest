@@ -67,7 +67,8 @@ struct LianxinPresentation {
         var value = TodoAppearance(); value.widget = style
         value.defaultMarker = TodoMarker(kind: .none)
         value.widget.markerOverride = style.lianxinDisplay.translationDisplay == .translation ? TodoMarker(kind: .none) : (style.lianxinMarker ?? TodoMarker(kind: .none))
-        value.widget.maximumItems = max(1, content.resolvedLines.count); value.widget.unifiedMarkers = true
+        value.widget.maximumItems = max(1, min(content.resolvedLines.count, min(8, max(1, style.lianxinMaximumItems ?? 8))))
+        value.widget.unifiedMarkers = true
         value.widget.showsFooter = false; value.widget.showsSeparators = false; value.widget.completedTextStyle = .keep
         value.widget.maximumTitleLines = style.lianxinDisplay.maximumLines.flatMap { $0 == 0 ? nil : $0 }
         value.widget.header = header(style.heading, customTitle: style.lianxinCustomTitle, member: content.idol, subtitle: subtitle(custom: style.lianxinCustomSubtitle, fallback: content.signatureSubtitle))

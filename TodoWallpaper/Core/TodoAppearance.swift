@@ -148,6 +148,8 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var lianxinDisplayStyle: LianxinDisplayStyle?
     var lianxinCustomTitle: String?
     var lianxinCustomSubtitle: String?
+    // nil沿用旧版显示全部；只控制连心小组件，不改变生成数量与壁纸。
+    var lianxinMaximumItems: Int?
     var lianxinMarker: TodoMarker?
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
@@ -181,6 +183,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         try lianxinMarker?.validate()
         if let lianxinCustomTitle, lianxinCustomTitle.count > 40 || lianxinCustomTitle.contains(where: \.isNewline) { throw AppearanceError.invalidStyle }
         if let lianxinCustomSubtitle, lianxinCustomSubtitle.count > 100 || lianxinCustomSubtitle.contains(where: \.isNewline) { throw AppearanceError.invalidStyle }
+        if let lianxinMaximumItems, !(1...8).contains(lianxinMaximumItems) { throw AppearanceError.invalidStyle }
         if let readableScrimOverride, !(0...0.8).contains(readableScrimOverride) { throw AppearanceError.invalidStyle }
         if let readableHeightRatio, !(0.25...0.7).contains(readableHeightRatio) { throw AppearanceError.invalidStyle }
         if let readableEdgeInset,
@@ -218,6 +221,7 @@ extension TodoAppearance {
         next.widget.fontSize = ReadableRules.finiteClamp(next.widget.fontSize, to: 12...20, fallback: 15)
         next.widget.spacing = ReadableRules.finiteClamp(next.widget.spacing, to: -10...40, fallback: 5)
         next.widget.maximumItems = min(10, max(1, next.widget.maximumItems))
+        next.widget.lianxinMaximumItems = next.widget.lianxinMaximumItems.map { min(8, max(1, $0)) }
         next.widget.maximumTitleLines = next.widget.maximumTitleLines.map { min(4, max(1, $0)) }
         next.widget.lianxinDisplayStyle = next.widget.lianxinDisplayStyle?.clamped
         next.lianxinWallpaperMarkerStyle?.clampForEditing()

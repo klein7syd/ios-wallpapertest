@@ -627,7 +627,15 @@ struct WidgetAppearanceEditor: View {
         do { try store.edit(id: id, title: item.title, marker: marker) }
         catch { self.error = error.localizedDescription }
     }
-    private var lianxinControls: some View {
+    @ViewBuilder private var lianxinControls: some View {
+        Picker("显示几句", selection: Binding(get: { widget.wrappedValue.lianxinMaximumItems ?? 0 }, set: {
+            widget.wrappedValue.lianxinMaximumItems = $0 == 0 ? nil : $0
+        })) {
+            Text("全部").tag(0)
+            ForEach(1...8, id: \.self) { Text("\($0) 句").tag($0) }
+        }.pickerStyle(.menu).frame(minHeight: 44)
+        Text("当前共有\(lianxinModel.publication.resolvedLines.count)句，按顺序显示；空间不足时会自动减少。这里不改变生成数量。")
+            .font(.caption).foregroundStyle(.secondary)
         LianxinContentControls(value: lianxinDisplay, hasTranslation: !(lianxinModel.publication.translation ?? "").isEmpty)
     }
     @ViewBuilder private var contentControls: some View {
