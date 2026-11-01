@@ -36,21 +36,17 @@ struct LianxinView: View {
                     if !model.loaded { Button("重新读取连心资料") { Task { await model.load() } } }
                     if model.connected {
                         Button("已连接：\(model.provider.name)") { openSettings() }.font(.caption)
-                    } else if !model.exampleMode {
+                    } else {
                         HStack {
                             Button("连接 AI（约 1 分钟）") { openSettings() }
-                            Button("先体验") { model.exampleMode = true; model.generate() }
                         }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }
-                    if model.exampleMode {
-                        Label("体验模式：示例内容，非 AI 生成", systemImage: "sparkles").font(.footnote)
-                        Button("连接我自己的AI") { model.exampleMode = false }
                     }
                     previews
                     LianxinRoleView(model: model)
                     LianxinLanguageView(model: model)
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("提示词（最多12000字）", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
+                        TextField("想听什么？比如：今天很累，想被哄一哄", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
+                        Text("像平常聊天一样写就好，语气和表达会由连心整理。").font(.caption).foregroundStyle(.secondary)
                     }.textFieldStyle(LianxinFieldStyle()).disabled(model.busy)
                     actions
                     if !model.profile.message.isEmpty || model.currentContent != nil {
@@ -70,7 +66,7 @@ struct LianxinView: View {
                             .frame(minHeight: 44).disabled(model.busy || loadingPhoto)
                     }
                     if let notice = model.notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
-                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；体验模式下的内容为示例，非 AI 生成。")
+                    Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论。生成时仅用名字和团体查找公开 Wiki；资料摘要会交给你选择的 AI，照片不会上传。")
                         .font(.caption).foregroundStyle(.secondary).padding(14)
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }.padding(20)
@@ -130,7 +126,9 @@ struct LianxinView: View {
             Button { openEditor(.wallpaper) } label: {
                 Label("去调整壁纸样式", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
             }.buttonStyle(.bordered).disabled(!canOutput)
-            Button("去调整小组件样式") { openEditor(.widget) }.frame(minHeight: 44)
+            Button { openEditor(.widget) } label: {
+                Label("去调整小组件样式", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
+            }.buttonStyle(.bordered)
         }.disabled(model.busy || loadingPhoto)
     }
 
@@ -169,9 +167,7 @@ struct LianxinView: View {
     }
     private var widgetPreview: some View {
         VStack {
-            Menu("小组件 · " + family.title) {
-                ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
-            }
+            WidgetFamilyPicker(family: $family)
             GeometryReader { proxy in
                 let scale = family.scale(availableWidth: proxy.size.width, availableHeight: proxy.size.height)
                 let style = store.appearance.style(in: .lianxin)
@@ -204,10 +200,10 @@ struct LianxinView: View {
         VStack(spacing: 8) {
             if model.busy || loadingPhoto { ProgressView(loadingPhoto ? "正在导入底图" : "正在处理") }
             HStack {
-                Stepper("生成几句：\(model.profile.requestedCount)", value: Binding(get: { model.profile.requestedCount }, set: { model.profile.generationCount = $0 }), in: 1...8).disabled(model.busy)
+                countControl
                 Button { model.generate() } label: {
-                    Text(model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 44)
-                }.buttonStyle(.borderedProminent).disabled(!model.loaded || model.busy || loadingPhoto)
+                    Text(model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 64)
+                }.buttonStyle(.borderedProminent).buttonBorderShape(.roundedRectangle(radius: 18)).disabled(!model.loaded || model.busy || loadingPhoto)
             }
             HStack {
                 PhotosPicker(selection: $selection, matching: .images) { Label("底图", systemImage: "photo").frame(minHeight: 44) }
@@ -215,6 +211,23 @@ struct LianxinView: View {
                 if model.busy { Button("取消") { model.cancel() }.frame(minHeight: 44) }
             }
         }.padding(.horizontal, 16).padding(.vertical, 8).background(.bar)
+    }
+
+    private var countControl: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("生成几句").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Button { model.profile.generationCount = max(1, model.profile.requestedCount - 1) } label: {
+                    Image(systemName: "minus").frame(width: 44, height: 44).background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }.disabled(model.profile.requestedCount == 1).accessibilityLabel("少生成一句")
+                Text("\(model.profile.requestedCount)").font(.headline.monospacedDigit()).frame(minWidth: 24)
+                Button { model.profile.generationCount = min(8, model.profile.requestedCount + 1) } label: {
+                    Image(systemName: "plus").frame(width: 44, height: 44).background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }.disabled(model.profile.requestedCount == 8).accessibilityLabel("多生成一句")
+            }.buttonStyle(.plain)
+        }.padding(10).frame(maxWidth: .infinity)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .disabled(model.busy || loadingPhoto)
     }
 
     private var settings: some View {

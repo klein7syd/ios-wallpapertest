@@ -88,7 +88,7 @@ actor LianxinStorage {
 @MainActor
 final class LianxinModel: ObservableObject {
     @Published var profile = LianxinProfile() { didSet {
-        if loaded && (oldValue.idolName != profile.idolName || oldValue.groupName != profile.groupName) { profile.understood = nil; profile.confidence = nil }
+        if loaded && (oldValue.idolName != profile.idolName || oldValue.groupName != profile.groupName) { profile.understood = nil; profile.confidence = nil; profile.researchSources = nil; researchNotice = nil }
         if loaded && oldValue != profile { scheduleInputSave(); scheduleSync() }
     } }
     @Published var key = ""
@@ -97,7 +97,7 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var busy = false
     @Published var error: String?
     @Published var notice: String?
-    @Published var exampleMode = false
+    @Published private(set) var researchNotice: String?
     @Published private(set) var availableModels: [String] = []
     @Published private(set) var keySaved = false
     @Published var connectionNotice: String?
@@ -114,12 +114,13 @@ final class LianxinModel: ObservableObject {
     private var styleObserver: AnyCancellable?
     private let storage = LianxinStorage()
     private let service: any AIServiceProtocol
+    private let research: any LianxinPublicResearching
     private var generation: Task<Void, Never>?
     private var generationID = UUID()
 
     private let connection: any LianxinConnectionService
-    init(service: any AIServiceProtocol = LianxinAPIService(), connection: any LianxinConnectionService = LianxinAPIService()) {
-        self.service = service; self.connection = connection
+    init(service: any AIServiceProtocol = LianxinAPIService(), connection: any LianxinConnectionService = LianxinAPIService(), research: any LianxinPublicResearching = LianxinPublicResearchService.shared) {
+        self.service = service; self.connection = connection; self.research = research
     }
     var provider: LianxinProviderPreset { LianxinProviderPreset.preset(profile.providerID) }
     private var credentialAccount: String { LianxinSetupRules.account(provider.id) }
@@ -258,7 +259,6 @@ final class LianxinModel: ObservableObject {
             profile.connectedSignature = signature
             try await storage.save(profile)
             connectionNotice = "✓ 测试成功。模型列表不代表每个模型都已开通，生成时仍以服务商权限为准。"
-            exampleMode = false
         } catch {
             profile.connectedSignature = nil
             connectionNotice = (error as? LianxinError)?.localizedDescription ?? LianxinError.network.localizedDescription
@@ -309,32 +309,33 @@ final class LianxinModel: ObservableObject {
         profile = LianxinLanguageRules.normalized(profile)
         let input = profile
         let secret = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        do { try LianxinRoleRules.validate(input); if !exampleMode { _ = try LianxinAPIService.request(profile: input, key: secret) } }
+        do { _ = try LianxinAPIService.request(profile: input, key: secret) }
         catch { self.error = error.localizedDescription; return }
         busy = true; notice = nil
-        let isExample = exampleMode
         let id = UUID(); generationID = id
         generation = Task {
-            defer { if generationID == id { busy = false; generation = nil } }
+            defer { if generationID == id { busy = false; generation = nil; if researchNotice?.hasPrefix("正在") == true { researchNotice = nil } } }
             do {
-                let raw = try await LianxinGeneration.generate(example: isExample, profile: input, key: secret, service: service)
+                researchNotice = "正在查找公开 Wiki 资料…"
+                var enriched = input
+                enriched.researchSources = await research.lookup(name: input.idolName, group: LianxinRoleRules.clean(input.groupName))
+                try Task.checkCancellation()
+                guard generationID == id else { return }
+                researchNotice = enriched.researchSources?.isEmpty == false ? "已找到公开参考资料；粉丝整理可能有误，仅参考公开形象。" : "暂未找到可用资料，将按已知信息和你的补充创作，不编造TMI。"
+                let raw = try await service.generate(profile: enriched, key: secret)
                 let result = LianxinGeneratedBatch.parse(raw, count: input.requestedCount, translated: input.translationEnabled == true)
                 guard !result.lines.isEmpty else { notice = result.notice ?? "没有生成可用话语，请重试。"; return }
                 try Task.checkCancellation()
                 guard generationID == id else { return }
-                var updated = input
+                var updated = enriched
                 updated.setLines(result.lines); updated.understood = result.understood; updated.confidence = result.confidence
                 updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
-                updated.exampleContent = isExample
-                if isExample { updated.exampleIndex = ((input.exampleIndex ?? 0) % 4) + 1 }
-                else { updated.connectedSignature = signature }
+                updated.exampleContent = false
+                updated.connectedSignature = signature
                 LianxinRoleRules.remember(&updated)
                 try await storage.save(updated)
                 profile = updated
                 notice = result.notice
-                if isExample && (!LianxinLanguageRules.choices.contains(where: { LianxinLanguageRules.identity($0) == LianxinLanguageRules.identity(LianxinLanguageRules.source(input)) }) || (input.translationEnabled == true && !LianxinLanguageRules.choices.contains(where: { LianxinLanguageRules.identity($0) == LianxinLanguageRules.identity(LianxinLanguageRules.target(input)) }))) {
-                    notice = "体验模式内置中/韩/日/英；其他语种暂用中文示例，请连接自己的 AI。"
-                }
             } catch is CancellationError { }
             catch let failure as URLError where failure.code == .cancelled { }
             catch {

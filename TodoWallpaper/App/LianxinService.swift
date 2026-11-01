@@ -35,6 +35,7 @@ struct LianxinProfile: Codable, Equatable, Sendable {
     var generationCount: Int?
     var understood: String?
     var confidence: String?
+    var researchSources: [LianxinPublicSource]?
     var roleNotesMigrated: Bool? = true
     var requestedCount: Int { min(8, max(1, generationCount ?? 4)) }
     var resolvedLines: [LianxinLine] { if let lines, !lines.isEmpty { return lines }; return message.isEmpty ? [] : [LianxinLine(text: message, translation: translation)] }
@@ -102,7 +103,7 @@ struct LianxinAPIService: AIServiceProtocol {
         ])
         return request
     }
-    // 连接测试/角色核对共用传输安全校验，不受尚未填写的创作提示词或语言影响。
+    // 连接测试共用传输安全校验，不受尚未填写的创作提示词或语言影响。
     static func authorizedRequest(profile: LianxinProfile, key: String) throws -> URLRequest {
         let address = profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: address), components.scheme?.lowercased() == "https",
@@ -215,16 +216,19 @@ enum LianxinGeneration {
 enum LianxinWritingRules {
     static let task = "你为用户创作粉丝向的应援话语。话语是创作，不是真实人物的真实言论。"
     static let writing = """
-    写作准则：口语化，像发给对方的一条私信或一段语音。用短句，句式有长短变化，不要整齐的排比。可以有一个虚构的小场景或细节（时间、动作、感受），但不编造真实发生过的事件。称呼自然使用，最多一两次。避免鸡汤、空洞抒情、客套话和书面套话。不要自称 AI，不解释自己在做什么，不出现“作为……”。默认1~3句，中文约60字以内；长度、语气、情境以用户提示词为准，但最终原文和译文各不超过200字，安全规则始终有效。表情符号除非用户要求，否则不用。
+    写作准则：口语化，像直接发给用户的一条私信或一段语音，从第一人称对“你”说话，不是向用户介绍这位成员。用短句，句式有长短变化，不要整齐的排比。
+    用户只写“很累”“哄哄我”“睡不着”等家常话时，先理解情绪和需要，再自然回应，不要求用户提供专业提示词。根据已知的公开说话风格选择措辞、节奏、直接或含蓄的关心；没有可靠风格资料时写得朴素自然，不堆砌人设标签或韩剧腔。
+    名字、团名是识别角色用的，不是每句的台词素材。话语里默认不出现IDOL名字、团名，不用第三人称说“喜欢某某”。用户称呼通常省略；整批话语自然使用称呼最多一两次，不必用满，禁止每句都点名或固定用称呼开头。用户明确要求昵称或自我介绍时才自然加入。
+    可以有一个虚构的小场景或细节（时间、动作、感受），但不编造真实发生过的事件、今天的工作行程、见面或私下关系。公开偏好、口头禅、习惯只在身份匹配且资料有依据时轻轻带出，最多一个贴切细节；不要逐条复述百科、塞满TMI或照抄粉丝原话。
+    避免鸡汤、空洞抒情、客套话和书面套话；关心应具体、留有余地，不训话，不夸张许诺。不要自称 AI，不解释自己在做什么，不出现“作为……”。每条默认1~3句，中文约60字以内；长度、语气、情境以用户提示词为准，但最终原文和译文各不超过200字，安全规则始终有效。表情符号除非用户要求，否则不用。
     以下仅为虚构人物的风格对照，不得照抄，不代表目标人物真实经历。
     反例：“愿你在人生的旅途中，如星辰般闪耀，岁月不负，前程似锦。”
-    正例：“今天练习到很晚，刚坐上车就想到你了。{称呼}回家路上慢点走，到家说一声。”
+    正例：“累了就先把手里的事放一放。热水喝两口，肩膀也松下来，今天已经做得够多了。”
     """
     static let plainOutput = "输出格式：只返回JSON，不加围栏或前后文字："
     static let translatedOutput = plainOutput
     static func system(_ profile: LianxinProfile) -> String {
-        let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return [task, LianxinRoleRules.inferredBlock(profile), writing.replacingOccurrences(of: "{称呼}", with: user.isEmpty ? "" : user + "，"),
+        return [task, LianxinRoleRules.inferredBlock(profile), writing,
                 LianxinLanguageRules.block(profile), LianxinGeneratedBatch.output(profile)].joined(separator: "\n\n")
     }
     static func example(_ profile: LianxinProfile) -> String {

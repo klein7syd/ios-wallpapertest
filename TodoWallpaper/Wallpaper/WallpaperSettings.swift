@@ -51,6 +51,7 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
     var lianxinDisplayStyle: LianxinDisplayStyle?
     var lianxinHeader: WidgetHeaderAppearance?
     var lianxinCustomTitle: String?
+    var lianxinCustomSubtitle: String?
     var lianxinEdgeInset: Double?
     var lianxinDisplay: LianxinDisplayStyle {
         if let lianxinDisplayStyle { return lianxinDisplayStyle }
@@ -84,6 +85,7 @@ struct WallpaperSettings: Codable, Equatable, Sendable {
         v.lianxinEdgeInset = lianxinEdgeInset.map { c($0, -min(12, v.padding)...40, 0) }
         if let header = lianxinHeader { try header.validate() }
         if let lianxinCustomTitle, lianxinCustomTitle.count > 40 || lianxinCustomTitle.contains(where: \.isNewline) { throw WallpaperError.invalidDraft }
+        if let lianxinCustomSubtitle, lianxinCustomSubtitle.count > 100 || lianxinCustomSubtitle.contains(where: \.isNewline) { throw WallpaperError.invalidDraft }
         v.textColor.red = c(textColor.red, 0...1, 1); v.textColor.green = c(textColor.green, 0...1, 1)
         v.textColor.blue = c(textColor.blue, 0...1, 1); v.textColor.alpha = c(textColor.alpha, 0...1, 1)
         return v

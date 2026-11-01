@@ -52,6 +52,10 @@ struct LianxinPresentation {
     static func secondaryTexts(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [UUID: String] {
         Dictionary(uniqueKeysWithValues: entries(content, style: style).compactMap { entry in entry.secondary.map { (entry.item.id, $0) } })
     }
+    static func subtitle(custom: String?, fallback: String?) -> String? {
+        let value = (custom ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? fallback : String(value.filter { !$0.isNewline }.prefix(100))
+    }
     static func header(_ raw: WidgetHeaderAppearance, customTitle: String?, member: String, subtitle: String?) -> WidgetHeaderAppearance {
         var value = raw
         let custom = (customTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,7 +70,7 @@ struct LianxinPresentation {
         value.widget.maximumItems = max(1, content.resolvedLines.count); value.widget.unifiedMarkers = true
         value.widget.showsFooter = false; value.widget.showsSeparators = false; value.widget.completedTextStyle = .keep
         value.widget.maximumTitleLines = style.lianxinDisplay.maximumLines.flatMap { $0 == 0 ? nil : $0 }
-        value.widget.header = header(style.heading, customTitle: style.lianxinCustomTitle, member: content.idol, subtitle: content.signatureSubtitle)
+        value.widget.header = header(style.heading, customTitle: style.lianxinCustomTitle, member: content.idol, subtitle: subtitle(custom: style.lianxinCustomSubtitle, fallback: content.signatureSubtitle))
         return value
     }
     static func annotations(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [String] {

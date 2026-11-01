@@ -15,6 +15,11 @@ struct LianxinRoleView: View {
             }
             TextField("团体（可选）", text: Binding(get: { model.profile.groupName ?? "" }, set: { model.profile.groupName = String($0.prefix(100)) })).focused($focused, equals: .group)
             Text("填写团体识别更准确；不填可能认错同名成员").font(.caption).foregroundStyle(.secondary)
+            if let notice = model.researchNotice { Text(notice).font(.caption).foregroundStyle(.secondary) }
+            ForEach((model.profile.researchSources ?? []).filter(\.isAllowed)) { source in
+                Link(source.siteName + " · " + source.title, destination: source.url).font(.caption)
+            }
+            if model.profile.researchSources?.isEmpty == false { Text("公开 Wiki 由社区整理，可能过时或有误（CC BY-SA）。").font(.caption2).foregroundStyle(.secondary) }
             TextField("你的称呼", text: Binding(get: { model.profile.userName }, set: { model.profile.userName = String($0.prefix(100)) })).focused($focused, equals: .user)
             TextField("想要的感觉、你们之间的称呼，或贴 1~3 句你觉得像 TA 的话", text: Binding(get: { model.profile.notes ?? "" }, set: { model.profile.notes = String($0.prefix(500)) }), axis: .vertical).lineLimit(3...8).focused($focused, equals: .notes)
             Text("只填公开形象信息 · 补充最多500字").font(.caption).foregroundStyle(.secondary)
@@ -31,7 +36,6 @@ struct LianxinLanguageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("语言").font(.headline)
-            if model.exampleMode { Text("体验模式提供中/韩/日/英示例；其他语种暂用中文，真实自定义语言请连接 AI。").font(.caption).foregroundStyle(.secondary) }
             Picker("说话语言", selection: Binding(get: { selection(model.profile.sourceLanguage) }, set: { model.updateLanguage(source: $0) })) {
                 ForEach(LianxinLanguageRules.choices + [LianxinLanguageRules.custom], id: \.self) { Text($0).tag($0) }
             }

@@ -28,8 +28,6 @@ struct LianxinSetupView: View {
         VStack(alignment: .leading, spacing: 16) {
             Label(model.connected ? "已连接：\(model.provider.name) · \(model.profile.model)" : "连接AI，跟着做就好", systemImage: model.connected ? "checkmark.circle.fill" : "wand.and.stars")
                 .font(.headline)
-            Button("没有密钥？先体验") { model.exampleMode = true; model.generate() }
-                .frame(minHeight: 44)
             HStack {
                 Text("1. 选服务商：\(model.provider.name)").font(.subheadline)
                 Spacer()

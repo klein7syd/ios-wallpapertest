@@ -147,6 +147,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
     var lianxinShowsCreationLabel: Bool?
     var lianxinDisplayStyle: LianxinDisplayStyle?
     var lianxinCustomTitle: String?
+    var lianxinCustomSubtitle: String?
     var lianxinMarker: TodoMarker?
     var maximumTitleLines: Int?
     /// One marker style for every task, ignoring per-item overrides.
@@ -179,6 +180,7 @@ struct WidgetAppearance: Codable, Equatable, Sendable {
         try lianxinDisplayStyle?.validate()
         try lianxinMarker?.validate()
         if let lianxinCustomTitle, lianxinCustomTitle.count > 40 || lianxinCustomTitle.contains(where: \.isNewline) { throw AppearanceError.invalidStyle }
+        if let lianxinCustomSubtitle, lianxinCustomSubtitle.count > 100 || lianxinCustomSubtitle.contains(where: \.isNewline) { throw AppearanceError.invalidStyle }
         if let readableScrimOverride, !(0...0.8).contains(readableScrimOverride) { throw AppearanceError.invalidStyle }
         if let readableHeightRatio, !(0.25...0.7).contains(readableHeightRatio) { throw AppearanceError.invalidStyle }
         if let readableEdgeInset,

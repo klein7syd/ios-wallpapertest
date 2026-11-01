@@ -15,6 +15,25 @@ private struct WidgetEditState: Equatable {
     let style: WidgetAppearance
     let markers: [TaskMarkerState]
 }
+// 常驻大触控目标，避免小菜单入口与预览手势争抢点击。
+struct WidgetFamilyPicker: View {
+    @Binding var family: WidgetPreviewFamily
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(WidgetPreviewFamily.allCases) { size in
+                Button { family = size } label: {
+                    Text(size.title).font(.subheadline).lineLimit(1).minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(family == size ? Color.accentColor.opacity(0.16) : Color(uiColor: .secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(family == size ? Color.accentColor.opacity(0.5) : Color.clear) }
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }.buttonStyle(.plain).accessibilityLabel("预览尺寸：" + size.title)
+                    .accessibilityAddTraits(family == size ? .isSelected : [])
+            }
+        }
+    }
+}
 struct WidgetAppearanceEditor: View {
     @ObservedObject var store: TodoStore
     let mode: ContentMode
@@ -285,20 +304,12 @@ struct WidgetAppearanceEditor: View {
     private func fixedPreview(height: CGFloat) -> some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Menu {
-                    ForEach(WidgetPreviewFamily.allCases) { size in Button(size.title) { family = size } }
-                } label: {
-                    Group {
-                        if typeSize.isAccessibilitySize { Text(family.title).lineLimit(1).fixedSize(horizontal: true, vertical: false) }
-                        else { Label(family.title, systemImage: "rectangle.3.group") }
-                    }.font(.subheadline)
-                }.accessibilityLabel("预览尺寸：\(family.title)")
-                Spacer(minLength: 0)
-                if !typeSize.isAccessibilitySize {
-                    Text(isLianxin ? "连心 · 标注始终显示" : "点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                }
+                WidgetFamilyPicker(family: $family)
                 Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
                     .accessibilityLabel("重置预览完成状态，不修改真实待办")
+            }.zIndex(1)
+            if !typeSize.isAccessibilitySize {
+                Text(isLianxin ? "连心预览" : "点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
             GeometryReader { proxy in
                 let scale = family.scale(availableWidth: proxy.size.width - 32, availableHeight: proxy.size.height - 8)
@@ -404,6 +415,9 @@ struct WidgetAppearanceEditor: View {
         Toggle("显示标题", isOn: heading.showsTitle)
         if isLianxin {
             Toggle("显示团体摘要", isOn: heading.showsSummary)
+            if editingAppearance.widget.heading.showsSummary {
+                TextField("右上角文字（留空使用团名）", text: Binding(get: { widget.wrappedValue.lianxinCustomSubtitle ?? "" }, set: { widget.wrappedValue.lianxinCustomSubtitle = String($0.filter { !$0.isNewline }.prefix(100)) })).textFieldStyle(LianxinFieldStyle())
+            }
             Text("团体摘要属于公开署名，会随话语同步到小组件。").font(.caption).foregroundStyle(.secondary)
         }
         if editingAppearance.widget.heading.showsTitle {

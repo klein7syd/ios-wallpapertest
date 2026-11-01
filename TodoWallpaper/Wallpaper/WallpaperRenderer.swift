@@ -181,19 +181,20 @@ enum WallpaperRenderer {
         var headingMetrics: WidgetHeaderLayout?
         var titleBlock: WallpaperTextBlock?, summaryBlock: WallpaperTextBlock?
         if let content {
+            let subtitle = LianxinPresentation.subtitle(custom: settings.lianxinCustomSubtitle, fallback: content.signatureSubtitle)
             let header = LianxinPresentation.header(settings.lianxinHeader ?? WidgetHeaderAppearance(), customTitle: settings.lianxinCustomTitle,
-                member: content.idol, subtitle: content.signatureSubtitle)
+                member: content.idol, subtitle: subtitle)
             var headerSettings = settings; headerSettings.font = header.font; headerSettings.weight = header.weight
             headerSettings.fontSize = header.fontSize; headerSettings.lineSpacing = 0
             let titleColor = header.followsTextColor ? effectiveTextColor(settings) : header.color
             let measured = text(header.text, width: 10000, settings: headerSettings, maxLines: 1, textColor: titleColor)
-            let summary = text(content.signatureSubtitle ?? "", width: 10000, settings: settings, opacity: 0.7, size: 11, maxLines: 1)
+            let summary = text(subtitle ?? "", width: 10000, settings: settings, opacity: 0.7, size: 11, maxLines: 1)
             let metrics = WidgetHeaderLayout.make(style: header, width: panelWidth - 2 * padding, maximumHeight: canvas.height * 0.6,
                 measuredTitleWidth: ceil(measured.lines.map { CTLineGetTypographicBounds($0, nil, nil, nil) }.max() ?? 0), titleLineHeight: measured.height,
                 measuredSummaryWidth: ceil(summary.lines.map { CTLineGetTypographicBounds($0, nil, nil, nil) }.max() ?? 0), summaryHeight: summary.height)
             headingMetrics = metrics
             if header.visibleTitle { titleBlock = text(header.text, width: metrics.titleWidth, settings: headerSettings, maxLines: 2, textColor: titleColor) }
-            if header.showsSummary { summaryBlock = text(content.signatureSubtitle ?? "", width: metrics.summaryWidth, settings: settings, opacity: 0.7, size: 11, maxLines: 1) }
+            if header.showsSummary { summaryBlock = text(subtitle ?? "", width: metrics.summaryWidth, settings: settings, opacity: 0.7, size: 11, maxLines: 1) }
         }
         let headingHeight = CGFloat(headingMetrics?.height ?? 0)
         let headingGap = headingHeight > 0 ? itemSpacing : 0

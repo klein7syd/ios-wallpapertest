@@ -388,6 +388,9 @@ struct WallpaperEditorView: View {
         PreciseSlider(title: "顶部留白", value: Binding(get: { model.settings.lianxinEdgeInset ?? 0 }, set: { model.settings.lianxinEdgeInset = $0 }), range: -min(12, model.settings.padding)...40, standard: 0)
         Toggle("显示标题", isOn: lianxinHeading.showsTitle)
         Toggle("显示团体摘要", isOn: lianxinHeading.showsSummary)
+        if lianxinHeading.wrappedValue.showsSummary {
+            TextField("右上角文字（留空使用团名）", text: Binding(get: { model.settings.lianxinCustomSubtitle ?? "" }, set: { model.settings.lianxinCustomSubtitle = String($0.filter { !$0.isNewline }.prefix(100)) })).textFieldStyle(LianxinFieldStyle())
+        }
         Text("团体摘要属于公开署名，详细角色设定不会共享。").font(.caption).foregroundStyle(.secondary)
         if lianxinHeading.wrappedValue.showsTitle {
             TextField("默认：" + lianxinModel.publication.idol, text: Binding(get: { model.settings.lianxinCustomTitle ?? "" }, set: { model.settings.lianxinCustomTitle = String($0.filter { !$0.isNewline }.prefix(40)) })).textFieldStyle(LianxinFieldStyle())

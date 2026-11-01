@@ -12,7 +12,7 @@ struct LianxinWidgetContent: View {
     var body: some View {
         TodoWidgetContent(document: TodoDocument(items: LianxinPresentation.items(value, style: display)), appearance: LianxinPresentation.look(content: value, style: style),
             error: nil, family: family, interactive: false, textAlignment: display.centered ? .center : .leading, effectsFamily: effectsFamily,
-            secondaryText: LianxinPresentation.secondaryTexts(value, style: display), summaryText: value.signatureSubtitle,
+            secondaryText: LianxinPresentation.secondaryTexts(value, style: display), summaryText: LianxinPresentation.subtitle(custom: style.lianxinCustomSubtitle, fallback: value.signatureSubtitle),
             annotations: LianxinPresentation.annotations(value, style: display), maximumLinesOverride: display.maximumLines == 0 ? Int.max : nil,
             secondaryScale: display.translationScale, secondaryOpacity: display.translationOpacity, alignsMarkerToFirstLine: false)
             .allowsHitTesting(false)
@@ -43,7 +43,7 @@ struct LianxinWidgetBackground: View {
             scrimColor: readable.color, scrimExtraInset: style.readable.edgeInset,
             contentDocument: TodoDocument(items: LianxinPresentation.items(value, style: display)), contentAppearance: LianxinPresentation.look(content: value, style: style),
             contentFamily: family, contentMargins: margins, effectsFamily: effectsFamily,
-            contentSecondaryText: LianxinPresentation.secondaryTexts(value, style: display), contentSummaryText: value.signatureSubtitle,
+            contentSecondaryText: LianxinPresentation.secondaryTexts(value, style: display), contentSummaryText: LianxinPresentation.subtitle(custom: style.lianxinCustomSubtitle, fallback: value.signatureSubtitle),
             contentAnnotations: LianxinPresentation.annotations(value, style: display), contentMaximumLines: display.maximumLines == 0 ? Int.max : nil,
             contentSecondaryScale: display.translationScale, alignsMarkerToFirstLine: false)
     }
