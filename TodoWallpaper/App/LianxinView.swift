@@ -210,7 +210,9 @@ struct LianxinView: View {
                     .buttonStyle(.bordered).disabled(!model.loaded || model.busy || loadingPhoto)
                 if model.busy { Button("取消") { model.cancel() }.frame(minHeight: 44) }
             }
-        }.padding(.horizontal, 16).padding(.vertical, 8).background(.bar)
+        }.padding(16).frame(maxWidth: .infinity)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private var countControl: some View {
@@ -232,24 +234,13 @@ struct LianxinView: View {
 
     private var settings: some View {
         NavigationStack {
-            Form {
-                Section("连接AI向导") { LianxinSetupView(model: model) }
-
-            }
-            .disabled(model.busy)
-            .navigationTitle("连心设置").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { Task { if await model.saveSettings() { showsSettings = false } } }.disabled(model.busy)
-                }
-            }
-            .interactiveDismissDisabled()
-            .scrollDismissesKeyboard(.interactively)
-            .buttonBorderShape(.roundedRectangle(radius: 14))
+            LianxinSetupView(model: model, onFinished: { showsSettings = false })
+            .navigationTitle("连接 AI").navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(model.busy)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") {
-                        showsSettings = false
+                        Task { await model.saveInputsNow(); showsSettings = false }
                     }.disabled(model.busy)
                 }
             }

@@ -154,7 +154,7 @@ final class LianxinModel: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            // 不把密钥写入普通文件；资料保存失败时恢复原钥匙串值。
+            //这里只保存普通配置；密钥由saveKey单独写入钥匙串。
             if !profile.endpoint.isEmpty { profile.endpoint = try LianxinSetupRules.endpoint(profile.endpoint) }
             try await storage.save(profile)
             notice = "已保存"
@@ -230,7 +230,7 @@ final class LianxinModel: ObservableObject {
         let keepsLegacyCustom = next.id == "custom" && provider.id == "custom"
         profile.providerID = next.id
         if !keepsLegacyCustom { profile.endpoint = next.endpoint; profile.model = next.model }
-        profile.connectedSignature = nil; availableModels = []; connectionNotice = nil; key = ""; keySaved = false
+        profile.connectedSignature = nil; profile.setupFinished = false; availableModels = []; connectionNotice = nil; key = ""; keySaved = false
         do { key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty }
         catch { connectionNotice = "密钥暂时无法读取，请解锁设备后重试。" }
     }
@@ -242,37 +242,50 @@ final class LianxinModel: ObservableObject {
         }
         do {
             try LianxinKeychain.save(cleaned, account: credentialAccount)
-            key = cleaned; keySaved = !cleaned.isEmpty; profile.connectedSignature = nil; connectionNotice = nil
+            key = cleaned; keySaved = !cleaned.isEmpty; profile.connectedSignature = nil; profile.setupFinished = false; availableModels = []; connectionNotice = nil
             return true
         } catch { connectionNotice = "密钥未保存，请解锁设备并检查签名后重试。"; return false }
     }
     func testConnection() async {
-        guard !busy else { return }
+        guard !busy, !Task.isCancelled else { return }
+        let previousSignature = profile.connectedSignature
         busy = true; connectionNotice = nil
         defer { busy = false }
         do {
             profile.endpoint = try LianxinSetupRules.endpoint(profile.endpoint)
             guard !key.isEmpty else { throw LianxinError.invalidKey }
             let models = try await connection.test(profile: profile, key: key, provider: provider)
+            try Task.checkCancellation()
             availableModels = models
             if profile.model.isEmpty { profile.model = models.first ?? provider.model }
             profile.connectedSignature = signature
             try await storage.save(profile)
             connectionNotice = "✓ 测试成功。模型列表不代表每个模型都已开通，生成时仍以服务商权限为准。"
+        } catch is CancellationError {
+            profile.connectedSignature = previousSignature
+            connectionNotice = "测试已取消，可以修改后再试。"
+        } catch let failure as URLError where failure.code == .cancelled {
+            profile.connectedSignature = previousSignature
+            connectionNotice = "测试已取消，可以修改后再试。"
         } catch {
             profile.connectedSignature = nil
             connectionNotice = (error as? LianxinError)?.localizedDescription ?? LianxinError.network.localizedDescription
         }
     }
-    func finishSetup() async {
-        guard connected else { return }
+    func finishSetup() async -> Bool {
+        guard connected, !busy else { return false }
+        let previous = profile.setupFinished
         profile.setupFinished = true
-        if !(await saveSettings()) { profile.setupFinished = false }
+        if await saveSettings() { return true }
+        profile.setupFinished = previous
+        return false
     }
     func chooseModel(_ value: String) async {
+        guard !busy, value != profile.model else { return }
         profile.model = value
         // 模型改变后需再次测试，避免沿用其他模型的成功状态。
         profile.connectedSignature = nil
+        profile.setupFinished = false; connectionNotice = nil
     }
 
     func setPhoto(_ data: Data?) async {

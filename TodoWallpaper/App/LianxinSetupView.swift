@@ -1,117 +1,276 @@
-// Target Membership：仅App。分步向导使用系统浏览器和PasteButton。
+// Target Membership：仅App。每次只处理一步，密钥只在内存与钥匙串之间流转。
 import SwiftUI
 
 struct LianxinSetupView: View {
     @ObservedObject var model: LianxinModel
-    @State private var choosing = false
+    var onFinished: () -> Void
+    private enum Step: Int { case provider, credential, model, connected }
+    @State private var step = Step.provider
+    @State private var started = false
     @State private var draftKey = ""
+    @State private var endpoint = ""
+    @State private var modelName = ""
+    @State private var editingKey = false
     @State private var revealsKey = false
+    @State private var manualModel = false
+    @State private var showsDeleteKey = false
+    @State private var message: String?
+    @State private var connectionTask: Task<Void, Never>?
     private enum Field: Hashable { case endpoint, key, model }
     @FocusState private var focused: Field?
     @Environment(\.openURL) private var openURL
-    private var finalAddress: String { (try? LianxinSetupRules.endpoint(model.profile.endpoint)) ?? "请填写有效的HTTPS地址" }
-    var body: some View {
-        Group {
-            if model.connected && !choosing {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("已连接：\(model.provider.name) · \(model.profile.model)").font(.headline)
-                    Button("更换服务商") { choosing = true }
-                    Button("重新测试") { Task { await model.testConnection() } }
-                    Button("清除密钥", role: .destructive) { _ = model.saveKey("") }
-                    if let notice = model.connectionNotice { Text(notice).font(.caption) }
-                }.disabled(model.busy)
-            } else { wizard }
-        }
-        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = nil } } }
-    }
-    private var wizard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label(model.connected ? "已连接：\(model.provider.name) · \(model.profile.model)" : "连接AI，跟着做就好", systemImage: model.connected ? "checkmark.circle.fill" : "wand.and.stars")
-                .font(.headline)
-            HStack {
-                Text("1. 选服务商：\(model.provider.name)").font(.subheadline)
-                Spacer()
-                Button(choosing ? "收起" : "更换") { choosing.toggle() }.frame(minHeight: 44)
-            }
-            if choosing || model.profile.providerID == nil && model.profile.endpoint.isEmpty {
-                ForEach(LianxinProviderPreset.all) { preset in
-                    Button {
-                        Task { await model.selectProvider(preset.id); draftKey = ""; revealsKey = false; choosing = false }
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(preset.name).font(.headline)
-                                Text(preset.detail).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if model.provider.id == preset.id { Image(systemName: "checkmark.circle.fill") }
-                        }.padding(12).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }.buttonStyle(.plain)
-                }
-            }
-            if model.provider.id != "custom", let url = URL(string: model.provider.keyPage) {
-                Text("2. 获取密钥").font(.subheadline)
-                Button { openURL(url) } label: { Label("获取密钥", systemImage: "safari").frame(minHeight: 44) }.buttonStyle(.bordered)
-                Text("在官方页面登录或注册，找到 API Key，创建并复制。\n回到这里粘贴；聊天会员不一定包含API额度。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(model.provider.detail).font(.caption).foregroundStyle(.secondary)
-            }
-            if model.provider.id == "custom" {
-                Text("2. 按服务商说明填写").font(.subheadline)
-                TextField("域名、Base URL或完整接口地址", text: $model.profile.endpoint)
-                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .endpoint)
-            }
-            Text("最终聊天地址：\(finalAddress)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-            if model.profile.endpoint.lowercased().hasPrefix("http://") { Text("需要 https，请向服务商确认安全地址。").font(.caption).foregroundStyle(.red) }
-            Text("3. 粘贴密钥").font(.subheadline)
-            HStack {
-                Group {
-                    if revealsKey { TextField("粘贴新密钥", text: $draftKey) }
-                    else { SecureField("粘贴新密钥", text: $draftKey) }
-                }.textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .key)
-                Button { revealsKey.toggle() } label: { Image(systemName: revealsKey ? "eye.slash" : "eye").frame(minWidth: 44, minHeight: 44) }
-                    .accessibilityLabel(revealsKey ? "隐藏密钥" : "显示新输入的密钥")
-            }
-            HStack {
-                PasteButton(payloadType: String.self) { values in
-                    if let value = values.first { draftKey = LianxinSetupRules.cleanKey(value) }
-                }
-                Button("保存密钥") {
-                    if model.saveKey(draftKey) { draftKey = ""; revealsKey = false }
-                }.frame(minHeight: 44).disabled(draftKey.isEmpty)
-            }
-            if model.keySaved {
-                HStack {
-                    Text("已保存 ✓ 尾号 \(model.keySuffix)").font(.caption)
-                    Spacer()
-                    Button("删除密钥", role: .destructive) { _ = model.saveKey("") }.font(.caption).frame(minHeight: 44)
-                }
-            }
-            Text("4. 测试连接并选择模型").font(.subheadline)
-            if !model.availableModels.isEmpty {
-                Picker("模型", selection: Binding(get: { model.profile.model }, set: { value in Task { await model.chooseModel(value) } })) {
-                    ForEach(Array(Set(model.availableModels + [model.profile.model])).sorted(), id: \.self) { Text($0).tag($0) }
-                }.pickerStyle(.menu)
-            } else if model.provider.id == "custom" || model.provider.modelsEndpoint == nil {
-                TextField("模型名称（已预填，可修改）", text: $model.profile.model).textInputAutocapitalization(.never)
-                    .autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .model)
-            } else { Text("推荐模型：\(model.profile.model)").font(.caption) }
-            Button { Task { await model.testConnection() } } label: {
-                Label("测试连接", systemImage: "network").frame(maxWidth: .infinity, minHeight: 44)
-            }.buttonStyle(.borderedProminent).disabled(!model.keySaved)
-            Text("测试会访问模型列表；没有可用列表时发送极短请求，可能产生少量费用。")
-                .font(.caption).foregroundStyle(.secondary)
-            if let message = model.connectionNotice { Text(message).font(.footnote).textSelection(.enabled) }
-            if model.connected { Label("已连接：\(model.provider.name) · \(model.profile.model)", systemImage: "checkmark.circle.fill").font(.footnote) }
-            if model.connected {
-                Button("完成设置") { Task { await model.finishSetup() } }.buttonStyle(.borderedProminent).frame(minHeight: 44)
-            }
-            Text("由你的服务商按用量计费，本 App 不收费，也不会上传你的照片。")
-                .font(.caption).foregroundStyle(.secondary)
 
+    private var selectedModel: String { modelName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var testedSelection: Bool { model.connected && selectedModel == model.profile.model }
+    private var finalAddress: String { (try? LianxinSetupRules.endpoint(endpoint)) ?? "填写后会在这里显示完整地址" }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                progress
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).font(.title2.bold())
+                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Group {
+                    switch step {
+                    case .provider: providers
+                    case .credential: credentials
+                    case .model: models
+                    case .connected: connectionSummary
+                    }
+                }.disabled(model.busy)
+                if let message { Text(message).font(.footnote).foregroundStyle(.red) }
+                if let notice = model.connectionNotice, step != .provider {
+                    Text(notice).font(.footnote).foregroundStyle(.secondary)
+                }
+                if connectionTask != nil {
+                    HStack {
+                        ProgressView("正在测试连接…")
+                        Spacer()
+                        Button("取消测试") { connectionTask?.cancel() }.frame(minHeight: 44)
+                    }
+                }
+                navigation
+                Text("由你的服务商按用量计费，本 App 不收费，也不会上传你的照片。密钥只保存在本机钥匙串。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(20)
         }
-        .disabled(model.busy)
-        .onChange(of: model.profile.providerID) { _, _ in draftKey = ""; revealsKey = false }
+        .background(Color(uiColor: .systemGroupedBackground).onTapGesture { focused = nil })
+        .scrollDismissesKeyboard(.interactively)
+        .buttonStyle(.plain)
+        .buttonBorderShape(.roundedRectangle(radius: 16))
+        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = nil } } }
+        .task {
+            guard !started else { return }; started = true
+            endpoint = model.profile.endpoint; modelName = model.profile.model
+            editingKey = !model.keySaved
+            step = model.connected ? .connected : (model.profile.providerID != nil || !endpoint.isEmpty ? .credential : .provider)
+        }
+        .onDisappear { connectionTask?.cancel(); draftKey = ""; revealsKey = false }
+        .onChange(of: modelName) { _, _ in message = nil; model.connectionNotice = nil }
+        .onChange(of: step) { _, _ in message = nil; model.connectionNotice = nil; focused = nil }
+        .confirmationDialog("删除这个服务商的密钥？其他服务商的密钥会保留。", isPresented: $showsDeleteKey, titleVisibility: .visible) {
+            Button("删除密钥", role: .destructive) {
+                if model.saveKey("") { draftKey = ""; revealsKey = false; editingKey = true; step = .credential }
+            }
+        }
+    }
+
+    private var title: String {
+        switch step {
+        case .provider: return "先选你使用的服务商"
+        case .credential: return "接入 " + model.provider.name
+        case .model: return "选择模型，测试后完成"
+        case .connected: return "AI 已连接"
+        }
+    }
+    private var detail: String {
+        switch step {
+        case .provider: return "密钥要和服务商对应。不清楚选哪个？选择你已注册并开通 API 的平台。"
+        case .credential: return "已有密钥就直接粘贴；没有的话，先到官方页面创建。"
+        case .model: return "通常保留当前推荐模型就好。更换模型后，需要重新测试。"
+        case .connected: return "当前连接已保存，可以回到连心生成话语。"
+        }
+    }
+    private var progress: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3, id: \.self) { index in
+                Text(["1 服务商", "2 密钥", "3 模型与测试"][index]).font(.caption.weight(.medium))
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .background(index == min(step.rawValue, 2) ? Color.accentColor.opacity(0.14) : Color(uiColor: .secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14, content: content).padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+    private func primary(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(title).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.borderedProminent)
+    }
+    private var providers: some View {
+        VStack(spacing: 10) {
+            ForEach(LianxinProviderPreset.all) { preset in
+                Button {
+                    focused = nil; message = nil
+                    Task {
+                        await model.selectProvider(preset.id)
+                        endpoint = model.profile.endpoint; modelName = model.profile.model
+                        draftKey = ""; revealsKey = false; editingKey = !model.keySaved; manualModel = false
+                        step = .credential
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(preset.name).font(.headline).foregroundStyle(.primary)
+                            Text(preset.detail).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: preset.id == model.profile.providerID ? "checkmark.circle.fill" : "chevron.right").foregroundStyle(Color.accentColor)
+                    }.padding(18).frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }
+            }
+        }
+    }
+    private var credentials: some View {
+        VStack(spacing: 16) {
+            card {
+                HStack { Text(model.provider.name).font(.headline); Spacer(); Button("更换服务商") { step = .provider; message = nil } }
+                if model.provider.id == "custom" {
+                    Text("接口地址").font(.subheadline.weight(.medium))
+                    TextField("粘贴 Base URL 或完整聊天接口", text: $endpoint).keyboardType(.URL)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .endpoint)
+                    Text("最终地址：" + finalAddress).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    if endpoint.lowercased().hasPrefix("http://") { Text("需要 https，请向服务商确认安全地址。").font(.caption).foregroundStyle(.red) }
+                } else if let url = URL(string: model.provider.keyPage) {
+                    Button { focused = nil; openURL(url) } label: {
+                        Label("前往官方页面获取密钥", systemImage: "safari").frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(.bordered)
+                    Text("登录后找到 API Key，创建并复制，再回到这里粘贴。聊天会员和 API 额度通常分开。").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            card {
+                Text("API 密钥").font(.headline)
+                if model.keySaved {
+                    HStack {
+                        Label("已保存 · 尾号 " + model.keySuffix, systemImage: "checkmark.shield").font(.subheadline)
+                        Spacer()
+                        Button(editingKey ? "取消更换" : "更换") { editingKey.toggle(); draftKey = ""; revealsKey = false }
+                    }
+                }
+                if editingKey || !model.keySaved {
+                    HStack(spacing: 8) {
+                        Group {
+                            if revealsKey { TextField("粘贴 API 密钥", text: $draftKey) }
+                            else { SecureField("粘贴 API 密钥", text: $draftKey) }
+                        }.textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .key)
+                        Button { revealsKey.toggle() } label: {
+                            Image(systemName: revealsKey ? "eye.slash" : "eye").frame(width: 44, height: 44)
+                        }.accessibilityLabel(revealsKey ? "隐藏密钥" : "显示新输入的密钥")
+                    }
+                    PasteButton(payloadType: String.self) { values in
+                        if let value = values.first { draftKey = LianxinSetupRules.cleanKey(value) }
+                    }
+                    Text("点“继续”时保存新密钥；关闭页面不会保存尚未提交的密钥。").font(.caption).foregroundStyle(.secondary)
+                }
+                if model.keySaved { Button("删除这个服务商的密钥", role: .destructive) { showsDeleteKey = true }.font(.caption).frame(minHeight: 44) }
+            }
+        }
+    }
+    private var models: some View {
+        card {
+            Text("当前模型").font(.headline)
+            if !model.availableModels.isEmpty && !manualModel && model.provider.id != "custom" {
+                Picker("选择模型", selection: $modelName) {
+                    ForEach(Array(Set(model.availableModels + [modelName])).filter { !$0.isEmpty }.sorted(), id: \.self) { Text($0).tag($0) }
+                }.pickerStyle(.menu).frame(minHeight: 44)
+            } else if model.provider.id == "custom" || manualModel {
+                TextField("填写服务商提供的模型名称", text: $modelName).textInputAutocapitalization(.never)
+                    .autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .model)
+            } else {
+                Text(modelName).font(.body.monospaced()).textSelection(.enabled)
+            }
+            if model.provider.id != "custom" {
+                Button(manualModel ? "使用推荐模型" : "手动填写其他模型") {
+                    manualModel.toggle()
+                    if !manualModel { modelName = model.provider.model }
+                    message = nil
+                }.font(.subheadline).frame(minHeight: 44)
+            }
+            if testedSelection {
+                Label("连接测试通过", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("可以直接完成；也可以先选其他模型，再重新测试。").font(.caption).foregroundStyle(.secondary)
+                Button("重新测试") { startTesting() }.frame(minHeight: 44)
+            } else {
+                Text(model.connected ? "模型已修改，请测试这次的选择。" : "测试通过后，就可以完成设置。").font(.caption).foregroundStyle(.secondary)
+            }
+            Text("测试可能访问模型列表或发送一条极短请求，可能产生少量费用；列表中的模型仍需账号已开通权限。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var connectionSummary: some View {
+        card {
+            Label(model.provider.name, systemImage: "checkmark.circle.fill").font(.headline).foregroundStyle(.green)
+            Text(model.profile.model).font(.body.monospaced()).textSelection(.enabled)
+            Text("密钥已保存 · 尾号 " + model.keySuffix).font(.caption).foregroundStyle(.secondary)
+            Divider()
+            Button("更换模型") { modelName = model.profile.model; step = .model; message = nil }.frame(minHeight: 44)
+            Button("修改密钥或接口") { endpoint = model.profile.endpoint; editingKey = !model.keySaved; step = .credential; message = nil }.frame(minHeight: 44)
+            Button("更换服务商") { step = .provider; message = nil }.frame(minHeight: 44)
+        }
+    }
+    @ViewBuilder private var navigation: some View {
+        VStack(spacing: 10) {
+            switch step {
+            case .provider: EmptyView()
+            case .credential:
+                primary("继续：选择模型", action: continueToModel)
+                    .disabled(model.busy || (!model.keySaved && LianxinSetupRules.cleanKey(draftKey).isEmpty))
+                Button("上一步：服务商") { step = .provider; message = nil }.frame(minHeight: 44).disabled(model.busy)
+            case .model:
+                if testedSelection {
+                    primary("完成设置，回到连心", action: finish).disabled(model.busy)
+                } else {
+                    primary("测试连接", action: startTesting).disabled(model.busy || selectedModel.isEmpty)
+                }
+                Button("上一步：密钥") { step = .credential; message = nil }.frame(minHeight: 44).disabled(model.busy)
+            case .connected:
+                primary("回到连心", action: onFinished).disabled(model.busy)
+            }
+        }.controlSize(.large).frame(maxWidth: .infinity)
+            .buttonBorderShape(.roundedRectangle(radius: 18))
+    }
+    private func continueToModel() {
+        focused = nil; message = nil; model.connectionNotice = nil
+        do {
+            let address = try LianxinSetupRules.endpoint(model.provider.id == "custom" ? endpoint : model.profile.endpoint)
+            let cleaned = LianxinSetupRules.cleanKey(draftKey)
+            if !draftKey.isEmpty && cleaned.isEmpty { message = "请粘贴完整密钥，或取消更换以使用已保存的密钥。"; return }
+            if !cleaned.isEmpty && !model.saveKey(cleaned) { return }
+            guard model.keySaved else { message = "请先粘贴这个服务商的密钥。"; return }
+            model.profile.endpoint = address; endpoint = address
+            draftKey = ""; revealsKey = false; editingKey = false; step = .model
+        } catch { message = (error as? LianxinError)?.localizedDescription ?? "接口地址不完整，请核对后继续。" }
+    }
+    private func startTesting() {
+        guard !model.busy, connectionTask == nil else { return }
+        guard !selectedModel.isEmpty, selectedModel.count <= 200 else { message = "请填写正确的模型名称（最多200字）。"; return }
+        focused = nil; message = nil
+        connectionTask = Task { @MainActor in
+            await model.chooseModel(selectedModel)
+            await model.testConnection()
+            connectionTask = nil
+        }
+    }
+    private func finish() {
+        focused = nil; message = nil
+        Task {
+            if await model.finishSetup() { onFinished() }
+            else { message = "设置暂未保存，请稍后重试。"; model.error = nil }
+        }
     }
 }
