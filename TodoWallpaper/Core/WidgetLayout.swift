@@ -48,7 +48,7 @@ struct WidgetLayoutMetrics: Equatable {
         let secondaryFont = NativeTypography.font(family: style.font, weight: style.weight, size: CTFontGetSize(actualFont) * secondaryScale)
         let secondaryLines = candidates.map { item in secondaryText[item.id].map { WidgetTitleMeasure.lineHeight($0, font: secondaryFont) } ?? 0 }
         let secondaryGap = max(0, style.spacing) / 2
-        func textTop(_ index: Int) -> Double { alignsMarkerToFirstLine && marks[index] > 0 ? max(0, (marks[index] + vertical - line) / 2) : 0 }
+        func textTop(_ index: Int) -> Double { 0 }
         func extraHeight(_ index: Int, _ lines: Int) -> Double { lines > 0 ? secondaryLines[index] * Double(lines) + secondaryGap : 0 }
         func rowHeight(_ index: Int, _ lines: Int, _ secondary: Int = 0) -> Double {
             max(marks[index] + (marks[index] > 0 ? vertical : 0), textTop(index) + line * Double(lines) + extraHeight(index, secondary) + (candidates[index].schedule == nil ? 0 : date + 2)) + padding

@@ -24,7 +24,7 @@ struct LianxinView: View {
     @State private var showsSettings = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
-    private enum Field: Hashable { case prompt, message, translation }
+    private enum Field: Hashable { case prompt, message(Int), translation(Int) }
     @FocusState private var focused: Field?
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -106,17 +106,22 @@ struct LianxinView: View {
 
     private var outputControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("编辑用于小组件和壁纸的话语", text: $model.profile.message, axis: .vertical)
-                .lineLimit(3...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message)
-            Text("\(model.profile.message.count)/200 字 · 自动同步；小号组件可能只展示部分文字。")
-                .font(.caption).foregroundStyle(.secondary)
-            if model.profile.translationEnabled == true {
-                TextField("译文（可编辑）", text: Binding(get: { model.profile.translation ?? "" }, set: { model.profile.translation = $0 }), axis: .vertical)
-                    .lineLimit(3...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .translation)
-                Text("\(model.profile.translation?.count ?? 0)/200 字 · 译文自动同步")
-                    .font(.caption).foregroundStyle(.secondary)
+            ForEach(Array(model.profile.resolvedLines.enumerated()), id: \.offset) { index, line in
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("话语 \(index + 1)", text: lineBinding(index, translation: false), axis: .vertical)
+                        .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message(index))
+                    if model.profile.translationEnabled == true {
+                        TextField("译文", text: lineBinding(index, translation: true), axis: .vertical)
+                            .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .translation(index))
+                    }
+                    HStack {
+                        Text("原文 \(line.text.count)/200 · 译文 \(line.translation?.count ?? 0)/200").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("删除", role: .destructive) { var values = model.profile.resolvedLines; if values.indices.contains(index) { values.remove(at: index); model.profile.setLines(values) } }
+                    }
+                }
             }
-            if !canOutput { Text("原文需为 1–200 字、译文最多200字，小组件保留上一次有效内容。").font(.caption).foregroundStyle(.secondary) }
+            if !canOutput { Text("每句话语需为1–200字，译文最多200字；无效输入保留上次内容。").font(.caption).foregroundStyle(.secondary) }
             if let error = model.syncError {
                 HStack { Text(error).font(.caption); Button("重试") { model.scheduleSync() } }
             } else if let date = model.syncedAt {
@@ -129,7 +134,15 @@ struct LianxinView: View {
         }.disabled(model.busy || loadingPhoto)
     }
 
-    private var canOutput: Bool { !model.profile.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.profile.message.count <= 200 && (model.profile.translationEnabled != true || (model.profile.translation?.count ?? 0) <= 200) }
+    private var canOutput: Bool { !model.profile.resolvedLines.isEmpty && model.profile.resolvedLines.count <= 8 && model.profile.resolvedLines.allSatisfy(\.isValid) }
+    private func lineBinding(_ index: Int, translation: Bool) -> Binding<String> {
+        Binding(get: { let values = model.profile.resolvedLines; guard values.indices.contains(index) else { return "" }; return translation ? (values[index].translation ?? "") : values[index].text }, set: { value in
+            var values = model.profile.resolvedLines; guard values.indices.contains(index) else { return }
+            if translation { values[index].translation = value } else { values[index].text = value }
+            model.profile.setLines(values)
+        })
+    }
+
 
     private func dismissKeyboard() {
         focused = nil
@@ -191,13 +204,14 @@ struct LianxinView: View {
         VStack(spacing: 8) {
             if model.busy || loadingPhoto { ProgressView(loadingPhoto ? "正在导入底图" : "正在处理") }
             HStack {
-                PhotosPicker(selection: $selection, matching: .images) {
-                    Label("底图", systemImage: "photo").frame(minHeight: 44)
-                }.buttonStyle(.bordered).disabled(!model.loaded || model.busy || loadingPhoto)
+                Stepper("生成几句：\(model.profile.requestedCount)", value: Binding(get: { model.profile.requestedCount }, set: { model.profile.generationCount = $0 }), in: 1...8).disabled(model.busy)
                 Button { model.generate() } label: {
-                    Label(model.profile.message.isEmpty ? "生成话语" : "再生成一句", systemImage: "heart.text.clipboard")
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                    Text(model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 44)
                 }.buttonStyle(.borderedProminent).disabled(!model.loaded || model.busy || loadingPhoto)
+            }
+            HStack {
+                PhotosPicker(selection: $selection, matching: .images) { Label("底图", systemImage: "photo").frame(minHeight: 44) }
+                    .buttonStyle(.bordered).disabled(!model.loaded || model.busy || loadingPhoto)
                 if model.busy { Button("取消") { model.cancel() }.frame(minHeight: 44) }
             }
         }.padding(.horizontal, 16).padding(.vertical, 8).background(.bar)

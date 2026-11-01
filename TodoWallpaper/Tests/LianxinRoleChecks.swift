@@ -24,7 +24,7 @@ enum LianxinRoleChecks {
         try require(!full.contains("绝不能出现的第四条") && LianxinRoleRules.fit(profile) == .great, "最多3条示例与很好贴合")
         profile.exampleLines = Array((profile.exampleLines ?? []).prefix(3))
         let system = LianxinWritingRules.system(profile)
-        let ordered = [LianxinWritingRules.task, "角色设定：", "写作准则：", "语言规则：", "输出格式："]
+        let ordered = [LianxinWritingRules.task, "创作对象：", "写作准则：", "语言规则：", "输出格式："]
         var position = system.startIndex
         for token in ordered {
             guard let range = system.range(of: token, range: position..<system.endIndex) else { throw LianxinError.invalidResponse }; position = range.upperBound
@@ -54,10 +54,10 @@ enum LianxinRoleChecks {
         var override = confirmed; override.groupName = "用户修改队伍"; override.position = "用户修改定位"; override.otherNames = ["UserAlias"]
         let overrideBlock = LianxinRoleRules.block(override)
         try require(overrideBlock.contains("用户修改队伍") && overrideBlock.contains("用户修改定位") && !overrideBlock.contains("核对队伍") && !overrideBlock.contains("Checked"), "冲突字段用户输入优先")
-        let roleRequest = try LianxinAPIService.roleRequest(profile: profile, key: "fixture-only")
+        let roleRequest = try LianxinAPIService.request(profile: profile, key: "fixture-only")
         let roleJSON = try JSONSerialization.jsonObject(with: roleRequest.httpBody ?? Data()) as? [String: Any]
         let roleMessages = roleJSON?["messages"] as? [[String: String]]
-        try require(roleMessages?.count == 2 && roleMessages?[0]["content"] == LianxinRoleRules.verification && roleMessages?[1]["content"] == "名字：虚构成员\n团体：虚构队伍" && roleJSON?["temperature"] == nil, "核对仅一个双消息请求，不携提示词或其他角色设定")
+        try require(roleMessages?.count == 2 && roleMessages?[0]["content"] == LianxinWritingRules.system(profile) && roleMessages?[1]["content"] == profile.prompt && roleJSON?["temperature"] == nil, "识别与创作合并一次请求，用户原文不改写")
         var recent = profile
         for index in 0..<8 { recent.idolName = "名字\(index)"; recent.groupName = "团体\(index)"; LianxinRoleRules.remember(&recent) }
         try require(recent.recentNames?.count == 5 && recent.recentNames?.first == "名字7" && recent.recentGroups?.last == "团体3", "最近名字和团体各保留5个")
@@ -67,6 +67,18 @@ enum LianxinRoleChecks {
         let old = Data(#"{"userName":"旧称呼","idolName":"旧名字","prompt":"旧提示词","endpoint":"https://example.invalid/v1/chat/completions","model":"old","message":"旧话语","messageIdol":"旧名字"}"#.utf8)
         let decoded = try JSONDecoder().decode(LianxinProfile.self, from: old)
         try require(decoded.idolName == "旧名字" && decoded.verifiedProfile == nil && decoded.translationEnabled != true && LianxinLanguageRules.source(decoded) == "中文", "旧JSON、新角色字段/语言/翻译默认兼容")
+        var migrated = profile
+        migrated.verifiedProfile = LianxinVerifiedProfile(result: checked, confirmedAt: .distantPast)
+        migrated.roleNotesMigrated = nil
+        migrated.migrateRoleNotes(); let once = migrated; migrated.migrateRoleNotes()
+        try require(migrated == once && (migrated.notes ?? "").contains("其他写法：Alias") && (migrated.notes?.count ?? 0) <= 500 && migrated.otherNames == nil && migrated.position == nil && migrated.fanName == nil && migrated.personality == nil && migrated.catchphrases == nil && migrated.exampleLines == nil && migrated.verifiedProfile == nil, "旧角色一次迁移进500字补充并清空，重复升级不重复拼接")
+        let oldPublication = LianxinPublication(idol: "名字", text: "旧句", photo: nil, date: .distantPast)
+        let batchPublication = LianxinPublication(idol: "名字", text: "首句", photo: nil, date: .distantPast, lines: [LianxinLine(text: "首句", translation: "First"), LianxinLine(text: "次句", translation: nil)])
+        let batchBytes = try JSONEncoder().encode(batchPublication)
+        let batchDecoded = try JSONDecoder().decode(LianxinPublication.self, from: batchBytes)
+        var batchProfile = decoded; batchProfile.setLines(batchPublication.resolvedLines)
+        let profileDecoded = try JSONDecoder().decode(LianxinProfile.self, from: JSONEncoder().encode(batchProfile))
+        try require(decoded.resolvedLines.first?.text == "旧话语" && profileDecoded.message == "首句" && profileDecoded.translation == "First" && profileDecoded.resolvedLines.count == 2 && oldPublication.resolvedLines == [LianxinLine(text: "旧句", translation: nil)] && batchDecoded.resolvedLines.count == 2 && batchDecoded.text == "首句" && batchDecoded.translation == "First" && batchDecoded.shareText.contains("次句") && batchDecoded.shareText.contains("AI 创作"), "新旧多句兼容、首句旧字段与分享后缀")
         let publication = LianxinPublication(idol: "署名", text: "原文", photo: nil, date: .distantPast, translation: "译文")
         let data = try JSONEncoder().encode(publication)
         let shared = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]

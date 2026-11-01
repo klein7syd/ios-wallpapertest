@@ -136,8 +136,9 @@ enum WallpaperRenderer {
         var settings = try raw.validated()
         let display = settings.lianxinDisplay
         if content != nil { settings.alignment = display.centered ? .center : .leading }
-        let presentation = content.map { LianxinPresentation($0, style: display) }
-        let sourceItems = presentation.map { [$0.item] } ?? items
+        let sourceItems = content.map { LianxinPresentation.items($0, style: display) } ?? items
+        let secondaryTexts = content.map { LianxinPresentation.secondaryTexts($0, style: display) } ?? [:]
+        if content != nil { settings.maximumItems = max(1, sourceItems.count) }
         let canvas = CGSize(width: logicalWidth, height: settings.logicalHeight)
         let margin: CGFloat = 8
         let panelWidth = canvas.width * CGFloat(settings.panelWidth)
@@ -163,7 +164,7 @@ enum WallpaperRenderer {
         var blocks: [(TodoItem, WallpaperTextBlock, WallpaperTextBlock?)] = []
         for item in candidates {
             let secondary: WallpaperTextBlock?
-            if let title = presentation?.secondary {
+            if let title = secondaryTexts[item.id] {
                 secondary = text(title, width: textWidth, settings: settings,
                     opacity: display.translationOpacity, size: settings.fontSize * display.translationScale, maxLines: limit(title))
             } else { secondary = nil }
@@ -203,11 +204,10 @@ enum WallpaperRenderer {
             settings: settings, opacity: 0.7, size: min(13, settings.fontSize), maxLines: 2)
         func rowMetrics(_ pair: (TodoItem, WallpaperTextBlock, WallpaperTextBlock?)) -> (height: CGFloat, textOffset: CGFloat, markerOffset: CGFloat, extent: CGFloat) {
             let extent = CGFloat(MarkerDrawing.extent(marker: marker(pair.0), style: markerStyle, completed: false))
-            let lineHeight = pair.1.ascent + CTFontGetDescent(pair.1.font)
-            let textOffset = max(0, (extent - lineHeight) / 2) + max(0, -CGFloat(markerStyle.verticalOffset))
-            let markerOffset = max(0, (lineHeight - extent) / 2) + max(0, CGFloat(markerStyle.verticalOffset))
             let textHeight = pair.1.height + (pair.2.map { $0.height + secondaryGap } ?? 0)
-            return (max(textHeight + textOffset, extent + markerOffset), textOffset, markerOffset, extent)
+            let offset = extent > 0 ? CGFloat(markerStyle.verticalOffset) : 0
+            let height = max(textHeight, extent) + abs(offset) * 2
+            return (height, (height - textHeight) / 2, (height - extent) / 2 + offset, extent)
         }
         var allHeight: CGFloat = 0
         for pair in blocks { allHeight += rowMetrics(pair).height }
@@ -226,8 +226,9 @@ enum WallpaperRenderer {
         var rows: [WallpaperRow] = []
         var used = headingHeight + headingGap + edge
         for (index, pair) in blocks.enumerated() {
+            if content != nil && pair.0.title.isEmpty { continue }
             let spacing: CGFloat = rows.isEmpty ? 0 : itemSpacing
-            let reserve: CGFloat = (filtered.count > index + 1 ? reserveFooter.height + 12 : 0) + supplementHeight
+            let reserve: CGFloat = (content == nil && filtered.count > index + 1 ? reserveFooter.height + 12 : 0) + supplementHeight
             let metrics = rowMetrics(pair)
             guard used + spacing + metrics.height + reserve <= usable + 0.01 else { break }
             used += spacing
@@ -251,7 +252,7 @@ enum WallpaperRenderer {
                 settings: settings, size: 11, maxLines: 1)
         }
         var supplements: [WallpaperSupplement] = []
-        for block in supplementBlocks where hidden == 0 {
+        for block in supplementBlocks where !rows.isEmpty {
             used += 4
             supplements.append(WallpaperSupplement(block: block, top: panel.minY + padding + used)); used += block.height
         }
@@ -262,12 +263,12 @@ enum WallpaperRenderer {
             if let summaryBlock { headings.append(WallpaperSupplement(block: summaryBlock, top: panel.minY + padding + edge,
                 x: panel.minX + padding + metrics.summaryX, width: metrics.summaryWidth, alignment: .trailing)) }
         }
-        let lineOverflow = blocks.contains { $0.1.truncated || $0.2?.truncated == true }
-        let missingTranslation = content != nil && display.translationDisplay == .translation && presentation?.primary.isEmpty != false
+        let lineOverflow = rows.contains { $0.block.truncated || $0.secondary?.truncated == true }
+        let missingTranslation = content != nil && display.translationDisplay == .translation && rows.isEmpty
         return WallpaperLayout(canvas: canvas, panel: panel, markerColumn: markerColumn, textWidth: textWidth, rows: rows,
             hiddenCount: hidden, footer: content == nil ? footer : nil, footerTop: panel.maxY - padding - (footer?.height ?? 0),
             emptyText: fittedEmpty, emptyTop: panel.minY + padding, supplements: supplements,
-            lianxinOverflow: content != nil && (hidden > 0 || rows.isEmpty || lineOverflow || missingTranslation),
+            lianxinOverflow: content != nil && (rows.isEmpty || lineOverflow || missingTranslation),
             headings: headings, drawMarkerStyle: content == nil ? nil : markerStyle, lianxinLineOverflow: content != nil && lineOverflow,
             lianxinMissingTranslation: missingTranslation)
     }

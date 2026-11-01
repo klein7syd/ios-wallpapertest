@@ -30,17 +30,27 @@ struct LianxinDisplayStyle: Codable, Equatable, Sendable {
 }
 struct LianxinPresentation {
     static let itemID = UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
+    var rowID = Self.itemID
     let primary: String
     let secondary: String?
-    init(_ content: LianxinPublication, style: LianxinDisplayStyle) {
+    init(_ content: LianxinPublication, style: LianxinDisplayStyle, line: LianxinLine? = nil, index: Int = 0) {
+        let value = line ?? content.resolvedLines.first ?? LianxinLine(text: content.text, translation: content.translation)
+        rowID = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1)) ?? Self.itemID
         switch style.translationDisplay {
-        case .both: primary = content.text; secondary = content.translation.flatMap { $0.isEmpty ? nil : $0 }
-        case .original: primary = content.text; secondary = nil
-        case .translation: primary = content.translation ?? ""; secondary = nil
+        case .both: primary = value.text; secondary = value.translation.flatMap { $0.isEmpty ? nil : $0 }
+        case .original: primary = value.text; secondary = nil
+        case .translation: primary = value.translation ?? ""; secondary = nil
         }
     }
     var item: TodoItem {
-        TodoItem(id: Self.itemID, title: primary, marker: nil, isCompleted: false, createdAt: .distantPast, updatedAt: .distantPast)
+        TodoItem(id: rowID, title: primary, marker: TodoMarker(kind: .none), isCompleted: false, createdAt: .distantPast, updatedAt: .distantPast)
+    }
+    static func entries(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [Self] {
+        content.resolvedLines.enumerated().map { Self(content, style: style, line: $0.element, index: $0.offset) }
+    }
+    static func items(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [TodoItem] { entries(content, style: style).map(\.item) }
+    static func secondaryTexts(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [UUID: String] {
+        Dictionary(uniqueKeysWithValues: entries(content, style: style).compactMap { entry in entry.secondary.map { (entry.item.id, $0) } })
     }
     static func header(_ raw: WidgetHeaderAppearance, customTitle: String?, member: String, subtitle: String?) -> WidgetHeaderAppearance {
         var value = raw
@@ -53,7 +63,7 @@ struct LianxinPresentation {
         var value = TodoAppearance(); value.widget = style
         value.defaultMarker = TodoMarker(kind: .none)
         value.widget.markerOverride = style.lianxinDisplay.translationDisplay == .translation ? TodoMarker(kind: .none) : (style.lianxinMarker ?? TodoMarker(kind: .none))
-        value.widget.maximumItems = 1; value.widget.unifiedMarkers = true
+        value.widget.maximumItems = max(1, content.resolvedLines.count); value.widget.unifiedMarkers = true
         value.widget.showsFooter = false; value.widget.showsSeparators = false; value.widget.completedTextStyle = .keep
         value.widget.maximumTitleLines = style.lianxinDisplay.maximumLines.flatMap { $0 == 0 ? nil : $0 }
         value.widget.header = header(style.heading, customTitle: style.lianxinCustomTitle, member: content.idol, subtitle: content.signatureSubtitle)

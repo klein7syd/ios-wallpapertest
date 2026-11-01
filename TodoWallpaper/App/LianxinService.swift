@@ -31,6 +31,25 @@ struct LianxinProfile: Codable, Equatable, Sendable {
     var translationEnabled: Bool?
     var translationLanguage: String?
     var translation: String?
+    var lines: [LianxinLine]?
+    var generationCount: Int?
+    var understood: String?
+    var confidence: String?
+    var roleNotesMigrated: Bool? = true
+    var requestedCount: Int { min(8, max(1, generationCount ?? 4)) }
+    var resolvedLines: [LianxinLine] { if let lines, !lines.isEmpty { return lines }; return message.isEmpty ? [] : [LianxinLine(text: message, translation: translation)] }
+    mutating func setLines(_ values: [LianxinLine]) { lines = values; message = values.first?.text ?? ""; translation = values.first?.translation }
+    mutating func migrateRoleNotes() {
+        guard roleNotesMigrated != true else { return }
+        var parts: [String] = []
+        func add(_ label: String, _ value: String?) { if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { parts.append(label + "：" + value) } }
+        add("补充", notes); add("其他写法", otherNames?.joined(separator: "、")); add("定位", position)
+        add("粉丝名", fanName); add("性格与说话习惯", personality); add("口头禅", catchphrases); add("示例话语", exampleLines?.joined(separator: "；"))
+        if let v = verifiedProfile?.result { add("已核对团体", v.group); add("已核对名字", v.member); add("已核对其他写法", v.otherNames.joined(separator: "、")); add("已核对定位", v.position); add("已核对粉丝名", v.fanName); add("已核对补充", v.notes) }
+        notes = String(parts.joined(separator: "\n").prefix(500))
+        otherNames = nil; position = nil; fanName = nil; personality = nil; catchphrases = nil; exampleLines = nil; verifiedProfile = nil
+        roleNotesMigrated = true
+    }
 }
 
 enum LianxinError: LocalizedError {
@@ -201,12 +220,12 @@ enum LianxinWritingRules {
     反例：“愿你在人生的旅途中，如星辰般闪耀，岁月不负，前程似锦。”
     正例：“今天练习到很晚，刚坐上车就想到你了。{称呼}回家路上慢点走，到家说一声。”
     """
-    static let plainOutput = "输出格式：只输出话语本身，不加引号、前缀、标题或解释，不使用 Markdown，不超过200字。"
-    static let translatedOutput = "输出格式：只返回一个 JSON 对象，不要代码围栏，不要任何前后文字：{\"text\":\"原文\",\"translation\":\"译文\"}。text 和 translation 各不超过200字。"
+    static let plainOutput = "输出格式：只返回JSON，不加围栏或前后文字："
+    static let translatedOutput = plainOutput
     static func system(_ profile: LianxinProfile) -> String {
         let user = profile.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return [task, LianxinRoleRules.block(profile), writing.replacingOccurrences(of: "{称呼}", with: user.isEmpty ? "" : user + "，"),
-                LianxinLanguageRules.block(profile), profile.translationEnabled == true ? translatedOutput : plainOutput].joined(separator: "\n\n")
+        return [task, LianxinRoleRules.inferredBlock(profile), writing.replacingOccurrences(of: "{称呼}", with: user.isEmpty ? "" : user + "，"),
+                LianxinLanguageRules.block(profile), LianxinGeneratedBatch.output(profile)].joined(separator: "\n\n")
     }
     static func example(_ profile: LianxinProfile) -> String {
         LianxinSamples.text(profile, language: LianxinLanguageRules.source(profile))
