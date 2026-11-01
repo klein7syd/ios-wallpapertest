@@ -34,66 +34,49 @@ enum LianxinKeychain {
     }
 }
 
-actor LianxinStorage {
-    private func directory() throws -> URL {
-        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("Lianxin", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root
-    }
-    func load() throws -> (LianxinProfile, Data?) {
-        let root = try directory()
-        let file = root.appendingPathComponent("profile-v1.json")
-        guard FileManager.default.fileExists(atPath: file.path) else { return (LianxinProfile(), nil) }
-        var profile = try JSONDecoder().decode(LianxinProfile.self, from: Data(contentsOf: file))
-        if profile.roleNotesMigrated != true { profile.migrateRoleNotes(); try save(profile) }
-        let photo: Data?
-        if let name = profile.photoName {
-            photo = try Data(contentsOf: WidgetPhotoReference.url(for: name, in: root))
-        } else { photo = nil }
-        return (profile, photo)
-    }
-    func save(_ profile: LianxinProfile) throws {
-        try JSONEncoder().encode(profile).write(to: directory().appendingPathComponent("profile-v1.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-    }
-    func importPhoto(_ data: Data) async throws -> (String, Data) {
-        let root = try directory()
-        let name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: root)
-        do { try data.write(to: root.appendingPathComponent(name + ".source"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]) }
-        catch { removePhoto(name); throw error }
-        return (name, try Data(contentsOf: WidgetPhotoReference.url(for: name, in: root)))
-    }
-    func photoData(_ name: String?, original: Bool = false) throws -> Data? {
-        guard let name else { return nil }
-        let root = try directory()
-        let thumbnail = try WidgetPhotoReference.url(for: name, in: root)
-        let source = root.appendingPathComponent(name + ".source")
-        return try Data(contentsOf: original && FileManager.default.fileExists(atPath: source.path) ? source : thumbnail)
-    }
-    func sharedPhotoData(name: String, directory: URL) throws -> Data {
-        try Data(contentsOf: WidgetPhotoReference.url(for: name, in: directory))
-    }
-    func publish(_ content: LianxinPublication, directory: URL) throws {
-        try Task.checkCancellation()
-        try content.save(directory: directory)
-    }
-    func currentContent(directory: URL) throws -> LianxinPublication? { try LianxinPublication.load(directory: directory) }
-    func removePhoto(_ name: String?) {
-        guard let name, let root = try? directory(), let url = try? WidgetPhotoReference.url(for: name, in: root) else { return }
-        try? FileManager.default.removeItem(at: url)
-        try? FileManager.default.removeItem(at: root.appendingPathComponent(name + ".source"))
-    }
-}
-
 @MainActor
 final class LianxinModel: ObservableObject {
     @Published var profile = LianxinProfile() { didSet {
         if loaded && (oldValue.idolName != profile.idolName || oldValue.groupName != profile.groupName) { profile.understood = nil; profile.confidence = nil; profile.researchSources = nil; researchNotice = nil }
-        if loaded && oldValue != profile { scheduleInputSave(); scheduleSync() }
+        if loaded && oldValue != profile { inputRevision += 1; scheduleInputSave(); scheduleSync() }
     } }
     @Published var key = ""
     @Published private(set) var photo: UIImage?
     @Published private(set) var loaded = false
+    @Published private(set) var loading = false
+    @Published private(set) var canRecoverProfile = false
+    @Published private(set) var isGenerating = false
+    @Published private(set) var photoSyncPending = false
+    private var credentialReadFailed = false
+    private var loadTask: Task<Void, Never>?
+    private var preparationTask: Task<Void, Never>?
+    private var inputRevision: UInt64 = 0
+    private var committingGeneration = false
+    private var lastPublished: LianxinPublication?
+    private struct ContentEdit {
+        let lines: [LianxinLine]
+        let idol: String
+        let group: String?
+        let example: Bool?
+    }
+    @Published private var contentHistory: [ContentEdit] = []
+    var canUndoContentEdit: Bool { !contentHistory.isEmpty && !busy }
+    private func rememberContentEdit() {
+        guard !profile.resolvedLines.isEmpty else { return }
+        contentHistory.append(ContentEdit(lines: profile.resolvedLines, idol: profile.messageIdol, group: profile.messageGroup, example: profile.exampleContent))
+        if contentHistory.count > 10 { contentHistory.removeFirst() }
+    }
+    func editLines(_ lines: [LianxinLine]) {
+        guard loaded, !busy, !lines.isEmpty, lines != profile.resolvedLines else { return }
+        rememberContentEdit(); profile.setLines(lines)
+    }
+    func undoContentEdit() {
+        guard loaded, !busy, let old = contentHistory.popLast() else { return }
+        var next = profile
+        next.setLines(old.lines); next.messageIdol = old.idol; next.messageGroup = old.group
+        next.messageIdentityCaptured = true; next.exampleContent = old.example
+        profile = next; notice = "已恢复上一版话语"
+    }
     @Published private(set) var busy = false
     @Published var error: String?
     @Published var notice: String?
@@ -107,11 +90,10 @@ final class LianxinModel: ObservableObject {
     @Published private(set) var syncError: String?
     var publication: LianxinPublication { currentContent ?? LianxinPublication(idol: "连心", text: "", photo: nil, date: .distantPast) }
     private var draftContent: LianxinPublication {
-        LianxinPublication(idol: profile.idolName.isEmpty ? profile.messageIdol : profile.idolName, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent, translation: profile.translationEnabled == true ? profile.translation : nil,
-            signatureSubtitle: LianxinRoleRules.clean(profile.groupName).isEmpty ? nil : profile.groupName, lines: profile.resolvedLines.map { LianxinLine(text: $0.text, translation: profile.translationEnabled == true ? $0.translation : nil) })
+        LianxinPublication(idol: profile.messageIdol.isEmpty ? profile.idolName : profile.messageIdol, text: profile.message, photo: nil, date: .distantPast, example: profile.exampleContent, translation: profile.translationEnabled == true ? profile.translation : nil,
+            signatureSubtitle: profile.messageGroup, lines: profile.resolvedLines.map { LianxinLine(text: $0.text, translation: profile.translationEnabled == true ? $0.translation : nil) })
     }
     private var syncTask: Task<Void, Never>?
-    private var styleObserver: AnyCancellable?
     private let storage = LianxinStorage()
     private let service: any AIServiceProtocol
     private let research: any LianxinPublicResearching
@@ -131,22 +113,60 @@ final class LianxinModel: ObservableObject {
 
 
     func load() async {
-        let span = EditorModePerformance.beginStage("LoadLianxin"); defer { EditorModePerformance.endStage("LoadLianxin", span) }
         EditorModePerformance.count("profile_load_calls")
         guard !loaded else { return }
-        EditorModePerformance.count("profile_disk_reads")
-        do {
-            let saved = try await storage.load()
-            profile = saved.0; photo = saved.1.flatMap { UIImage(data: $0) }
-            loaded = true
-            if let directory = try? mediaDirectory() { currentContent = try? await storage.currentContent(directory: directory) }
-            scheduleSync()
+        if let loadTask { await loadTask.value; return }
+        loading = true
+        let task = Task { @MainActor in
+            let span = EditorModePerformance.beginStage("LoadLianxin")
+            defer { EditorModePerformance.endStage("LoadLianxin", span); loading = false }
+            EditorModePerformance.count("profile_disk_reads")
             do {
-                try LianxinCredentialMigration.migrate(profile: profile, store: LianxinSystemCredentials())
-                key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty
+                let saved = try await storage.load()
+                var restored = saved.profile
+                if restored.messageIdentityCaptured != true {
+                    if restored.messageIdol.isEmpty { restored.messageIdol = restored.idolName }
+                    restored.messageGroup = restored.groupName; restored.messageIdentityCaptured = true
+                }
+                profile = restored; photo = saved.photo.flatMap { UIImage(data: $0) }
+                photoSyncPending = restored.pendingPhotoSync == true
+                if saved.missingPhoto { notice = "底图暂时无法读取，文字资料已保留。请重新选择照片或移除底图。" }
+                if let directory = try? mediaDirectory() { currentContent = try? await storage.currentContent(directory: directory) }
+                lastPublished = currentContent
+                loaded = true; canRecoverProfile = false; error = nil
+                inputRevision += 1
+                scheduleInputSave(); scheduleSync()
+                credentialReadFailed = true
+                await retryCredentials()
+            } catch {
+                canRecoverProfile = await storage.canRecover()
+                self.error = "连心资料读取失败，原文件已保留且暂停自动保存。请重试读取，或从上次资料恢复。"
             }
-            catch { notice = "密钥暂时无法读取，请解锁设备后重试；其他连心资料仍可查看。" }
-        } catch { self.error = "连心资料读取失败，原文件已保留。请稍后重新打开页面重试。" }
+        }
+        loadTask = task
+        await task.value
+        loadTask = nil
+    }
+    func recoverProfile() async {
+        guard !loaded, !loading, canRecoverProfile else { return }
+        do { try await storage.recover(); await load() }
+        catch { self.error = "恢复失败，原资料与备份均已保留，请稍后重试。" }
+    }
+    func retryCredentials() async {
+        guard loaded, credentialReadFailed, !busy else { return }
+        do {
+            try LianxinCredentialMigration.migrate(profile: profile, store: LianxinSystemCredentials())
+            key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty
+            credentialReadFailed = false
+            connectionNotice = nil
+        } catch {
+            connectionNotice = "密钥暂时无法读取，请解锁设备后重试读取密钥。"
+        }
+    }
+    private func persistCurrent() async throws {
+        inputSaveTask?.cancel()
+        let value = profile, revision = inputRevision
+        try await storage.save(value, revision: revision)
     }
 
     func saveSettings() async -> Bool {
@@ -156,7 +176,7 @@ final class LianxinModel: ObservableObject {
         do {
             //这里只保存普通配置；密钥由saveKey单独写入钥匙串。
             if !profile.endpoint.isEmpty { profile.endpoint = try LianxinSetupRules.endpoint(profile.endpoint) }
-            try await storage.save(profile)
+            try await persistCurrent()
             notice = "已保存"
             return true
         } catch { self.error = "设置未能完整保存，请重试。"; return false }
@@ -165,16 +185,18 @@ final class LianxinModel: ObservableObject {
     private var inputSaveTask: Task<Void, Never>?
     private func scheduleInputSave() {
         inputSaveTask?.cancel()
-        let value = profile
+        guard loaded else { return }
+        let value = profile, revision = inputRevision
         inputSaveTask = Task {
-            do { try await Task.sleep(for: .milliseconds(400)); try Task.checkCancellation(); try await storage.save(value) }
+            do { try await Task.sleep(for: .milliseconds(400)); try Task.checkCancellation(); try await storage.save(value, revision: revision) }
             catch is CancellationError { }
             catch { self.error = "输入暂未保存，请重试。" }
         }
     }
     func saveInputsNow() async {
-        inputSaveTask?.cancel()
-        do { try await storage.save(profile) } catch { self.error = "输入未保存，请重试。" }
+        guard loaded else { return }
+        if committingGeneration, let generation { await generation.value; return }
+        do { try await persistCurrent() } catch { self.error = "输入未保存，请重试。" }
     }
     private func mediaDirectory() throws -> URL {
         if let store = styleStore { return try store.mediaDirectory() }
@@ -183,71 +205,103 @@ final class LianxinModel: ObservableObject {
     func wallpaperPhotoData() async throws -> Data? {
         if let store = styleStore, store.appearance.lianxin != nil {
             guard let name = store.appearance.lianxin?.photoName(at: .now) else { return nil }
-            if name == profile.sharedPhotoName, let original = try await storage.photoData(profile.photoName, original: true) { return original }
+            if name == profile.sharedPhotoName, let original = try? await storage.photoData(profile.photoName, original: true) { return original }
             return try await storage.sharedPhotoData(name: name, directory: mediaDirectory())
         }
         return try await storage.photoData(profile.photoName, original: true)
     }
     func syncBackdrop() async throws {
-        guard let store = styleStore else { return }
-        var root = store.appearance; root.initializeLianxin()
-        if let data = try await storage.photoData(profile.photoName) {
-            let name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: mediaDirectory())
-            root.lianxin?.backgroundPhotoName = name; root.lianxin?.backdrop = .photo
-            root.lianxin?.photoRotation?.enabled = false; root.lianxin?.backgroundCrop = PhotoCrop()
-            try store.saveAppearance(root)
-            profile.sharedPhotoName = name
-        } else {
-            root.lianxin?.backgroundPhotoName = nil; root.lianxin?.photoRotation = nil; root.lianxin?.backdrop = .system
-            try store.saveAppearance(root); profile.sharedPhotoName = nil
+        guard loaded, let store = styleStore else { throw LianxinError.storage }
+        let selectedName = profile.photoName
+        let data = try await storage.photoData(selectedName)
+        var sharedName: String?
+        var transaction: UUID?
+        let directory = try mediaDirectory()
+        if let data {
+            let batch = try await WidgetPhotoStore.shared.beginBatch(sharedDirectory: directory)
+            transaction = batch
+            do { sharedName = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: directory, transactionID: batch) }
+            catch { await WidgetPhotoStore.shared.rollbackBatch(batch, sharedDirectory: directory); throw error }
         }
-        try await storage.save(profile)
+        do {
+            // 等待导入时用户可能调节样式，始终合并最新样式，而非覆盖旧快照。
+            var root = store.appearance; root.initializeLianxin()
+            root.lianxin?.backgroundPhotoName = sharedName
+            root.lianxin?.backdrop = sharedName == nil ? .system : .photo
+            root.lianxin?.photoRotation = nil; root.lianxin?.backgroundCrop = PhotoCrop()
+            try store.saveAppearance(root)
+        } catch {
+            if let transaction { await WidgetPhotoStore.shared.rollbackBatch(transaction, sharedDirectory: directory) }
+            throw error
+        }
+        if let transaction { try await WidgetPhotoStore.shared.commitBatch(transaction, sharedDirectory: directory) }
+        profile.sharedPhotoName = sharedName
+        profile.pendingPhotoSync = false
+        try await persistCurrent()
+        photoSyncPending = false
+    }
+    func retryPhotoSync() async {
+        guard loaded, !busy, photoSyncPending else { return }
+        busy = true; defer { busy = false }
+        do { try await syncBackdrop(); notice = "底图已同步" }
+        catch { self.error = "照片已保留，底图仍未同步。请稍后重试。" }
     }
 
     func prepareStyle(_ store: TodoStore) async {
-        let span = EditorModePerformance.beginStage("PrepareLianxinStyle"); defer { EditorModePerformance.endStage("PrepareLianxinStyle", span) }
         EditorModePerformance.count("prepare_style_calls")
+        guard loaded else { return }
         styleStore = store
-        if styleObserver == nil {
-            styleObserver = store.$appearance.map(\.lianxin).removeDuplicates().dropFirst().sink { [weak self] _ in self?.scheduleSync() }
-        }
+        if let preparationTask { await preparationTask.value; return }
         guard store.appearance.lianxin == nil else { return }
-        EditorModePerformance.count("style_initializations")
-        do {
-            var name: String?
-            let legacyPhoto = try await storage.photoData(profile.photoName)
-            let publishedPhoto = try LianxinPublication.load(directory: mediaDirectory())?.photo
-            if let data = legacyPhoto ?? publishedPhoto { name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: mediaDirectory()) }
-            profile.sharedPhotoName = name
-            var root = store.appearance; root.initializeLianxin(photoName: name)
-            try store.saveAppearance(root)
-        } catch { self.error = "连心样式初始化失败，请重试。" }
+        let task = Task { @MainActor in
+            let span = EditorModePerformance.beginStage("PrepareLianxinStyle")
+            defer { EditorModePerformance.endStage("PrepareLianxinStyle", span) }
+            EditorModePerformance.count("style_initializations")
+            do {
+                let legacyPhoto = try? await storage.photoData(profile.photoName)
+                let publishedPhoto = currentContent?.photo
+                var name: String?
+                if let data = legacyPhoto ?? publishedPhoto { name = try await WidgetPhotoStore.shared.importPhoto(data, sharedDirectory: mediaDirectory()) }
+                // 在途等待之后再次检查，不能覆盖其他入口已经建立的样式。
+                guard store.appearance.lianxin == nil else { return }
+                var root = store.appearance; root.initializeLianxin(photoName: name)
+                try store.saveAppearance(root)
+                profile.sharedPhotoName = name
+            } catch { self.error = "连心样式初始化失败，请重试。" }
+        }
+        preparationTask = task; await task.value; preparationTask = nil
     }
     func selectProvider(_ id: String) async {
-        guard !busy else { return }
+        guard loaded, !busy else { return }
         let next = LianxinProviderPreset.preset(id)
-        guard next.id != profile.providerID else { return }
-        let keepsLegacyCustom = next.id == "custom" && provider.id == "custom"
-        profile.providerID = next.id
-        if !keepsLegacyCustom { profile.endpoint = next.endpoint; profile.model = next.model }
-        profile.connectedSignature = nil; profile.setupFinished = false; availableModels = []; connectionNotice = nil; key = ""; keySaved = false
-        do { key = try LianxinKeychain.read(account: credentialAccount); keySaved = !key.isEmpty }
-        catch { connectionNotice = "密钥暂时无法读取，请解锁设备后重试。" }
+        guard next.id != provider.id else { await retryCredentials(); return }
+        var updated = profile
+        var configurations = updated.providerConfigurations ?? [:]
+        configurations[provider.id] = LianxinProviderConfiguration(endpoint: profile.endpoint, model: profile.model,
+            connectedSignature: profile.connectedSignature, setupFinished: profile.setupFinished)
+        let saved = configurations[next.id]
+        updated.providerID = next.id; updated.providerConfigurations = configurations
+        updated.endpoint = saved?.endpoint ?? next.endpoint; updated.model = saved?.model ?? next.model
+        updated.connectedSignature = saved?.connectedSignature; updated.setupFinished = saved?.setupFinished ?? false
+        profile = updated
+        availableModels = []; connectionNotice = nil; key = ""; keySaved = false
+        credentialReadFailed = true
+        await retryCredentials()
     }
     func saveKey(_ input: String) -> Bool {
-        guard !busy else { return false }
+        guard loaded, !busy else { return false }
         let cleaned = LianxinSetupRules.cleanKey(input)
         guard cleaned.count <= 4096, cleaned.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
             connectionNotice = "密钥中还有空格或换行，请重新完整复制。"; return false
         }
         do {
             try LianxinKeychain.save(cleaned, account: credentialAccount)
-            key = cleaned; keySaved = !cleaned.isEmpty; profile.connectedSignature = nil; profile.setupFinished = false; availableModels = []; connectionNotice = nil
+            credentialReadFailed = false; key = cleaned; keySaved = !cleaned.isEmpty; profile.connectedSignature = nil; profile.setupFinished = false; availableModels = []; connectionNotice = nil
             return true
         } catch { connectionNotice = "密钥未保存，请解锁设备并检查签名后重试。"; return false }
     }
     func testConnection() async {
-        guard !busy, !Task.isCancelled else { return }
+        guard loaded, !busy, !Task.isCancelled else { return }
         let previousSignature = profile.connectedSignature
         busy = true; connectionNotice = nil
         defer { busy = false }
@@ -259,8 +313,8 @@ final class LianxinModel: ObservableObject {
             availableModels = models
             if profile.model.isEmpty { profile.model = models.first ?? provider.model }
             profile.connectedSignature = signature
-            try await storage.save(profile)
-            connectionNotice = "✓ 测试成功。模型列表不代表每个模型都已开通，生成时仍以服务商权限为准。"
+            try await persistCurrent()
+            connectionNotice = "✓ 当前模型已完成生成测试。其他模型的权限仍需单独测试。"
         } catch is CancellationError {
             profile.connectedSignature = previousSignature
             connectionNotice = "测试已取消，可以修改后再试。"
@@ -281,7 +335,7 @@ final class LianxinModel: ObservableObject {
         return false
     }
     func chooseModel(_ value: String) async {
-        guard !busy, value != profile.model else { return }
+        guard loaded, !busy, value != profile.model else { return }
         profile.model = value
         // 模型改变后需再次测试，避免沿用其他模型的成功状态。
         profile.connectedSignature = nil
@@ -304,15 +358,17 @@ final class LianxinModel: ObservableObject {
                 guard let decoded = UIImage(data: imported.1) else { throw LianxinError.storage }
                 updated.photoName = imported.0; image = decoded
             } else { updated.photoName = nil }
+            updated.pendingPhotoSync = true
             try Task.checkCancellation()
-            try await storage.save(updated)
+            inputSaveTask?.cancel(); inputRevision += 1
+            try await storage.save(updated, revision: inputRevision)
             privatePhotoCommitted = true
-            profile = updated; photo = image
+            profile = updated; photo = image; photoSyncPending = true
             try await syncBackdrop()
             await storage.removePhoto(oldName)
         } catch {
             if !privatePhotoCommitted { await storage.removePhoto(importedName) }
-            if privatePhotoCommitted { self.error = "照片已保留，但共享样式尚未更新，请重新选择后重试。"; return }
+            if privatePhotoCommitted { self.error = "照片已保留，共享底图暂未更新。可点“重试底图同步”，无需重新选图。"; return }
             if !(error is CancellationError) { self.error = "底图未能保存，原来的照片已保留。" }
         }
     }
@@ -324,17 +380,17 @@ final class LianxinModel: ObservableObject {
         let secret = key.trimmingCharacters(in: .whitespacesAndNewlines)
         do { _ = try LianxinAPIService.request(profile: input, key: secret) }
         catch { self.error = error.localizedDescription; return }
-        busy = true; notice = nil
+        busy = true; isGenerating = true; notice = nil
         let id = UUID(); generationID = id
         generation = Task {
-            defer { if generationID == id { busy = false; generation = nil; if researchNotice?.hasPrefix("正在") == true { researchNotice = nil } } }
+            defer { if generationID == id { busy = false; isGenerating = false; committingGeneration = false; generation = nil; if researchNotice?.hasPrefix("正在") == true { researchNotice = nil } } }
             do {
                 researchNotice = "正在查找公开 Wiki 资料…"
                 var enriched = input
                 enriched.researchSources = await research.lookup(name: input.idolName, group: LianxinRoleRules.clean(input.groupName))
                 try Task.checkCancellation()
                 guard generationID == id else { return }
-                researchNotice = enriched.researchSources?.isEmpty == false ? "已找到公开参考资料；粉丝整理可能有误，仅参考公开形象。" : "暂未找到可用资料，将按已知信息和你的补充创作，不编造TMI。"
+                researchNotice = enriched.researchSources?.isEmpty == false ? "已找到公开参考资料；粉丝整理可能有误，仅参考公开形象。" : "暂未取得可核对的资料，可能是网络不可达、名字有歧义或没有条目；将按你的补充创作。"
                 let raw = try await service.generate(profile: enriched, key: secret)
                 let result = LianxinGeneratedBatch.parse(raw, count: input.requestedCount, translated: input.translationEnabled == true)
                 guard !result.lines.isEmpty else { notice = result.notice ?? "没有生成可用话语，请重试。"; return }
@@ -343,10 +399,16 @@ final class LianxinModel: ObservableObject {
                 var updated = enriched
                 updated.setLines(result.lines); updated.understood = result.understood; updated.confidence = result.confidence
                 updated.messageIdol = input.idolName.isEmpty ? "连心" : input.idolName
+                updated.messageGroup = LianxinRoleRules.clean(input.groupName).isEmpty ? nil : input.groupName
+                updated.messageIdentityCaptured = true
                 updated.exampleContent = false
                 updated.connectedSignature = signature
                 LianxinRoleRules.remember(&updated)
-                try await storage.save(updated)
+                // 进入原子提交后不再允许“取消”，避免磁盘已提交但界面仍称取消。
+                isGenerating = false; committingGeneration = true
+                inputSaveTask?.cancel(); inputRevision += 1
+                try await storage.save(updated, revision: inputRevision)
+                rememberContentEdit()
                 profile = updated
                 notice = result.notice
             } catch is CancellationError { }
@@ -359,7 +421,11 @@ final class LianxinModel: ObservableObject {
         }
     }
 
-    func cancel() { generation?.cancel() }
+    func cancel() {
+        guard isGenerating else { return }
+        generation?.cancel()
+        notice = "已取消生成，原有话语保留。"
+    }
 
     func updateLanguage(source: String? = nil, target: String? = nil, enabled: Bool? = nil) {
         var next = profile
@@ -369,29 +435,37 @@ final class LianxinModel: ObservableObject {
         profile = LianxinLanguageRules.normalized(next)
     }
 
+    private func sameContent(_ first: LianxinPublication?, _ second: LianxinPublication) -> Bool {
+        guard let first else { return false }
+        return first.resolvedLines == second.resolvedLines && first.idol == second.idol && first.example == second.example
+            && first.signatureSubtitle == second.signatureSubtitle
+    }
     func scheduleSync() {
         guard loaded else { return }
-        syncTask?.cancel()
         let draft = draftContent
-        guard (try? draft.validate()) != nil else { return } // 无效输入不覆盖上一份有效内容。
-        if currentContent?.resolvedLines != draft.resolvedLines || currentContent?.idol != draft.idol || currentContent?.example != draft.example || currentContent?.translation != draft.translation || currentContent?.signatureSubtitle != draft.signatureSubtitle {
-            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now, example: draft.example, translation: draft.translation, signatureSubtitle: draft.signatureSubtitle, lines: draft.lines)
+        guard (try? draft.validate()) != nil else { syncTask?.cancel(); return }
+        if !sameContent(currentContent, draft) {
+            currentContent = LianxinPublication(idol: draft.idol, text: draft.text, photo: nil, date: .now,
+                example: draft.example, translation: draft.translation, signatureSubtitle: draft.signatureSubtitle, lines: draft.lines)
         }
+        // 私有输入、壁纸样式和相同内容不会重写共享文件或扰动拖动事务。
+        guard !sameContent(lastPublished, draft) else { syncTask?.cancel(); syncError = nil; return }
+        syncTask?.cancel()
         let content = publication
         syncTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(400)); try Task.checkCancellation()
-                // 样式和照片引用先落盘；共享内容里没有接口、提示词或凭证。
-                styleStore?.flushAppearance()
-                if styleStore?.appearanceError != nil { throw LianxinError.storage }
+                lastPublished = nil
                 try await storage.publish(content, directory: mediaDirectory())
                 try Task.checkCancellation()
+                lastPublished = content
                 WidgetCenter.shared.reloadTimelines(ofKind: LianxinPublication.kind)
                 syncedAt = .now; syncError = nil
             } catch is CancellationError { }
-            catch { syncError = "小组件暂未更新，请重试。上一份有效内容已保留。" }
+            catch { syncError = "内容暂未同步，请重试。桌面保留上一份有效内容。" }
         }
     }
+
 }
 
 struct LianxinSystemCredentials: LianxinCredentialStore {

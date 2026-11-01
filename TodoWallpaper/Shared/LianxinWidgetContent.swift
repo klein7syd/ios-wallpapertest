@@ -9,9 +9,10 @@ struct LianxinWidgetContent: View {
     var effectsFamily: WidgetFamily? = nil
     private var value: LianxinPublication { content ?? LianxinPublication(idol: "连心", text: "打开连心，写下一句话。", photo: nil, date: .distantPast) }
     private var display: LianxinDisplayStyle { style.lianxinDisplay }
+    private var missingTranslation: Bool { display.translationDisplay == .translation && LianxinPresentation.translatedCount(value) == 0 }
     var body: some View {
-        TodoWidgetContent(document: TodoDocument(items: LianxinPresentation.items(value, style: display)), appearance: LianxinPresentation.look(content: value, style: style),
-            error: nil, family: family, interactive: false, textAlignment: display.centered ? .center : .leading, effectsFamily: effectsFamily,
+        TodoWidgetContent(document: missingTranslation ? nil : TodoDocument(items: LianxinPresentation.items(value, style: display)), appearance: LianxinPresentation.look(content: value, style: style),
+            error: missingTranslation ? "还没有译文，请打开连心补充。" : nil, family: family, interactive: false, textAlignment: display.centered ? .center : .leading, effectsFamily: effectsFamily,
             secondaryText: LianxinPresentation.secondaryTexts(value, style: display), summaryText: LianxinPresentation.subtitle(custom: style.lianxinCustomSubtitle, fallback: value.signatureSubtitle),
             annotations: LianxinPresentation.annotations(value, style: display), maximumLinesOverride: display.maximumLines == 0 ? Int.max : nil,
             secondaryScale: display.translationScale, secondaryOpacity: display.translationOpacity, alignsMarkerToFirstLine: false)

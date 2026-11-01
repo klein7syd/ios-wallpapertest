@@ -36,10 +36,11 @@ struct LianxinPresentation {
     init(_ content: LianxinPublication, style: LianxinDisplayStyle, line: LianxinLine? = nil, index: Int = 0) {
         let value = line ?? content.resolvedLines.first ?? LianxinLine(text: content.text, translation: content.translation)
         rowID = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1)) ?? Self.itemID
+        let translation = value.translation?.trimmingCharacters(in: .whitespacesAndNewlines)
         switch style.translationDisplay {
-        case .both: primary = value.text; secondary = value.translation.flatMap { $0.isEmpty ? nil : $0 }
+        case .both: primary = value.text; secondary = translation.flatMap { $0.isEmpty ? nil : $0 }
         case .original: primary = value.text; secondary = nil
-        case .translation: primary = value.translation ?? ""; secondary = nil
+        case .translation: primary = translation ?? ""; secondary = nil
         }
     }
     var item: TodoItem {
@@ -47,6 +48,14 @@ struct LianxinPresentation {
     }
     static func entries(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [Self] {
         content.resolvedLines.enumerated().map { Self(content, style: style, line: $0.element, index: $0.offset) }
+            .filter { !$0.primary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+    static func translatedCount(_ content: LianxinPublication) -> Int {
+        content.resolvedLines.filter { !($0.translation ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+    static func translationSummary(_ content: LianxinPublication) -> String {
+        let translated = translatedCount(content), missing = content.resolvedLines.count - translated
+        return "\(translated) 句话语有译文" + (missing > 0 ? "，\(missing) 句缺少译文；仅译文时略过缺失项。" : "。")
     }
     static func items(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [TodoItem] { entries(content, style: style).map(\.item) }
     static func secondaryTexts(_ content: LianxinPublication, style: LianxinDisplayStyle) -> [UUID: String] {

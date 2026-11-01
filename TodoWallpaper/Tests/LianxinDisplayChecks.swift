@@ -9,6 +9,11 @@ enum LianxinDisplayChecks {
         }
         let content = LianxinPublication(idol: "成员", text: String(String(repeating: "中文과한국어🌙", count: 30).prefix(200)), photo: nil, date: .distantPast,
             translation: String(String(repeating: "한국어와中文 translated text ", count: 15).prefix(200)), signatureSubtitle: "公开团体")
+        let partial = LianxinPublication(idol: "成员", text: "第一句", photo: nil, date: .distantPast, lines: [LianxinLine(text: "第一句", translation: "  "), LianxinLine(text: "第二句", translation: "Second")])
+        var onlyTranslation = LianxinDisplayStyle(); onlyTranslation.translationDisplay = .translation
+        let translated = LianxinPresentation.entries(partial, style: onlyTranslation)
+        try require(translated.count == 1 && translated[0].primary == "Second" && translated[0].rowID != LianxinPresentation.itemID, "跳过缺译文并保留原索引身份")
+        try require(LianxinPresentation.translatedCount(partial) == 1, "翻译统计遍历全批次")
         var count = 0
         for family in WidgetPreviewFamily.allCases {
             for scale in [1.0, 1.6, 2.82] {

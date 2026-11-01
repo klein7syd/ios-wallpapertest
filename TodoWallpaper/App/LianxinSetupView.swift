@@ -14,6 +14,8 @@ struct LianxinSetupView: View {
     @State private var revealsKey = false
     @State private var manualModel = false
     @State private var showsDeleteKey = false
+    @State private var showsModels = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var message: String?
     @State private var connectionTask: Task<Void, Never>?
     private enum Field: Hashable { case endpoint, key, model }
@@ -65,10 +67,17 @@ struct LianxinSetupView: View {
             guard !started else { return }; started = true
             endpoint = model.profile.endpoint; modelName = model.profile.model
             editingKey = !model.keySaved
-            step = model.connected ? .connected : (model.profile.providerID != nil || !endpoint.isEmpty ? .credential : .provider)
+            step = model.connected ? .connected : model.keySaved && !endpoint.isEmpty ? .model : (model.profile.providerID != nil || !endpoint.isEmpty ? .credential : .provider)
         }
         .onDisappear { connectionTask?.cancel(); draftKey = ""; revealsKey = false }
-        .onChange(of: modelName) { _, _ in message = nil; model.connectionNotice = nil }
+        .onChange(of: modelName) { _, value in
+            message = nil; model.connectionNotice = nil
+            guard !model.busy, value.count <= 200 else { return }
+            Task { await model.chooseModel(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        }
+        .sheet(isPresented: $showsModels) {
+            LianxinModelSelection(models: model.availableModels, recommended: model.provider.model, selection: $modelName)
+        }
         .onChange(of: step) { _, _ in message = nil; model.connectionNotice = nil; focused = nil }
         .confirmationDialog("删除这个服务商的密钥？其他服务商的密钥会保留。", isPresented: $showsDeleteKey, titleVisibility: .visible) {
             Button("删除密钥", role: .destructive) {
@@ -93,8 +102,9 @@ struct LianxinSetupView: View {
         case .connected: return "当前连接已保存，可以回到连心生成话语。"
         }
     }
+    private var progressLayout: AnyLayout { typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8)) }
     private var progress: some View {
-        HStack(spacing: 8) {
+        progressLayout {
             ForEach(0..<3, id: \.self) { index in
                 Text(["1 服务商", "2 密钥", "3 模型与测试"][index]).font(.caption.weight(.medium))
                     .frame(maxWidth: .infinity, minHeight: 36)
@@ -155,6 +165,8 @@ struct LianxinSetupView: View {
             }
             card {
                 Text("API 密钥").font(.headline)
+                Text("发送到：" + ((URL(string: finalAddress)?.host) ?? model.provider.name)).font(.caption).foregroundStyle(.secondary)
+                if !model.keySaved { Button("重新读取已保存的密钥") { Task { await model.retryCredentials() } }.font(.caption).frame(minHeight: 44) }
                 if model.keySaved {
                     HStack {
                         Label("已保存 · 尾号 " + model.keySuffix, systemImage: "checkmark.shield").font(.subheadline)
@@ -185,9 +197,12 @@ struct LianxinSetupView: View {
         card {
             Text("当前模型").font(.headline)
             if !model.availableModels.isEmpty && !manualModel && model.provider.id != "custom" {
-                Picker("选择模型", selection: $modelName) {
-                    ForEach(Array(Set(model.availableModels + [modelName])).filter { !$0.isEmpty }.sorted(), id: \.self) { Text($0).tag($0) }
-                }.pickerStyle(.menu).frame(minHeight: 44)
+                Button { showsModels = true } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 5) { Text("选择模型").font(.caption); Text(modelName).font(.body.monospaced()).multilineTextAlignment(.leading) }
+                        Spacer(); Image(systemName: "chevron.up.chevron.down")
+                    }.frame(minHeight: 44)
+                }.buttonStyle(.bordered)
             } else if model.provider.id == "custom" || manualModel {
                 TextField("填写服务商提供的模型名称", text: $modelName).textInputAutocapitalization(.never)
                     .autocorrectionDisabled().textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .model)
@@ -208,7 +223,7 @@ struct LianxinSetupView: View {
             } else {
                 Text(model.connected ? "模型已修改，请测试这次的选择。" : "测试通过后，就可以完成设置。").font(.caption).foregroundStyle(.secondary)
             }
-            Text("测试可能访问模型列表或发送一条极短请求，可能产生少量费用；列表中的模型仍需账号已开通权限。")
+            Text("模型选择自动保存在本机。测试会向当前模型发送极短请求，可能产生少量费用；只有测试成功才显示已连接。")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -271,6 +286,42 @@ struct LianxinSetupView: View {
         Task {
             if await model.finishSetup() { onFinished() }
             else { message = "设置暂未保存，请稍后重试。"; model.error = nil }
+        }
+    }
+}
+
+// 大目录用原生搜索列表，避免把数百个模型塞进菜单。
+private struct LianxinModelSelection: View {
+    let models: [String]
+    let recommended: String
+    @Binding var selection: String
+    @State private var search = ""
+    @Environment(\.dismiss) private var dismiss
+    private var choices: [String] {
+        let values = Set(models + [recommended, selection]).filter { !$0.isEmpty }
+        return values.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) }
+            .sorted { left, right in
+                if left == recommended { return right != recommended }
+                if right == recommended { return false }
+                return left < right
+            }
+    }
+    var body: some View {
+        NavigationStack {
+            List(choices, id: \.self) { value in
+                Button { selection = value; dismiss() } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(value).foregroundStyle(.primary)
+                            if value == recommended { Text("推荐").font(.caption).foregroundStyle(.secondary) }
+                        }
+                        Spacer()
+                        if value == selection { Image(systemName: "checkmark").accessibilityLabel("当前选择") }
+                    }.frame(minHeight: 44)
+                }
+            }.searchable(text: $search, prompt: "搜索模型名称")
+                .navigationTitle("选择模型").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
         }
     }
 }
