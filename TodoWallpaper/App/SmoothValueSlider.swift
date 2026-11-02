@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// UIKit tracks the finger immediately. Publish at most one model update per
-/// display frame, rather than rebuilding the editor for every touch sample.
+// 原生滑块独立跟手；预览按主线程实际负担限频，释放时提交最终值。
+// CADisplayLink只取最新采样，不排队重放过期触控。
 struct SmoothValueSlider: UIViewRepresentable {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -27,11 +27,14 @@ struct SmoothValueSlider: UIViewRepresentable {
         private(set) var active = false
         private var pending: Double?
         private var link: CADisplayLink?
+        private var lastPublication: CFTimeInterval = 0
+        private var publicationInterval: CFTimeInterval = 1.0 / 20.0
         private let proxy = FrameProxy()
         init(value: Binding<Double>, editing: @escaping (Bool) -> Void) { self.value = value; self.editing = editing; super.init(); proxy.owner = self }
         @objc func begin() {
             guard !active else { return }
-            active = true; editing(true)
+            active = true; lastPublication = 0; publicationInterval = 1.0 / 20.0
+            editing(true)
             let display = CADisplayLink(target: proxy, selector: #selector(FrameProxy.frame))
             display.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
             display.add(to: .main, forMode: .common); link = display
@@ -40,10 +43,24 @@ struct SmoothValueSlider: UIViewRepresentable {
             pending = Double(slider.value)
             if !slider.isTracking { flush() } // VoiceOver and keyboard adjustments.
         }
+        func publishPreview() {
+            let now = CACurrentMediaTime()
+            guard pending != nil, now - lastPublication >= publicationInterval else { return }
+            let started = now
+            flush()
+            // 同步排版昂贵时给触控留出主线程时间；轻量调整逐步回到20Hz。
+            let cost = CACurrentMediaTime() - started
+            publicationInterval = min(0.25, max(1.0 / 20.0, max(cost * 4, publicationInterval * 0.8)))
+            lastPublication = CACurrentMediaTime()
+        }
         func flush() {
             guard let next = pending else { return }
             pending = nil
-            if value.wrappedValue != next { value.wrappedValue = next }
+            if Float(value.wrappedValue) != Float(next) {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { value.wrappedValue = next }
+            }
         }
         @objc func end() {
             flush(); link?.invalidate(); link = nil
@@ -52,6 +69,6 @@ struct SmoothValueSlider: UIViewRepresentable {
     }
     private final class FrameProxy: NSObject {
         weak var owner: Coordinator?
-        @objc func frame() { owner?.flush() }
+        @objc func frame() { owner?.publishPreview() }
     }
 }
