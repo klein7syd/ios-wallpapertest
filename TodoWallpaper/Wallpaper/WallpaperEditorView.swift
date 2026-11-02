@@ -118,21 +118,29 @@ struct WallpaperEditorView: View {
                 .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 6)
             }
             .background(Color(uiColor: .systemGroupedBackground))
+            .buttonBorderShape(.roundedRectangle(radius: 14))
+            .textFieldStyle(LianxinFieldStyle())
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .wallpaper, current: mode.rawValue) { selectedContentMode = $0 } }.disabled(model.busy)
+                    EditorContentMenu(mode: mode) { _ in
+                        edits.finish(editState)
+                        EditorModePerformance.toggle(page: .wallpaper, current: mode.rawValue) { selectedContentMode = $0 }
+                    }.disabled(model.busy)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                         .disabled(!edits.canUndo || model.busy || model.draftBlocked)
                         .accessibilityIdentifier("wallpaper.undo")
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { fullScreen = true } label: { Label("全屏预览", systemImage: "arrow.up.left.and.arrow.down.right") }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { navigation.selectTool(.output) } label: { Label("保存与分享", systemImage: "square.and.arrow.up") }
+                        .disabled(!dataReady || model.busy).accessibilityIdentifier("wallpaper.export")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button("全屏预览", systemImage: "arrow.up.left.and.arrow.down.right") { fullScreen = true }
+                        Toggle("高级调整", isOn: $advanced)
                         Button("重新读取待办", systemImage: "arrow.clockwise") { store.flushAppearance(); store.reload() }
                         Button("恢复壁纸默认排版", systemImage: "arrow.counterclockwise") { resetConfirmation = true }
                         Button(navigation.inspectorExpanded ? "收起设置" : "展开设置", systemImage: "slider.horizontal.3") { toggleInspector() }
@@ -252,6 +260,7 @@ struct WallpaperEditorView: View {
     }
     private func inspector(height: Double) -> some View {
         VStack(spacing: 8) {
+            toolSelector.frame(height: 44)
             if isLianxin, let layout = model.layout, layout.hiddenCount > 0, !layout.rows.isEmpty {
                 Text("有 \(layout.hiddenCount) 条放不下，已省略").font(.caption).foregroundStyle(.secondary)
             }
@@ -279,7 +288,6 @@ struct WallpaperEditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .disabled(!model.ready || model.busy || model.draftBlocked)
             }
-            toolSelector.frame(height: 44)
         }
         .frame(height: height)
         .accessibilityIdentifier("wallpaper.inspector")
@@ -290,7 +298,7 @@ struct WallpaperEditorView: View {
                 selection: Binding(get: { tool }, set: { next in
                     edits.finish(editState)
                     withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) { navigation.selectTool(next) }
-                }), title: { $0.title }, compact: isLianxin)
+                }), title: { $0.title }, compact: isLianxin, icon: { $0.icon })
             Button {
                 toggleInspector()
             } label: {
@@ -313,7 +321,7 @@ struct WallpaperEditorView: View {
         let photoTitle = model.hasPhoto ? "更换背景照片" : "选择背景照片"
         InspectorGroupTitle(title: "背景素材", detail: "先选照片，再在上方预览中调整构图。")
         PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
-            Label(photoTitle, systemImage: "photo")
+            Label(photoTitle, systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
         }.buttonStyle(.bordered)
         if model.hasPhoto {
             PreciseSlider(title: "等比例缩放", value: $model.settings.backgroundZoom, range: 1...4, standard: 1, precision: 2)
@@ -399,8 +407,12 @@ struct WallpaperEditorView: View {
             Toggle("标题颜色跟随文字", isOn: lianxinHeading.followsTextColor)
             StyleColorControl(title: "标题颜色", value: lianxinHeading.color).disabled(lianxinHeading.wrappedValue.followsTextColor)
             Picker("标题位置", selection: Binding(get: { lianxinHeading.wrappedValue.horizontalPosition < 0.25 ? 0 : lianxinHeading.wrappedValue.horizontalPosition > 0.75 ? 2 : 1 }, set: { lianxinHeading.wrappedValue.horizontalPosition = Double($0) / 2 })) { Text("左").tag(0); Text("中").tag(1); Text("右").tag(2) }.pickerStyle(.segmented)
-            Picker("标题字体", selection: lianxinHeading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            Picker("标题字重", selection: lianxinHeading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            InspectorChoice(title: "标题字体") {
+                Picker("标题字体", selection: lianxinHeading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            }
+            InspectorChoice(title: "标题字重") {
+                Picker("标题字重", selection: lianxinHeading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            }
             PreciseSlider(title: "标题大小", value: lianxinHeading.fontSize, range: 12...32, standard: 17)
         }
     }
@@ -415,8 +427,12 @@ struct WallpaperEditorView: View {
         } else {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
         }
-        Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        InspectorChoice(title: "字重") {
+            Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
+        InspectorChoice(title: "字体") {
+            Picker("字体", selection: $model.settings.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
         if !isLianxin {
         Toggle("包含已完成事项", isOn: $model.settings.includeCompleted)
         Stepper("最多 \(model.settings.maximumItems) 项", value: $model.settings.maximumItems, in: 1...20)
@@ -504,11 +520,12 @@ struct WallpaperEditorView: View {
         if quality == .custom {
             HStack { TextField("宽 px", text: $pixelWidth); Text("×"); TextField("高 px", text: $pixelHeight); Button("应用") { applyPixels() } }.keyboardType(.numberPad)
         }
-        Text("输出 \(model.settings.size.label) · 相册保存前会校验实际 PNG 像素尺寸").font(.caption)
-        VStack(spacing: 12) {
-            Button { Task { await model.export(saveToPhotos: true) } } label: { Label("保存相册", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity, minHeight: 44) }
-            Button { Task { await model.export(saveToPhotos: false) } } label: { Label("系统分享", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
-        }.buttonStyle(.borderedProminent).disabled(!canExport)
+        Label("输出 " + model.settings.size.label + " px", systemImage: "aspectratio").font(.caption).foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { exportButtons }
+            VStack(spacing: 12) { exportButtons }
+        }.disabled(!canExport)
+        Text("保存后，到系统照片或壁纸设置中设为壁纸。").font(.caption).foregroundStyle(.secondary)
         if let size = model.lastExportSize { Text("最近成品已校验：\(size) px").font(.caption) }
         if advanced {
             Button("将壁纸样式应用到小组件") { applyWidgetStyle() }
@@ -518,6 +535,14 @@ struct WallpaperEditorView: View {
             Text("按目标像素重新绘制 SDR PNG。预览不写入相册；静态壁纸需手动设置。")
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+    @ViewBuilder private var exportButtons: some View {
+        Button { Task { await model.export(saveToPhotos: true) } } label: {
+            Label("保存相册", systemImage: "square.and.arrow.down").fixedSize().frame(maxWidth: .infinity, minHeight: 44)
+        }.buttonStyle(.borderedProminent)
+        Button { Task { await model.export(saveToPhotos: false) } } label: {
+            Label("系统分享", systemImage: "square.and.arrow.up").fixedSize().frame(maxWidth: .infinity, minHeight: 44)
+        }.buttonStyle(.bordered)
     }
     private func chooseAspect(_ value: WallpaperAspect) {
         if let ratio = value.ratio { setRatio(ratio) }

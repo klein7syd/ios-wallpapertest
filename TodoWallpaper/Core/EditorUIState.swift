@@ -76,7 +76,8 @@ enum EditorSizing {
         if !expanded { return min(52, available) }
         // The system Tab Bar is already outside this proposed height. Reserve
         // a compact toolbar + settings viewport and prioritize the portrait canvas.
-        return min(advanced ? 278 : 214, max(120, available * (advanced ? 0.42 : 0.31)), max(52, available - 110))
+        // 参数区至少露出一组完整控件，键盘/小屏仍保留可操作的画布。
+        return min(advanced ? 350 : 300, max(140, available * (advanced ? 0.48 : 0.43)), max(52, available - 140))
     }
     static func wallpaperInspectorHeight(available: Double, expanded: Bool, advanced: Bool, previewScale: Double) -> Double {
         let base = panelHeight(available: available, expanded: expanded, advanced: advanced)

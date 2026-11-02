@@ -161,39 +161,58 @@ struct WidgetAppearanceEditor: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 fixedPreview(height: EditorSizing.widgetPreviewHeight(available: geometry.size.height, family: family))
-                InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") + (selectedTaskID?.uuidString ?? ".default")) {
-                    if let message = store.appearanceError {
-                        Text(message).font(.caption).foregroundStyle(.red)
-                        Button("重试") { store.reloadAppearance() }
-                        Button("恢复有效样式备份") {
-                            do { try store.recoverAppearance() } catch { self.error = error.localizedDescription }
+                VStack(spacing: 4) {
+                    EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
+                        title: { $0.rawValue }, compact: geometry.size.height < 320)
+                        .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
+                        .accessibilityIdentifier("widget.tools")
+                    Divider().padding(.horizontal, 18)
+                    InspectorViewport(pageID: tool.id + (advanced ? ".advanced" : ".basic") + (selectedTaskID?.uuidString ?? ".default")) {
+                        if let message = store.appearanceError {
+                            Text(message).font(.caption).foregroundStyle(.red)
+                            Button("重试") { store.reloadAppearance() }
+                            Button("恢复有效样式备份") {
+                                do { try store.recoverAppearance() } catch { self.error = error.localizedDescription }
+                            }
+                        }
+                        switch tool {
+                        case .theme: themeControls
+                        case .header: headerControls
+                        case .text: textControls
+                        case .marker: markerControls
+                        case .content: if isLianxin { lianxinControls } else { contentControls }
                         }
                     }
-                    switch tool {
-                    case .theme: themeControls
-                    case .header: headerControls
-                    case .text: textControls
-                    case .marker: markerControls
-                    case .content: if isLianxin { lianxinControls } else { contentControls }
-                    }
+                    .frame(maxHeight: .infinity).accessibilityIdentifier("widget.settings")
                 }
-                .frame(maxHeight: .infinity).accessibilityIdentifier("widget.settings")
-                EditorToolPicker(choices: WidgetEditorTool.allCases, selection: $tool,
-                    title: { $0.rawValue }, compact: geometry.size.height < 320)
-                    .padding(.horizontal, 16).padding(.vertical, 6)
-                    .accessibilityIdentifier("widget.tools")
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 8)
             }
             .clipped()
         }
         .background(Color(uiColor: .systemGroupedBackground))
+        .buttonBorderShape(.roundedRectangle(radius: 14))
+        .textFieldStyle(LianxinFieldStyle())
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button(isLianxin ? "切换回待办" : "切换到连心") { EditorModePerformance.toggle(page: .widget, current: mode.rawValue) { selectedContentMode = $0 } } }
+            ToolbarItem(placement: .topBarLeading) {
+                EditorContentMenu(mode: mode) { _ in
+                    edits.finish(editState); cropPhoto = false
+                    EditorModePerformance.toggle(page: .widget, current: mode.rawValue) { selectedContentMode = $0 }
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { undoEdit() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .disabled(!edits.canUndo || store.loadError != nil || store.appearanceError != nil || importingPhoto)
                     .accessibilityIdentifier("widget.undo")
-                Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("小组件帮助")
+                Menu {
+                    Toggle("高级调整", isOn: $advanced)
+                    if !isLianxin {
+                        Button("重置预览完成状态", systemImage: "arrow.counterclockwise") { preview.reset() }
+                    }
+                    Button("如何添加与使用小组件", systemImage: "questionmark.circle") { showHelp = true }
+                } label: { Label("更多设置", systemImage: "ellipsis.circle") }
             }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -303,15 +322,10 @@ struct WidgetAppearanceEditor: View {
     }
     private func fixedPreview(height: CGFloat) -> some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                WidgetFamilyPicker(family: $family)
-                if !isLianxin {
-                    Button { preview.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44) }
-                        .accessibilityLabel("重置预览完成状态，不修改真实待办")
-                }
-            }.zIndex(1)
+            WidgetFamilyPicker(family: $family).zIndex(1)
             if !typeSize.isAccessibilitySize {
-                Text(isLianxin ? "连心预览" : "点标记编辑 · 点文字试完成").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                Text(isLianxin ? "连心 · 真实样式预览" : "点标记编辑 · 点文字试完成")
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
             GeometryReader { proxy in
                 let scale = family.scale(availableWidth: proxy.size.width - 32, availableHeight: proxy.size.height - 8)
@@ -365,14 +379,21 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var themeControls: some View {
         InspectorGroupTitle(title: "背景与照片", detail: "先选背景，再调整照片构图与明暗。")
-        Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        InspectorChoice(title: "明暗外观") {
+            Picker("明暗", selection: widget.theme) { ForEach(WidgetTheme.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
+        InspectorChoice(title: "背景类型") {
             Picker("背景", selection: widget.backdrop) { ForEach(WidgetBackdrop.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
             if editingAppearance.widget.backdrop == .solid { StyleColorControl(title: "面板底色", value: widget.panelColor) }
             if editingAppearance.widget.backdrop == .photo {
                 PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
                     Label("选择或更换照片", systemImage: "photo")
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }.buttonStyle(.bordered).disabled(importingPhoto)
-                Button("选择相册，每天换一张", systemImage: "photo.stack") { chooseAlbum = true }
+                Button { chooseAlbum = true } label: {
+                    Label("选择相册，每天换一张", systemImage: "photo.stack").frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.bordered)
                 if importingPhoto { ProgressView("正在处理照片…") }
                 if let rotation = editingAppearance.widget.photoRotation {
                     Toggle("每日轮换 · \(rotation.title)", isOn: Binding(get: { editingAppearance.widget.photoRotation?.enabled ?? false }, set: {
@@ -440,8 +461,12 @@ struct WidgetAppearanceEditor: View {
             })) {
                 Text("左").tag(0); Text("中").tag(1); Text("右").tag(2)
             }.pickerStyle(.segmented)
-            Picker("标题字体", selection: heading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-            Picker("标题字重", selection: heading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            InspectorChoice(title: "标题字体") {
+                Picker("标题字体", selection: heading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            }
+            InspectorChoice(title: "标题字重") {
+                Picker("标题字重", selection: heading.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+            }
             if advanced {
                 PreciseSlider(title: "标题大小", value: heading.fontSize, range: 12...32, standard: 17)
                 PreciseSlider(title: "标题水平位置", value: heading.horizontalPosition, range: 0...1, standard: 0, precision: 2)
@@ -450,12 +475,16 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var textControls: some View {
         InspectorGroupTitle(title: "文字与可读性", detail: "先选位置与颜色，再细调字体和护字效果。")
-        Picker("文字位置", selection: readableAnchor) {
-            ForEach(TextAnchor.allCases) { Text($0.title).tag($0) }
-        }.pickerStyle(.segmented)
-        Picker("可读性强度", selection: readableIntensity) {
-            ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
-        }.pickerStyle(.segmented)
+        InspectorChoice(title: "文字位置") {
+            Picker("文字位置", selection: readableAnchor) {
+                ForEach(TextAnchor.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented)
+        }
+        InspectorChoice(title: "可读性强度") {
+            Picker("可读性强度", selection: readableIntensity) {
+                ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented)
+        }
         Toggle("文字跟随系统", isOn: widget.followsSystemText)
         StyleColorControl(title: "文字色", value: widget.textColor)
             .disabled(editingAppearance.widget.followsSystemText)
@@ -465,8 +494,12 @@ struct WidgetAppearanceEditor: View {
         } else {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.widgetScale, standard: 1, precision: 2)
         }
-        Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-        Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        InspectorChoice(title: "字重") {
+            Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
+        InspectorChoice(title: "字体") {
+            Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+        }
         if advanced {
             PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
         }
@@ -648,7 +681,10 @@ struct WidgetAppearanceEditor: View {
         Toggle("显示行分隔线", isOn: Binding(get: { editingAppearance.widget.separatesRows }, set: { widget.wrappedValue.showsSeparators = $0 }))
         Stepper("最多 \(editingAppearance.widget.maximumItems) 项", value: widget.maximumItems, in: 1...10)
         Picker("完成事项", selection: widget.completed) { ForEach(WidgetCompleted.allCases) { Text($0.title).tag($0) } }.pickerStyle(.menu)
-        Button("请求更新小组件") { store.flushAppearance(); store.reload() }
+        Button { store.flushAppearance(); store.reload() } label: {
+            Label("请求更新小组件", systemImage: "arrow.clockwise").frame(maxWidth: .infinity, minHeight: 44)
+        }.buttonStyle(.bordered)
+        Text("更改会自动保存；主屏幕的更新时间由系统决定。").font(.caption).foregroundStyle(.secondary)
     }
     private var help: some View {
         NavigationStack {

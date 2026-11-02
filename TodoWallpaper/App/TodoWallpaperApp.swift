@@ -112,6 +112,10 @@ private struct DisplayError: Identifiable {
     let message: String
 }
 
+private enum TodoListFilter: String, CaseIterable {
+    case all = "全部", pending = "待完成", completed = "已完成"
+}
+
 struct TodoListView: View {
     @ObservedObject var store: TodoStore
     @State private var editor: EditorRequest?
@@ -119,6 +123,16 @@ struct TodoListView: View {
     @State private var confirmRecovery = false
     @State private var importCalendar = false
     @State private var importAfterEditor = false
+    @State private var filter = TodoListFilter.all
+    @State private var editMode = EditMode.inactive
+    private var completedCount: Int { store.items.filter(\.isCompleted).count }
+    private var filteredItems: [TodoItem] {
+        switch filter {
+        case .all: return store.items
+        case .pending: return store.items.filter { !$0.isCompleted }
+        case .completed: return store.items.filter(\.isCompleted)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -137,46 +151,18 @@ struct TodoListView: View {
                 } else if !store.hasLoaded {
                     ProgressView("正在读取")
                 } else {
-                    List {
-                        ForEach(store.items) { item in
-                            row(item)
-                                .swipeActions(edge: .leading) {
-                                    Button { perform { try store.setCompleted(id: item.id, completed: !item.isCompleted) } } label: {
-                                        Label(item.isCompleted ? "恢复待办" : "完成待办", systemImage: item.isCompleted ? "arrow.uturn.backward" : "checkmark")
-                                    }.tint(.green)
-                                }
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) { perform { try store.delete(ids: [item.id]) } } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                    Button { editor = EditorRequest(item: item) } label: {
-                                        Label("编辑", systemImage: "pencil")
-                                    }.tint(.blue)
-                                }
-                        }
-                        .onDelete { offsets in
-                            let ids = Set(offsets.compactMap { store.items.indices.contains($0) ? store.items[$0].id : nil })
-                            perform { try store.delete(ids: ids) }
-                        }
-                        .onMove { offsets, destination in
-                            perform { try store.move(from: offsets, to: destination) }
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                    .overlay {
-                        if store.items.isEmpty {
-                            ContentUnavailableView("还没有待办", systemImage: "checklist", description: Text("点下方“新增待办”，记下第一件事。"))
-                        }
-                    }
+                    taskList
                 }
             }
             .navigationTitle("待办")
+            .environment(\.editMode, $editMode)
+            .onChange(of: filter) { _, _ in editMode = .inactive }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    EditButton().disabled(store.items.isEmpty || store.loadError != nil)
+                    EditButton().environment(\.editMode, $editMode).disabled(filteredItems.isEmpty || store.loadError != nil)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { importCalendar = true } label: { Label("从日历或提醒事项导入", systemImage: "calendar.badge.plus") }
+                    Button { importCalendar = true } label: { Label("导入", systemImage: "calendar.badge.plus") }
                         .disabled(!store.hasLoaded || store.loadError != nil)
                 }
             }
@@ -210,6 +196,59 @@ struct TodoListView: View {
         }
     }
 
+    private var taskList: some View {
+        let items = filteredItems
+        return List {
+            Section {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(store.items.isEmpty ? "从一件小事开始" : store.items.count == completedCount ? "都完成了，休息一下吧" : "还有 \(store.items.count - completedCount) 件待完成")
+                            .font(.title3.weight(.semibold))
+                        Text("共 \(store.items.count) 件 · 已完成 \(completedCount) 件")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Picker("筛选待办", selection: $filter) {
+                        ForEach(TodoListFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }.pickerStyle(.segmented).frame(minHeight: 44)
+                    if filter != .all && editMode.isEditing {
+                        Text("切到“全部”可拖动调整顺序。").font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.vertical, 4)
+            }.listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
+            Section {
+                if items.isEmpty {
+                    ContentUnavailableView(filter == .completed ? "还没有已完成事项" : filter == .pending ? "没有待完成事项" : "还没有待办",
+                        systemImage: filter == .pending ? "checkmark.circle" : "checklist",
+                        description: Text(store.items.isEmpty ? "点下方“新增待办”，记下第一件事。" : filter == .completed ? "完成的事项会出现在这里。" : "可以放松一下，也可以记下新的计划。"))
+                        .listRowBackground(Color.clear)
+                }
+                ForEach(items) { item in
+                    row(item)
+                        .swipeActions(edge: .leading) {
+                            Button { perform { try store.setCompleted(id: item.id, completed: !item.isCompleted) } } label: {
+                                Label(item.isCompleted ? "恢复待办" : "完成待办", systemImage: item.isCompleted ? "arrow.uturn.backward" : "checkmark")
+                            }.tint(.green)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) { perform { try store.delete(ids: [item.id]) } } label: { Label("删除", systemImage: "trash") }
+                            Button { editor = EditorRequest(item: item) } label: { Label("编辑", systemImage: "pencil") }.tint(.blue)
+                        }
+                        .moveDisabled(filter != .all)
+                }
+                .onDelete { offsets in
+                    let ids = Set(offsets.compactMap { items.indices.contains($0) ? items[$0].id : nil })
+                    perform { try store.delete(ids: ids) }
+                }
+                .onMove { offsets, destination in
+                    guard filter == .all else { return }
+                    perform { try store.move(from: offsets, to: destination) }
+                }
+            } header: {
+                HStack { Text(filter.rawValue + "事项"); Spacer(); Text("\(items.count) 件") }
+            }
+        }.listStyle(.insetGrouped).scrollDismissesKeyboard(.interactively)
+    }
+
     private func row(_ item: TodoItem) -> some View {
         HStack(spacing: 12) {
             Button {
@@ -221,6 +260,7 @@ struct TodoListView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
+            .accessibilityValue(item.isCompleted ? "已完成" : "待完成")
             .accessibilityLabel(item.isCompleted ? "恢复：\(item.title)" : "完成：\(item.title)")
             Button { editor = EditorRequest(item: item) } label: {
                 VStack(alignment: .leading, spacing: 4) {
@@ -232,7 +272,7 @@ struct TodoListView: View {
             }
             .buttonStyle(.borderless)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     private func perform(_ operation: () throws -> Void) {
@@ -272,6 +312,8 @@ struct TodoEditorView: View {
                 Section {
                     TextField("想完成什么？", text: $title, axis: .vertical)
                         .lineLimit(3...6).focused($focused)
+                } header: {
+                    Text("事项")
                 } footer: {
                     Text("\(title.trimmingCharacters(in: .whitespacesAndNewlines).count) / 200 字符")
                 }
@@ -282,7 +324,6 @@ struct TodoEditorView: View {
                         Toggle("指定时间", isOn: $includesTime)
                         if includesTime { DatePicker("时间", selection: $scheduleDate, displayedComponents: .hourAndMinute) }
                     }
-                    if item == nil { Button("从日历 / 提醒事项导入", systemImage: "calendar.badge.plus") { onImport(); dismiss() } }
                 }
                 Section("单项标记") {
                     Toggle("继承壁纸标记", isOn: $inheritsMarker)
@@ -290,11 +331,18 @@ struct TodoEditorView: View {
                     Text("单项设置优先；恢复继承后使用壁纸默认标记。新待办默认继承。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                if item == nil {
+                    Section {
+                        Button("从日历 / 提醒事项导入", systemImage: "calendar.badge.plus") { onImport(); dismiss() }
+                    }
+                }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(item == nil ? "新增待办" : "编辑待办")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = false } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         do { try onSave(title, inheritsMarker ? nil : markerOverride, scheduled ? TodoSchedule(date: scheduleDate, includesTime: includesTime) : nil); dismiss() }
