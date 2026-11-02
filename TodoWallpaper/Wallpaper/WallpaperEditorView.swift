@@ -117,7 +117,7 @@ struct WallpaperEditorView: View {
                 .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: navigation.inspectorExpanded)
                 .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 6)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(AppThemeBackground())
             .buttonBorderShape(.roundedRectangle(radius: 14))
             .textFieldStyle(LianxinFieldStyle())
             .navigationTitle("壁纸").navigationBarTitleDisplayMode(.inline)
@@ -339,15 +339,17 @@ struct WallpaperEditorView: View {
     }
     @ViewBuilder private var panelControls: some View {
         InspectorGroupTitle(title: "面板布局", detail: "先调整大小和位置，再调整玻璃质感。")
+        if advanced {
+            Toggle("自动高度", isOn: $model.settings.automaticHeight)
+            Toggle("自定义位置", isOn: $model.settings.customPosition)
+        }
         if !advanced {
             PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
         } else {
             PreciseSlider(title: "宽度比例", value: $model.settings.panelWidth, range: 0.3...0.96, standard: 0.88, precision: 2)
-            Toggle("自动高度", isOn: $model.settings.automaticHeight)
             if !model.settings.automaticHeight {
                 PreciseSlider(title: "高度比例", value: $model.settings.panelHeight, range: 0.12...0.94, standard: 0.38, precision: 2)
             }
-            Toggle("自定义位置", isOn: $model.settings.customPosition)
             if model.settings.customPosition {
                 PreciseSlider(title: "水平中心", value: $model.settings.panelX, range: 0...1, standard: 0.5, precision: 2)
                 PreciseSlider(title: "垂直中心", value: $model.settings.panelY, range: 0...1, standard: 0.5, precision: 2)
@@ -370,9 +372,9 @@ struct WallpaperEditorView: View {
             PreciseSlider(title: "内边距", value: $model.settings.padding, range: 8...48, standard: 20)
         }
         InspectorGroupTitle(title: "玻璃质感", detail: "透明度、模糊和底色共同决定面板效果。")
+        Toggle("深色底色", isOn: $model.settings.darkGlass)
         PreciseSlider(title: "玻璃不透明度", value: $model.settings.glassOpacity, range: 0...0.85, standard: 0.22, precision: 2)
         PreciseSlider(title: "模糊程度", value: $model.settings.blurRadius, range: 0...45, standard: 22)
-        Toggle("深色底色", isOn: $model.settings.darkGlass)
         if advanced {
             PreciseSlider(title: "边框不透明度", value: $model.settings.borderOpacity, range: 0...1, standard: 0.25, precision: 2)
             PreciseSlider(title: "高光", value: $model.settings.highlight, range: 0...0.6, standard: 0.12, precision: 2)
@@ -395,7 +397,6 @@ struct WallpaperEditorView: View {
     }
     @ViewBuilder private var lianxinHeaderControls: some View {
         InspectorGroupTitle(title: "标题与位置", detail: "留空使用成员名，团体摘要可单独显示。")
-        PreciseSlider(title: "顶部留白", value: Binding(get: { model.settings.lianxinEdgeInset ?? 0 }, set: { model.settings.lianxinEdgeInset = $0 }), range: -min(12, model.settings.padding)...40, standard: 0)
         Toggle("显示标题", isOn: lianxinHeading.showsTitle)
         Toggle("显示团体摘要", isOn: lianxinHeading.showsSummary)
         if lianxinHeading.wrappedValue.showsSummary {
@@ -404,8 +405,6 @@ struct WallpaperEditorView: View {
         Text("团体摘要属于公开署名，详细角色设定不会共享。").font(.caption).foregroundStyle(.secondary)
         if lianxinHeading.wrappedValue.showsTitle {
             TextField("默认：" + lianxinModel.publication.idol, text: Binding(get: { model.settings.lianxinCustomTitle ?? "" }, set: { model.settings.lianxinCustomTitle = String($0.filter { !$0.isNewline }.prefix(40)) })).textFieldStyle(LianxinFieldStyle())
-            Toggle("标题颜色跟随文字", isOn: lianxinHeading.followsTextColor)
-            StyleColorControl(title: "标题颜色", value: lianxinHeading.color).disabled(lianxinHeading.wrappedValue.followsTextColor)
             Picker("标题位置", selection: Binding(get: { lianxinHeading.wrappedValue.horizontalPosition < 0.25 ? 0 : lianxinHeading.wrappedValue.horizontalPosition > 0.75 ? 2 : 1 }, set: { lianxinHeading.wrappedValue.horizontalPosition = Double($0) / 2 })) { Text("左").tag(0); Text("中").tag(1); Text("右").tag(2) }.pickerStyle(.segmented)
             InspectorChoice(title: "标题字体") {
                 Picker("标题字体", selection: lianxinHeading.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
@@ -415,18 +414,16 @@ struct WallpaperEditorView: View {
             }
             PreciseSlider(title: "标题大小", value: lianxinHeading.fontSize, range: 12...32, standard: 17)
         }
+        PreciseSlider(title: "顶部留白", value: Binding(get: { model.settings.lianxinEdgeInset ?? 0 }, set: { model.settings.lianxinEdgeInset = $0 }), range: -min(12, model.settings.padding)...40, standard: 0)
+        PreciseSlider(title: "标题与正文间距", value: Binding(get: { lianxinHeading.wrappedValue.contentSpacing ?? model.settings.itemSpacing }, set: { lianxinHeading.wrappedValue.contentSpacing = $0 }), range: 0...60, standard: 12)
+        if lianxinHeading.wrappedValue.showsTitle {
+            Divider()
+            Toggle("标题颜色跟随文字", isOn: lianxinHeading.followsTextColor)
+            StyleColorControl(title: "标题颜色", value: lianxinHeading.color).disabled(lianxinHeading.wrappedValue.followsTextColor)
+        }
     }
     @ViewBuilder private var textControls: some View {
-        InspectorGroupTitle(title: "文字排版", detail: "先调字号与颜色，再选择显示哪些事项。")
-        StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
-        if advanced {
-            PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
-            if model.settings.filtered(contentItems).contains(where: { model.settings.marker(for: $0, appearance: editingAppearance).kind != .none }) {
-                PreciseSlider(title: "标记与文字间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
-            }
-        } else {
-            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
-        }
+        InspectorGroupTitle(title: "文字排版", detail: "先选字体与显示内容，再调整间距和颜色。")
         InspectorChoice(title: "字重") {
             Picker("字重", selection: $model.settings.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         }
@@ -439,11 +436,24 @@ struct WallpaperEditorView: View {
         }
         if advanced {
             if !isLianxin { Picker("对齐", selection: $model.settings.alignment) { ForEach(WallpaperAlignment.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented) }
+            if !isLianxin { Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8) }
+        }
+        Divider()
+        if advanced {
+            PreciseSlider(title: "字号", value: $model.settings.fontSize, range: 10...38, standard: 18)
+            if model.settings.filtered(contentItems).contains(where: { model.settings.marker(for: $0, appearance: editingAppearance).kind != .none }) {
+                PreciseSlider(title: "标记与文字间距", value: appearance.markerStyle.gap, range: 0...32, standard: 10)
+            }
+        } else {
+            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.wallpaperScale, standard: 1, precision: 2)
+        }
+        if advanced {
             if isLianxin { LianxinTranslationControls(value: lianxinDisplay) }
             PreciseSlider(title: "行间距", value: $model.settings.lineSpacing, range: 0...20, standard: 4)
             PreciseSlider(title: "事项间距", value: $model.settings.itemSpacing, range: 0...36, standard: 12)
-            if !isLianxin { Stepper("每项最多 \(model.settings.maximumLines) 行", value: $model.settings.maximumLines, in: 1...8) }
         }
+        Divider()
+        StyleColorControl(title: "文字颜色", value: $model.settings.textColor)
     }
     private var markerTasks: [TodoItem] {
         let ids = model.layout?.rows.map { $0.item.id } ??

@@ -17,6 +17,7 @@ struct WidgetLayoutMetrics: Equatable {
     let markerWidth: Double
     let gap: Double
     let lineHeight: Double
+    let headerGap: Double
     let headerHeight: Double
     let footerHeight: Double
     let separatorHeight: Double
@@ -41,7 +42,8 @@ struct WidgetLayoutMetrics: Equatable {
         // 负行距只移除装饰留白，不压缩字形自身所需高度。
         let padding = style.compact ? 0 : max(0, min(4, spacing * 0.8) + max(-2, min(0, style.spacing) * 0.2))
         let header = min(max(0, height), max(0, headerHeight))
-        let afterHeader = max(0, height - header - (header > 0 ? spacing : 0))
+        let headerGap = header > 0 ? (style.heading.contentSpacing ?? spacing) : 0
+        let afterHeader = max(0, height - header - headerGap)
         let line = max(1, fontLineHeight)
         let date = dateLineHeight ?? max(11, line * 0.65)
         let actualFont = font ?? NativeTypography.font(family: style.font, weight: style.weight, size: style.fontSize)
@@ -77,7 +79,7 @@ struct WidgetLayoutMetrics: Equatable {
             if lines < min(limit, needed) || secondary < min(limit, secondaryNeeded) { break }
         }
         return WidgetLayoutMetrics(rows: rows, markerWidth: marker, gap: gap, lineHeight: line,
-            headerHeight: header, footerHeight: footer, separatorHeight: 0, spacing: spacing,
+            headerGap: headerGap, headerHeight: header, footerHeight: footer, separatorHeight: 0, spacing: spacing,
             showsFooter: footerFits, availableRowHeight: rowSpace)
     }
 }

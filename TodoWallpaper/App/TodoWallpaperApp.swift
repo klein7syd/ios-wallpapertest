@@ -9,6 +9,7 @@ struct TodoWallpaperApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(ContentMode.key) private var contentMode = "todo"
     @State private var navigation = AppNavigationState()
+    @AppStorage(AppTheme.key) private var interfaceTheme = AppTheme.system.rawValue
     #if TODO_UI_CHECKS
     @State private var didRunUIProbe = false
     @MainActor init() {
@@ -24,6 +25,7 @@ struct TodoWallpaperApp: App {
     var body: some Scene {
         WindowGroup {
             primaryTabs.environmentObject(lianxinModel)
+            .preferredColorScheme((AppTheme(rawValue: interfaceTheme) ?? .system).scheme)
             .onChange(of: contentMode) { _, value in if value == "lianxin" { Task { await lianxinModel.load(); await lianxinModel.prepareStyle(store) } } }
             .task {
                 #if TODO_UI_CHECKS
@@ -246,7 +248,9 @@ struct TodoListView: View {
             } header: {
                 HStack { Text(filter.rawValue + "事项"); Spacer(); Text("\(items.count) 件") }
             }
-        }.listStyle(.insetGrouped).scrollDismissesKeyboard(.interactively)
+        }.listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(AppThemeBackground()).scrollDismissesKeyboard(.interactively)
     }
 
     private func row(_ item: TodoItem) -> some View {
@@ -363,6 +367,7 @@ struct TodoEditorView: View {
 struct AboutView: View {
     @ObservedObject var store: TodoStore
     @AppStorage(EditorStandards.advancedKey) private var advancedControls = false
+    @AppStorage(AppTheme.key) private var interfaceTheme = AppTheme.system.rawValue
     private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     private var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?" }
     var body: some View {
@@ -371,6 +376,12 @@ struct AboutView: View {
                 Section("Todo Wallpaper") {
                     LabeledContent("版本", value: "\(version) · 构建 \(build)")
                     Text("原生待办与个性化壁纸")
+                }
+                Section("界面主题") {
+                    Picker("主题", selection: $interfaceTheme) {
+                        ForEach(AppTheme.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    Text("仅改变 App 界面，不改变小组件与导出的壁纸。").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("关于连心与 AI 创作") {
                     Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论；旧版本保留的体验内容为示例，非 AI 生成。")
@@ -398,6 +409,8 @@ struct AboutView: View {
                     Text("安装标识：\(Bundle.main.bundleIdentifier ?? "未知")").font(.caption).textSelection(.enabled)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(AppThemeBackground())
             .navigationTitle("关于")
         }
     }

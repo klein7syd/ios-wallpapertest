@@ -191,7 +191,7 @@ struct WidgetAppearanceEditor: View {
             }
             .clipped()
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(AppThemeBackground())
         .buttonBorderShape(.roundedRectangle(radius: 14))
         .textFieldStyle(LianxinFieldStyle())
         .navigationTitle("小组件").navigationBarTitleDisplayMode(.inline)
@@ -434,7 +434,6 @@ struct WidgetAppearanceEditor: View {
     }
     @ViewBuilder private var headerControls: some View {
         InspectorGroupTitle(title: "标题与位置", detail: "标题内容与整块文字的位置在这里调整。")
-        PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
         Toggle("显示标题", isOn: heading.showsTitle)
         if isLianxin {
             Toggle("显示团体摘要", isOn: heading.showsSummary)
@@ -453,9 +452,6 @@ struct WidgetAppearanceEditor: View {
                 heading.wrappedValue.text = String(text.filter { !$0.isNewline }.prefix(40))
             })).textInputAutocapitalization(.never).submitLabel(.done)
             }
-            Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
-            StyleColorControl(title: "标题颜色", value: heading.color)
-            .disabled(editingAppearance.widget.heading.followsTextColor)
             Picker("标题位置", selection: Binding(get: { editingAppearance.widget.heading.horizontalPosition < 0.25 ? 0 : editingAppearance.widget.heading.horizontalPosition > 0.75 ? 2 : 1 }, set: {
                 heading.wrappedValue.horizontalPosition = Double($0) / 2
             })) {
@@ -472,9 +468,17 @@ struct WidgetAppearanceEditor: View {
                 PreciseSlider(title: "标题水平位置", value: heading.horizontalPosition, range: 0...1, standard: 0, precision: 2)
             }
         }
+        PreciseSlider(title: edgeLabel, value: edgeBinding, range: edgeRange, standard: 0)
+        PreciseSlider(title: "标题与正文间距", value: Binding(get: { heading.wrappedValue.contentSpacing ?? max(0, editingAppearance.widget.spacing) }, set: { heading.wrappedValue.contentSpacing = $0 }), range: 0...60, standard: 5)
+        if editingAppearance.widget.heading.showsTitle {
+            Divider()
+            Toggle("标题颜色跟随文字", isOn: heading.followsTextColor)
+            StyleColorControl(title: "标题颜色", value: heading.color)
+            .disabled(editingAppearance.widget.heading.followsTextColor)
+        }
     }
     @ViewBuilder private var textControls: some View {
-        InspectorGroupTitle(title: "文字与可读性", detail: "先选位置与颜色，再细调字体和护字效果。")
+        InspectorGroupTitle(title: "文字与可读性", detail: "上方选择排版，下方调整尺寸、间距和颜色。")
         InspectorChoice(title: "文字位置") {
             Picker("文字位置", selection: readableAnchor) {
                 ForEach(TextAnchor.allCases) { Text($0.title).tag($0) }
@@ -485,40 +489,37 @@ struct WidgetAppearanceEditor: View {
                 ForEach(ReadabilityIntensity.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented)
         }
-        Toggle("文字跟随系统", isOn: widget.followsSystemText)
-        StyleColorControl(title: "文字色", value: widget.textColor)
-            .disabled(editingAppearance.widget.followsSystemText)
-        if advanced {
-            PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
-            if hasVisibleMarker { PreciseSlider(title: "标记与文字间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
-        } else {
-            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.widgetScale, standard: 1, precision: 2)
-        }
         InspectorChoice(title: "字重") {
             Picker("字重", selection: widget.weight) { ForEach(WallpaperWeight.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         }
         InspectorChoice(title: "字体") {
             Picker("字体", selection: widget.font) { ForEach(WallpaperFont.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
         }
-        if advanced {
-            PreciseSlider(title: "行距", value: widget.spacing, range: -10...40, standard: 5)
-        }
-        Toggle("紧凑布局", isOn: widget.compact)
+        Toggle("文字跟随系统", isOn: widget.followsSystemText)
+        Toggle("去掉事项内部留白", isOn: widget.compact)
+        Text("事项间距控制两项之间的距离；内部留白控制每项文字周围的空间。").font(.caption).foregroundStyle(.secondary)
         if !isLianxin {
         Picker("每项文字行数", selection: Binding(get: { editingAppearance.widget.maximumTitleLines ?? 0 }, set: { widget.wrappedValue.maximumTitleLines = $0 == 0 ? nil : $0 })) {
             Text("自动").tag(0); Text("1 行").tag(1); Text("2 行").tag(2); Text("3 行").tag(3); Text("4 行").tag(4)
         }.pickerStyle(.menu)
         }
-        if isLianxin && advanced { LianxinTranslationControls(value: lianxinDisplay) }
         if !isLianxin {
         Text("点按后效果").font(.subheadline)
         Picker("点按后效果", selection: Binding(get: { editingAppearance.widget.textCompletion }, set: { widget.wrappedValue.completedTextStyle = $0 })) {
             ForEach(WidgetTextCompletion.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.menu)
-        if editingAppearance.widget.textCompletion == .color {
-            StyleColorControl(title: "完成文字色", value: Binding(get: { editingAppearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
         }
+        Divider()
+        if advanced {
+            PreciseSlider(title: "字号", value: widget.fontSize, range: 12...20, standard: 15)
+            if hasVisibleMarker { PreciseSlider(title: "标记与文字间距", value: widget.markerStyle.gap, range: 0...32, standard: 10) }
+        } else {
+            PreciseSlider(title: "排版缩放", value: layoutScale, range: EditorStandards.widgetScale, standard: 1, precision: 2)
         }
+        if advanced {
+            PreciseSlider(title: "事项间距", value: widget.spacing, range: 0...40, standard: 5)
+        }
+        if isLianxin && advanced { LianxinTranslationControls(value: lianxinDisplay) }
         if advanced {
             PreciseSlider(title: "Scrim 强度", value: scrimBinding, range: 0...0.8, standard: autoScrim, precision: 2)
             Text(settings.scrimOverride == nil
@@ -529,6 +530,14 @@ struct WidgetAppearanceEditor: View {
             Button("全部恢复标准") { resetReadable() }
         } else if settings != ReadableSettings() {
             Text("已使用自定义参数").font(.caption).foregroundStyle(.secondary)
+        }
+        Divider()
+        StyleColorControl(title: "文字色", value: widget.textColor)
+            .disabled(editingAppearance.widget.followsSystemText)
+        if !isLianxin {
+        if editingAppearance.widget.textCompletion == .color {
+            StyleColorControl(title: "完成文字色", value: Binding(get: { editingAppearance.widget.completionColor }, set: { widget.wrappedValue.completedTextColor = $0 }))
+        }
         }
     }
     private var settings: ReadableSettings { editingAppearance.widget.readable }

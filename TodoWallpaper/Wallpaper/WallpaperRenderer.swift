@@ -197,7 +197,7 @@ enum WallpaperRenderer {
             if header.showsSummary { summaryBlock = text(subtitle ?? "", width: metrics.summaryWidth, settings: settings, opacity: 0.7, size: 11, maxLines: 1) }
         }
         let headingHeight = CGFloat(headingMetrics?.height ?? 0)
-        let headingGap = headingHeight > 0 ? itemSpacing : 0
+        let headingGap = headingHeight > 0 ? CGFloat(settings.lianxinHeader?.contentSpacing ?? Double(itemSpacing)) : 0
         let edge = content == nil ? 0 : CGFloat(settings.lianxinEdgeInset ?? 0)
         let empty = filtered.isEmpty ? text(content != nil ? (display.translationDisplay == .translation ? "请在连心补充译文" : "请在连心生成话语") : (sourceItems.isEmpty ? "还没有待办" : "今天的待办都完成了"),
             width: panelWidth - 2 * padding, settings: settings, maxLines: 3) : nil

@@ -90,7 +90,7 @@ struct LianxinView: View {
     private var page: some View {
         scrollContent
             .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemGroupedBackground).onTapGesture { dismissKeyboard() })
+            .background(AppThemeBackground().contentShape(Rectangle()).onTapGesture { dismissKeyboard() })
             .buttonBorderShape(.roundedRectangle(radius: 14))
             .navigationTitle("连心")
             .toolbar {

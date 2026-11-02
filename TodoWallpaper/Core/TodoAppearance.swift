@@ -89,8 +89,10 @@ struct WidgetHeaderAppearance: Codable, Equatable, Sendable {
     /// Position within the available title region, excluding the summary.
     var horizontalPosition: Double = 0
     var topInset: Double = 0
+    var contentSpacing: Double?
     var visibleTitle: Bool { showsTitle && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     func validate() throws {
+        if let contentSpacing, !contentSpacing.isFinite || !(0...60).contains(contentSpacing) { throw AppearanceError.invalidStyle }
         guard text.count <= 40, !text.contains(where: { $0.isNewline }), color.isValid,
               (12...32).contains(fontSize), (0...1).contains(horizontalPosition),
               (0...24).contains(topInset) else { throw AppearanceError.invalidStyle }
@@ -240,6 +242,7 @@ extension TodoAppearance {
             next.widget.backgroundCrop = crop
         }
         if var header = next.widget.header {
+            header.contentSpacing = header.contentSpacing.map { ReadableRules.finiteClamp($0, to: 0...60, fallback: 5) }
             header.color.clampForEditing()
             header.fontSize = ReadableRules.finiteClamp(header.fontSize, to: 12...32, fallback: 17)
             header.horizontalPosition = ReadableRules.finiteClamp(header.horizontalPosition, to: 0...1, fallback: 0)

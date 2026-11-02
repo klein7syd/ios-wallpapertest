@@ -226,6 +226,14 @@ struct MarkerStyleEditor: View {
     var body: some View {
         if controls.visible {
             VStack(alignment: .leading, spacing: 18) {
+                if showsCompletion {
+                    Text("标记点按后效果").font(.subheadline)
+                    Picker("标记点按后效果", selection: completion) {
+                        ForEach(MarkerCompletion.allCases.filter { !(controls.emoji || controls.image) || $0 != .checkShapes }) {
+                            Text($0.title).tag($0)
+                        }
+                    }.pickerStyle(.menu)
+                }
                 if advanced {
                     if controls.emoji { PreciseSlider(title: "Emoji 大小", value: $style.emojiSize, range: 8...48, standard: 22) }
                     else { PreciseSlider(title: controls.image ? "图片大小" : "图形大小", value: $style.size, range: 8...48, standard: 18) }
@@ -241,12 +249,6 @@ struct MarkerStyleEditor: View {
                     if kind == .filled && advanced { StyleColorControl(title: "边框色", value: $style.stroke) }
                 }
                 if showsCompletion {
-                    Text("标记点按后效果").font(.subheadline)
-                    Picker("标记点按后效果", selection: completion) {
-                        ForEach(MarkerCompletion.allCases.filter { !(controls.emoji || controls.image) || $0 != .checkShapes }) {
-                            Text($0.title).tag($0)
-                        }
-                    }.pickerStyle(.menu)
                     if controls.completionEmoji(style.completion) {
                         EmojiEntry(value: $style.completionEmoji)
                         if advanced && !controls.emoji {

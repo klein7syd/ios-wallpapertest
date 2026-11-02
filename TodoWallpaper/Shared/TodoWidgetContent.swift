@@ -70,7 +70,7 @@ struct TodoWidgetContent: View {
             VStack(alignment: .leading, spacing: 0) {
                 if headingMetrics.height > 0 {
                     header(items: items, layout: headingMetrics)
-                    Color.clear.frame(height: metrics.spacing)
+                    Color.clear.frame(height: metrics.headerGap)
                 }
                 if document == nil {
                     Text(error ?? "请先打开 App 完成迁移").font(.system(size: footerUnit)).lineLimit(3)
@@ -253,7 +253,7 @@ struct WidgetContentLayout {
         if document == nil || shown.isEmpty && !items.isEmpty { rows = ceil(footerUnit * 1.3) }
         else if items.isEmpty { rows = lineHeight }
         else { rows = metrics.usedHeight }
-        let textHeight = (header.height > 0 ? header.height + metrics.spacing : 0) + rows
+        let textHeight = (header.height > 0 ? header.height + metrics.headerGap : 0) + rows
             + (metrics.showsFooter ? metrics.footerHeight + metrics.spacing : 0) + annotationHeight
         let geometry = ReadableContentGeometry(canvasHeight: height, textHeight: textHeight)
         return WidgetContentLayout(header: header, metrics: metrics, shown: shown, geometry: geometry,
