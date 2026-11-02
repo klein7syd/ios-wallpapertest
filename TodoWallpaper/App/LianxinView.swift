@@ -27,6 +27,7 @@ struct LianxinView: View {
     @State private var family = WidgetPreviewFamily.small
     @AppStorage("editor.contentMode") private var contentMode = "todo"
     @State private var showsSettings = false
+    @State private var showsLanguage = false
     @State private var selection: PhotosPickerItem?
     @State private var loadingPhoto = false
     @State private var lineIDs = (0..<8).map { _ in UUID() }
@@ -48,21 +49,25 @@ struct LianxinView: View {
                         }
                     }
                     if model.photoSyncPending { Button("重试同步已保存的底图") { Task { await model.retryPhotoSync() } }.disabled(model.busy) }
-                    if model.connected {
-                        Button("已连接：\(model.provider.name) · \(model.profile.model)") { openSettings() }.font(.caption)
-                    } else {
-                        HStack {
-                            Button("连接 AI") { openSettings() }.disabled(!model.loaded || model.busy)
-                        }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }
-                    previews
+                    connectionStatus
                     LianxinRoleView(model: model).disabled(!model.loaded)
-                    LianxinLanguageView(model: model).disabled(!model.loaded)
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField("想听什么？比如：今天很累，想被哄一哄", text: limited(\.prompt, 12000), axis: .vertical).lineLimit(4...10).focused($focused, equals: .prompt)
-                        Text("像平常聊天一样写就好，语气和表达会由连心整理。").font(.caption).foregroundStyle(.secondary)
+                        Label("想听什么", systemImage: "text.bubble").font(.headline)
+                        TextField("比如：今天很累，想被哄一哄", text: limited(\.prompt, 12000), axis: .vertical)
+                            .lineLimit(3...10).focused($focused, equals: .prompt)
+                        Text("像平常聊天一样写就好。").font(.caption).foregroundStyle(.secondary)
+                        DisclosureGroup(isExpanded: $showsLanguage) {
+                            LianxinLanguageView(model: model).padding(.top, 8)
+                        } label: {
+                            HStack {
+                                Label("语言与翻译", systemImage: "globe").font(.subheadline)
+                                Spacer()
+                                Text(languageSummary).font(.caption).foregroundStyle(.secondary)
+                            }.frame(minHeight: 44)
+                        }
                     }.textFieldStyle(LianxinFieldStyle()).disabled(!model.loaded || model.busy)
                     actions
+                    if let notice = model.notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
                     if !model.profile.message.isEmpty || model.currentContent != nil {
                         outputControls
                         HStack {
@@ -75,11 +80,7 @@ struct LianxinView: View {
                             }
                         }.disabled(!model.loaded || !canOutput || model.busy)
                     }
-                    if store.appearance.lianxin?.backgroundPhotoName != nil {
-                        Button("移除底图", role: .destructive) { Task { await model.setPhoto(nil) } }
-                            .frame(minHeight: 44).disabled(model.busy || loadingPhoto)
-                    }
-                    if let notice = model.notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
+                    appearanceSection
                     Text("连心里的话语由 AI 创作，不代表任何真实人物的真实言论。生成时仅用名字和团体查找公开 Wiki；资料摘要会交给你选择的 AI，照片不会上传。")
                         .font(.caption).foregroundStyle(.secondary).padding(14)
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -115,11 +116,17 @@ struct LianxinView: View {
     }
 
     private var outputControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("你的话语", systemImage: "quote.bubble").font(.headline)
+                Spacer()
+                Text("\(editableRows.count) 句 · 可直接编辑").font(.caption).foregroundStyle(.secondary)
+            }
             ForEach(editableRows) { row in
                 let index = row.index
                 let line = row.line
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("第 \(index + 1) 句").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     TextField("话语 \(index + 1)", text: lineBinding(index, translation: false), axis: .vertical)
                         .lineLimit(2...8).textFieldStyle(LianxinFieldStyle()).focused($focused, equals: .message(row.id))
                     if model.profile.translationEnabled == true {
@@ -137,7 +144,8 @@ struct LianxinView: View {
                         Text(line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "请填写这句话语；暂未同步。" : line.text.count > 200 ? "这句原文超过200字，请缩短后同步。" : "这句译文超过200字，请缩短后同步。")
                             .font(.caption).foregroundStyle(.red)
                     }
-                }
+                }.padding(14)
+                    .background(Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
             if model.canUndoContentEdit {
                 Button("撤销删除或恢复上一批", systemImage: "arrow.uturn.backward") { focused = nil; model.undoContentEdit() }.frame(minHeight: 44)
@@ -149,12 +157,6 @@ struct LianxinView: View {
             } else if let date = model.syncedAt {
                 Text("已保存并请求小组件刷新 · " + date.formatted(date: .omitted, time: .standard)).font(.caption2).foregroundStyle(.tertiary)
             }
-            Button { openEditor(.wallpaper) } label: {
-                Label("去调整壁纸样式", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 44)
-            }.buttonStyle(.bordered).disabled(!canOutput)
-            Button { openEditor(.widget) } label: {
-                Label("去调整小组件样式", systemImage: "square.grid.2x2").frame(maxWidth: .infinity, minHeight: 44)
-            }.buttonStyle(.bordered)
         }.disabled(!model.loaded || model.busy || loadingPhoto)
     }
 
@@ -189,7 +191,7 @@ struct LianxinView: View {
     private func openEditor(_ page: AppPage) { contentMode = "lianxin"; navigation.selectPage(page) }
     private var previews: some View {
         Group {
-            if family != .small || typeSize.isAccessibilitySize { VStack(spacing: 16) { wallpaperPreview; widgetPreview } }
+            if family != .small || typeSize >= .xxxLarge { VStack(spacing: 16) { wallpaperPreview; widgetPreview } }
             else { ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 12) { wallpaperPreview.frame(width: 140); widgetPreview.frame(width: 170) }
                 VStack(spacing: 16) { wallpaperPreview; widgetPreview }
@@ -198,10 +200,12 @@ struct LianxinView: View {
     }
     private var wallpaperPreview: some View {
         VStack {
-            Text("壁纸预览").font(.headline)
+            Text("壁纸").font(.subheadline.weight(.medium))
             WallpaperLiveCanvas(model: wallpaper, editsBackground: false, editable: false).frame(height: 280)
                 .onTapGesture { openEditor(.wallpaper) }
-            Button("调整壁纸") { openEditor(.wallpaper) }
+            Button { openEditor(.wallpaper) } label: {
+                Label("调整壁纸", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity, minHeight: 44)
+            }.buttonStyle(.bordered).disabled(!canOutput)
         }
     }
     private var widgetPreview: some View {
@@ -219,7 +223,9 @@ struct LianxinView: View {
                     .frame(width: family.width * scale, height: family.height * scale)
                     .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
             }.frame(height: family == .large ? 280 : 170).contentShape(Rectangle()).onTapGesture { openEditor(.widget) }
-            Button("调整小组件") { openEditor(.widget) }
+            Button { openEditor(.widget) } label: {
+                Label("调整小组件", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity, minHeight: 44)
+            }.buttonStyle(.bordered)
         }
     }
     private var previewItems: [TodoItem] { WallpaperContentSource.lianxin(model.publication).items }
@@ -241,14 +247,10 @@ struct LianxinView: View {
             generationLayout {
                 countControl
                 Button { dismissKeyboard(); if model.connected { model.generate() } else { openSettings() } } label: {
-                    Text(!model.connected ? "连接 AI" : model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, minHeight: 64)
+                    Text(!model.connected ? "连接 AI" : model.profile.resolvedLines.isEmpty ? "生成话语" : "重新生成").frame(minWidth: 70, maxWidth: .infinity, minHeight: 52)
                 }.buttonStyle(.borderedProminent).buttonBorderShape(.roundedRectangle(radius: 18)).disabled(!model.loaded || model.busy || loadingPhoto)
             }
-            HStack {
-                PhotosPicker(selection: $selection, matching: .images) { Label("底图", systemImage: "photo").frame(minHeight: 44) }
-                    .buttonStyle(.bordered).disabled(!model.loaded || model.busy || loadingPhoto)
-                if model.isGenerating { Button("取消生成") { model.cancel() }.frame(minHeight: 44) }
-            }
+            if model.isGenerating { Button("取消生成") { model.cancel() }.frame(minHeight: 44) }
         }.padding(16).frame(maxWidth: .infinity)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -271,6 +273,49 @@ struct LianxinView: View {
         }.padding(10).frame(maxWidth: .infinity)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .disabled(model.busy || loadingPhoto)
+    }
+
+    private var languageSummary: String {
+        let source = LianxinLanguageRules.source(model.profile)
+        return model.profile.translationEnabled == true ? source + " → " + LianxinLanguageRules.target(model.profile) : source
+    }
+    private var connectionStatus: some View {
+        Button { openSettings() } label: {
+            HStack(spacing: 12) {
+                Image(systemName: model.connected ? "checkmark.circle.fill" : "link")
+                    .foregroundStyle(model.connected ? Color.green : Color.accentColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.connected ? model.provider.name + " · 已连接" : "连接你的 AI").font(.subheadline.weight(.semibold))
+                    Text(model.connected ? model.profile.model : "首次使用，先选择服务商并填写密钥")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }.buttonStyle(.plain).disabled(!model.loaded || model.busy || loadingPhoto)
+    }
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("外观预览", systemImage: "paintpalette").font(.headline)
+            previews
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { photoControls }
+                VStack(alignment: .leading, spacing: 8) { photoControls }
+            }
+        }.padding(16)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .disabled(!model.loaded || model.busy || loadingPhoto)
+    }
+    @ViewBuilder private var photoControls: some View {
+        PhotosPicker(selection: $selection, matching: .images) {
+            Label(store.appearance.lianxin?.backgroundPhotoName == nil ? "选择底图" : "更换底图", systemImage: "photo")
+                .frame(minHeight: 44)
+        }.buttonStyle(.bordered)
+        if store.appearance.lianxin?.backgroundPhotoName != nil {
+            Button("移除底图", role: .destructive) { Task { await model.setPhoto(nil) } }.frame(minHeight: 44)
+        }
     }
 
     private var settings: some View {

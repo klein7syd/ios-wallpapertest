@@ -162,6 +162,7 @@ struct TodoListView: View {
                             perform { try store.move(from: offsets, to: destination) }
                         }
                     }
+                    .listStyle(.insetGrouped)
                     .overlay {
                         if store.items.isEmpty {
                             ContentUnavailableView("还没有待办", systemImage: "checklist", description: Text("点下方“新增待办”，记下第一件事。"))
@@ -184,6 +185,7 @@ struct TodoListView: View {
                     Label("新增待办", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 18))
                 .disabled(!store.hasLoaded || store.loadError != nil)
                 .padding(.horizontal, 16).padding(.vertical, 8)
                 .background(.bar)
@@ -215,7 +217,7 @@ struct TodoListView: View {
             } label: {
                 TodoMarkerView(marker: store.appearance.marker(for: item), completed: item.isCompleted,
                                style: store.appearance.markerStyle)
-                    .frame(minWidth: 24, minHeight: 32)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)

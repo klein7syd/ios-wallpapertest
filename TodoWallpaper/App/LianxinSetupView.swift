@@ -29,7 +29,7 @@ struct LianxinSetupView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                progress
+                if step != .connected { progress }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title).font(.title2.bold())
                     Text(detail).font(.subheadline).foregroundStyle(.secondary)
@@ -53,12 +53,16 @@ struct LianxinSetupView: View {
                         Button("取消测试") { connectionTask?.cancel() }.frame(minHeight: 44)
                     }
                 }
-                navigation
                 Text("由你的服务商按用量计费，本 App 不收费，也不会上传你的照片。密钥只保存在本机钥匙串。")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(20)
         }
         .background(Color(uiColor: .systemGroupedBackground).onTapGesture { focused = nil })
+        .safeAreaInset(edge: .bottom) {
+            if step != .provider && focused == nil {
+                navigation.padding(.horizontal, 20).padding(.vertical, 12).background(.bar)
+            }
+        }
         .scrollDismissesKeyboard(.interactively)
         .buttonStyle(.plain)
         .buttonBorderShape(.roundedRectangle(radius: 16))
