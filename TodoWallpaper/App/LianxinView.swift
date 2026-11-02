@@ -309,8 +309,9 @@ struct LianxinView: View {
             .disabled(!model.loaded || model.busy || loadingPhoto)
     }
     @ViewBuilder private var photoControls: some View {
+        let hasPhoto = store.appearance.lianxin?.backgroundPhotoName != nil
         PhotosPicker(selection: $selection, matching: .images) {
-            Label(store.appearance.lianxin?.backgroundPhotoName == nil ? "选择底图" : "更换底图", systemImage: "photo")
+            Label(hasPhoto ? "更换底图" : "选择底图", systemImage: "photo")
                 .frame(minHeight: 44)
         }.buttonStyle(.bordered)
         if store.appearance.lianxin?.backgroundPhotoName != nil {
