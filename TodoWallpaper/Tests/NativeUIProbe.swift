@@ -236,8 +236,10 @@ enum NativeUIProbe {
             var independent = TodoAppearance(); independent.defaultMarker = TodoMarker(kind: .square)
             independent.widget.markerOverride = TodoMarker(kind: .emoji, emoji: "🌙")
             editor.updateAppearance(independent)
+            await editor.waitForPreviewLayout()
             try require(editor.layout?.rows.first?.marker.kind == .square, "Live model draws edited wallpaper marker despite task/Widget overrides")
             editor.settings.usesTaskMarkers = true
+            await editor.waitForPreviewLayout()
             try require(editor.layout?.rows.first?.marker.emoji == "❤️", "Live model restores preserved individual Emoji")
             try await editor.restoreEditorState(settings: initialSettings, photoName: initialName)
             editor.updateItems([]); editor.updateAppearance(TodoAppearance()); await editor.saveNow()

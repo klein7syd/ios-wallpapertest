@@ -306,8 +306,11 @@ final class WallpaperEditorModel: ObservableObject {
         }
     }
 
+    func waitForPreviewLayout() async { await layoutTask?.value }
+
     func export(saveToPhotos: Bool) async {
         guard ready, !busy, !draftBlocked else { return }
+        await waitForPreviewLayout()
         if let issue = layout?.lianxinIssue { message = issue.localizedDescription; return }
         isExporting = true; needsPhotoPermission = false
         previewTask?.cancel(); isRendering = false
