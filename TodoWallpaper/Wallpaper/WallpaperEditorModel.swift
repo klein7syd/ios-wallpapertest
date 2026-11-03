@@ -20,6 +20,7 @@ final class WallpaperEditorModel: ObservableObject {
     @Published private(set) var layout: WallpaperLayout?
     @Published private(set) var appearance = TodoAppearance()
     @Published private(set) var lianxinContent: LianxinPublication?
+    private var layoutTask: Task<Void, Never>?
     private var layoutContent: LianxinPublication?
     private var layoutKey: WallpaperSettings?
     private var layoutItems: [TodoItem] = []
@@ -47,6 +48,7 @@ final class WallpaperEditorModel: ObservableObject {
     private var wantsExactPreview = false
     private var blurTask: Task<Void, Never>?
     private var blurKey = ""
+    private var pendingBlur: (WallpaperLivePhoto, WallpaperSettings, String?)?
     private var appliedSharedPhoto: String?
     private var hasAppliedSharedPhoto = false
     private var requestedSharedPhoto: String?
@@ -241,16 +243,29 @@ final class WallpaperEditorModel: ObservableObject {
         }
     }
 
+    private var needsLayout: Bool {
+        layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle || layoutContent != lianxinContent || (lianxinContent != nil && layoutAppearance.widget != appearance.widget)
+    }
+
     private func schedulePreview() {
         scheduleLiveBlur()
         // Background/position/blur/tint changes do NOT reshape text or regenerate pixels.
-        if layoutKey != settings.glyphKey || layoutItems != items || layoutAppearance.defaultMarker != appearance.defaultMarker || layoutAppearance.markerStyle != appearance.markerStyle || layoutContent != lianxinContent || (lianxinContent != nil && layoutAppearance.widget != appearance.widget) {
-            do {
-                let span = EditorModePerformance.beginStage("WallpaperTextLayout"); defer { EditorModePerformance.endStage("WallpaperTextLayout", span) }
-                layout = try WallpaperRenderer.layout(settings: settings.glyphKey, items: items, appearance: appearance, content: lianxinContent)
-                layoutContent = lianxinContent
-                layoutKey = settings.glyphKey; layoutItems = items; layoutAppearance = appearance; previewError = nil
-            } catch { previewError = error.localizedDescription }
+        if layoutTask == nil && needsLayout {
+            layoutTask = Task { [weak self] in
+                guard let self else { return }
+                defer { self.layoutTask = nil }
+                while self.needsLayout {
+                    let key = self.settings.glyphKey, tasks = self.items
+                    let look = self.appearance, content = self.lianxinContent
+                    do {
+                        let measured = try await self.renderer.measure(settings: key, items: tasks, appearance: look, content: content)
+                        self.layout = measured
+                        self.layoutKey = key; self.layoutItems = tasks
+                        self.layoutAppearance = look; self.layoutContent = content
+                        self.previewError = nil
+                    } catch { self.previewError = error.localizedDescription; break }
+                }
+            }
         }
         previewTask?.cancel()
         // Ordinary editing uses native photo/text layers. Render the poster bitmap
@@ -272,18 +287,22 @@ final class WallpaperEditorModel: ObservableObject {
     }
 
     private func scheduleLiveBlur() {
-        guard let photo = livePhoto else { blurTask?.cancel(); blurKey = ""; liveBlurPhoto = nil; return }
+        guard let photo = livePhoto else { pendingBlur = nil; blurKey = ""; liveBlurPhoto = nil; return }
         let key = "\(photoName ?? ""):\(settings.blurRadius):\(settings.backgroundZoom):\(settings.aspectRatio)"
         guard key != blurKey else { return }
-        blurKey = key; blurTask?.cancel()
-        let snapshot = settings
-        blurTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(140)); try Task.checkCancellation()
-                let image = try await renderer.liveBlur(photo: photo, settings: snapshot)
-                try Task.checkCancellation(); liveBlurPhoto = image
-            } catch is CancellationError { }
-            catch { /* Live texture is an approximation; exact export reports real failures. */ }
+        blurKey = key
+        pendingBlur = (photo, settings, photoName)
+        guard blurTask == nil else { return }
+        blurTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.blurTask = nil }
+            while let request = self.pendingBlur {
+                self.pendingBlur = nil
+                do {
+                    let image = try await self.renderer.liveBlur(photo: request.0, settings: request.1)
+                    if self.livePhoto != nil && self.photoName == request.2 { self.liveBlurPhoto = image }
+                } catch { /* 精确导出沿用独立错误提示。 */ }
+            }
         }
     }
 

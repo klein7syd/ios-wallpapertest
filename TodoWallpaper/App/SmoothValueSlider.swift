@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// 原生滑块独立跟手；短暂停顿预览，释放时提交最终值。
+// 原生滑块独立跟手，每个显示帧发布最新值，释放时提交最终值。
 // CADisplayLink只取最新采样，不排队重放过期触控。
 struct SmoothValueSlider: UIViewRepresentable {
     @Binding var value: Double
@@ -27,13 +27,11 @@ struct SmoothValueSlider: UIViewRepresentable {
         private(set) var active = false
         private var pending: Double?
         private var link: CADisplayLink?
-        private var lastInput: CFTimeInterval = 0
-        private let previewQuietInterval: CFTimeInterval = 0.16
         private let proxy = FrameProxy()
         init(value: Binding<Double>, editing: @escaping (Bool) -> Void) { self.value = value; self.editing = editing; super.init(); proxy.owner = self }
         @objc func begin() {
             guard !active else { return }
-            active = true; lastInput = CACurrentMediaTime()
+            active = true
             editing(true)
             let display = CADisplayLink(target: proxy, selector: #selector(FrameProxy.frame))
             display.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
@@ -41,12 +39,11 @@ struct SmoothValueSlider: UIViewRepresentable {
         }
         @objc func changed(_ slider: UISlider) {
             pending = Double(slider.value)
-            lastInput = CACurrentMediaTime()
             if !slider.isTracking { flush() } // VoiceOver and keyboard adjustments.
         }
         func publishPreview() {
-            // 连续拖动不发布到整棵SwiftUI树；短暂停顿才预览，松手始终提交。
-            guard pending != nil, CACurrentMediaTime() - lastInput >= previewQuietInterval else { return }
+            // 合并同一显示帧内的触控采样，不等待手指停顿。
+            guard pending != nil else { return }
             flush()
         }
 

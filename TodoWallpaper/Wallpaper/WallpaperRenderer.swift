@@ -489,6 +489,9 @@ struct WallpaperLivePhoto: @unchecked Sendable {
     let info: WallpaperPhotoInfo
 }
 actor WallpaperRenderService {
+    func measure(settings: WallpaperSettings, items: [TodoItem], appearance: TodoAppearance, content: LianxinPublication?) throws -> WallpaperLayout {
+        try WallpaperRenderer.layout(settings: settings, items: items, appearance: appearance, content: content)
+    }
     private let context = CIContext(options: [.cacheIntermediates: false])
     func loadPhoto(at url: URL) throws -> WallpaperLivePhoto {
         let info = try WallpaperRenderer.photoInfo(at: url)

@@ -28,7 +28,8 @@ final class EditorUndoState<Value: Equatable>: ObservableObject {
     var canUndo: Bool { hasUndo && !isRestoring }
     private func updateAvailability() {
         if hasUndo != history.canUndo { hasUndo = history.canUndo }
-        retainedValuesChanged(history.retainedValues)
+        // 数值滑条不会更换照片引用，避免每帧扫描全部撤销快照。
+        if activeKey?.hasPrefix("slider.") != true { retainedValuesChanged(history.retainedValues) }
     }
     func synchronize(_ value: Value) {
         settle?.cancel(); settle = nil; activeKey = nil
@@ -38,6 +39,7 @@ final class EditorUndoState<Value: Equatable>: ObservableObject {
     func finish(_ value: Value) {
         settle?.cancel(); settle = nil
         observe(value); history.endInteraction(); activeKey = nil
+        updateAvailability()
     }
     func context(read: @escaping () -> Value) -> EditorInteractionContext {
         EditorInteractionContext(begin: { [weak self] key in
